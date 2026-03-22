@@ -1,4 +1,5 @@
 using STS2_Editor.Scripts.Editor.Core.Models;
+using STS2_Editor.Scripts.Editor.Graph;
 using STS2_Editor.Scripts.Editor.Packaging;
 
 namespace STS2_Editor.Scripts.Editor.Runtime;
@@ -8,6 +9,8 @@ public sealed class EditorRuntimeRegistry
     private readonly PackageArchiveService _archiveService;
     private readonly EditorPackageStore _packageStore;
     private readonly RuntimePackageBackend _backend;
+
+    public event Action<RuntimeOverrideResolutionResult>? ResolutionChanged;
 
     public EditorRuntimeRegistry(PackageArchiveService archiveService, EditorPackageStore packageStore)
     {
@@ -27,6 +30,7 @@ public sealed class EditorRuntimeRegistry
     public void Initialize()
     {
         _backend.Initialize();
+        RaiseResolutionChanged();
     }
 
     public void SetSessionStates(IEnumerable<PackageSessionState> states)
@@ -43,23 +47,27 @@ public sealed class EditorRuntimeRegistry
 
         _packageStore.SaveSessionStates(normalized);
         _backend.RebuildFromInstalledPackages();
+        RaiseResolutionChanged();
     }
 
     public void Refresh()
     {
         _backend.RebuildFromInstalledPackages();
+        RaiseResolutionChanged();
     }
 
     public PackageInstallResult ImportPackage(string packageFilePath, bool enabledByDefault = true)
     {
         var result = _packageStore.InstallPackage(packageFilePath, enabledByDefault);
         _backend.RebuildFromInstalledPackages();
+        RaiseResolutionChanged();
         return result;
     }
 
     public void EnablePackage(string packageKey, bool enabled)
     {
         _backend.EnablePackage(packageKey, enabled);
+        RaiseResolutionChanged();
     }
 
     public bool MovePackage(string packageKey, int direction)
@@ -106,11 +114,31 @@ public sealed class EditorRuntimeRegistry
 
     public PackageSessionNegotiationResult Negotiate(IEnumerable<RemotePeerPackageSnapshot> peerSnapshots)
     {
-        return _backend.NegotiateSession(peerSnapshots);
+        var result = _backend.NegotiateSession(peerSnapshots);
+        RaiseResolutionChanged();
+        return result;
     }
 
     public bool TryGetOverride(ModStudioEntityKind kind, string entityId, out EntityOverrideEnvelope? envelope)
     {
-        return _backend.TryGetOverride(kind, entityId, out envelope);
+        var resolvedEntityId = ModStudioBootstrap.RuntimeDynamicContentRegistry.ResolveEditorEntityId(kind, entityId);
+        return _backend.TryGetOverride(kind, resolvedEntityId, out envelope);
+    }
+
+    public bool TryGetGraph(string graphId, out BehaviorGraphDefinition? graph)
+    {
+        if (LastResolution.Graphs.TryGetValue(graphId, out var resolved))
+        {
+            graph = resolved;
+            return true;
+        }
+
+        graph = null;
+        return false;
+    }
+
+    private void RaiseResolutionChanged()
+    {
+        ResolutionChanged?.Invoke(LastResolution);
     }
 }

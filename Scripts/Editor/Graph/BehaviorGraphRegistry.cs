@@ -17,6 +17,7 @@ public sealed class BehaviorGraphRegistry
     public void RegisterBuiltIns()
     {
         RegisterProvider(new BuiltInBehaviorNodeDefinitionProvider());
+        BuiltInBehaviorNodeExecutors.RegisterInto(this);
     }
 
     public void RegisterProvider(IBehaviorNodeDefinitionProvider provider)

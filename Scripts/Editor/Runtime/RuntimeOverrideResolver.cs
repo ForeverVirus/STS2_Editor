@@ -10,6 +10,7 @@ public sealed class RuntimeOverrideResolver
         IReadOnlyCollection<PackageSessionState> sessionStates)
     {
         var result = new RuntimeOverrideResolutionResult();
+        var conflictMap = new Dictionary<RuntimeEntityKey, PackageOverrideConflict>();
         var packageLookup = installedPackages
             .ToDictionary(package => package.PackageKey, StringComparer.Ordinal);
         var orderedStates = sessionStates
@@ -30,6 +31,7 @@ public sealed class RuntimeOverrideResolver
             foreach (var envelope in package.Project.Overrides)
             {
                 var key = new RuntimeEntityKey(envelope.EntityKind, envelope.EntityId);
+                TrackConflict(conflictMap, key, state);
                 result.SetOverride(key, CloneEnvelope(envelope));
             }
 
@@ -44,7 +46,36 @@ public sealed class RuntimeOverrideResolver
             }
         }
 
+        foreach (var conflict in conflictMap.Values.Where(conflict => conflict.Participants.Count > 1))
+        {
+            result.AddConflict(conflict);
+        }
+
         return result;
+    }
+
+    private static void TrackConflict(
+        IDictionary<RuntimeEntityKey, PackageOverrideConflict> conflictMap,
+        RuntimeEntityKey key,
+        PackageSessionState state)
+    {
+        if (!conflictMap.TryGetValue(key, out var conflict))
+        {
+            conflict = new PackageOverrideConflict
+            {
+                EntityKind = key.Kind,
+                EntityId = key.EntityId
+            };
+            conflictMap[key] = conflict;
+        }
+
+        conflict.AddParticipant(new PackageOverrideConflictParticipant
+        {
+            PackageKey = state.PackageKey,
+            DisplayName = state.DisplayName,
+            LoadOrder = state.LoadOrder
+        });
+        conflict.WinningPackageKey = state.PackageKey;
     }
 
     private static EntityOverrideEnvelope CloneEnvelope(EntityOverrideEnvelope source)

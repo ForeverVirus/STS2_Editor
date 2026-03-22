@@ -47,17 +47,29 @@ public sealed class EditorPackageStore
 
     public PackageInstallResult InstallPackage(string packageFilePath, bool enabledByDefault = true)
     {
-        if (!_archiveService.TryImport(packageFilePath, out var manifest, out _ ) || manifest is null)
+        if (!_archiveService.TryImport(packageFilePath, out var manifest, out var importedProject) ||
+            manifest is null ||
+            importedProject is null)
         {
             throw new InvalidOperationException($"Package archive '{packageFilePath}' could not be imported.");
         }
 
         Directory.CreateDirectory(InstalledPackagesRootPath);
 
-        var normalizedFileName = PackagingPathUtility.NormalizeFileName($"{manifest.PackageKey}.sts2pack");
-        var destinationPath = Path.Combine(InstalledPackagesRootPath, normalizedFileName);
-        var replacedExistingInstall = File.Exists(destinationPath);
-        File.Copy(packageFilePath, destinationPath, overwrite: true);
+        var destinationPath = ModStudioPaths.GetInstalledPackageDirectory(manifest.PackageKey);
+        var replacedExistingInstall = Directory.Exists(destinationPath);
+        if (Directory.Exists(destinationPath))
+        {
+            Directory.Delete(destinationPath, recursive: true);
+        }
+
+        Directory.CreateDirectory(destinationPath);
+
+        var normalizedProject = _archiveService.NormalizeImportedProject(manifest, importedProject);
+        _archiveService.ExtractManagedAssets(packageFilePath, manifest, normalizedProject);
+
+        ModStudioJson.Save(Path.Combine(destinationPath, "manifest.json"), manifest);
+        ModStudioJson.Save(Path.Combine(destinationPath, "project.json"), normalizedProject);
 
         var states = LoadSessionStates().ToList();
         var existing = states.FirstOrDefault(state => string.Equals(state.PackageKey, manifest.PackageKey, StringComparison.Ordinal));
@@ -71,11 +83,11 @@ public sealed class EditorPackageStore
             states.Add(existing);
         }
 
-        existing.PackageId = manifest.PackageId;
-        existing.DisplayName = manifest.DisplayName;
-        existing.Version = manifest.Version;
-        existing.Checksum = manifest.Checksum;
-        existing.PackageFilePath = destinationPath;
+            existing.PackageId = manifest.PackageId;
+            existing.DisplayName = manifest.DisplayName;
+            existing.Version = manifest.Version;
+            existing.Checksum = manifest.Checksum;
+            existing.PackageFilePath = destinationPath;
         existing.Enabled = enabledByDefault;
         existing.SessionEnabled = enabledByDefault;
         existing.DisabledReason = string.Empty;

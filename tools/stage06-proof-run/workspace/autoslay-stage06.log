@@ -1,0 +1,179 @@
+MegaDot v4.5.1.m.8.mono.custom_build - https://godotengine.org
+D3D12 12_0 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4060
+WARNING: PSO caching is not implemented yet in the Direct3D 12 driver.
+   at: pipeline_cache_create (drivers/d3d12/rendering_device_driver_d3d12.cpp:4467)
+
+FMOD Sound System: Successfully initialized
+[INFO] Found release_info.json at: F:\SteamLibrary\steamapps\common\Slay the Spire 2\release_info.json
+[INFO] [Sentry.NET] Initialized: env=playtesters, release=v0.99.1
+[INFO] Steamworks: attempting initialization...
+[INFO] Steam is running: True
+[INFO] Steamworks initialization succeeded!
+[INFO] Steam is enabled, we will write saves to steam storage. Enabled for account: True, app: True 
+[INFO] Registered 8 migrations
+[INFO] Current save versions: PrefsSave v2; ProfileSave v2; SerializableProgress v21; RunHistory v8; SerializableRun v14; SettingsSave v5
+[INFO] Syncing cloud save files to the local save directory
+[WARN] Asset not cached: res://scenes/cards/card.tscn
+[WARN] Asset not cached: res://scenes/cards/holders/grid_card_holder.tscn
+[INFO] AtlasManager: Loaded ui_atlas with 102 sprites
+[INFO] AtlasManager: Loaded compressed with 45 sprites
+[INFO] Found mod manifest file F:\SteamLibrary\steamapps\common\Slay the Spire 2\mods\STS2_Editor\STS2_Editor.json
+[ERROR] Mod STS2_Editor lists dependency  which was not found! Mod may not function correctly
+   at MegaCrit.Sts2.Core.Modding.ModManager.SortModList(List`1 manualOrdering)
+   at MegaCrit.Sts2.Core.Modding.ModManager.Initialize(IModManagerFileIo fileIo, ModSettings settings)
+   at MegaCrit.Sts2.Core.Helpers.OneTimeInitialization.ExecuteEssential()
+   at MegaCrit.Sts2.Core.Nodes.NGame.GameStartup()
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at MegaCrit.Sts2.Core.Nodes.NGame.GameStartup()
+   at MegaCrit.Sts2.Core.Nodes.NGame.GameStartupWrapper()
+   at System.Runtime.CompilerServices.AsyncMethodBuilderCore.Start[TStateMachine](TStateMachine& stateMachine)
+   at MegaCrit.Sts2.Core.Nodes.NGame.GameStartupWrapper()
+   at MegaCrit.Sts2.Core.Nodes.NGame._EnterTree()
+   at Godot.Node.InvokeGodotClassMethod(godot_string_name& method, NativeVariantPtrArgs args, godot_variant& ret)
+   at Godot.CanvasItem.InvokeGodotClassMethod(godot_string_name& method, NativeVariantPtrArgs args, godot_variant& ret)
+   at Godot.Control.InvokeGodotClassMethod(godot_string_name& method, NativeVariantPtrArgs args, godot_variant& ret)
+   at MegaCrit.Sts2.Core.Nodes.NGame.InvokeGodotClassMethod(godot_string_name& method, NativeVariantPtrArgs args, godot_variant& ret)
+   at Godot.Bridge.CSharpInstanceBridge.Call(IntPtr godotObjectGCHandle, godot_string_name* method, godot_variant** args, Int32 argCount, godot_variant_call_error* refCallError, godot_variant* ret)
+
+[INFO] Loading assembly DLL F:\SteamLibrary\steamapps\common\Slay the Spire 2\mods\STS2_Editor\STS2_Editor.dll
+[INFO] Calling initializer method of type STS2_Editor.Scripts.Entry for STS2_Editor, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
+[INFO] Mod Studio bootstrap initialized.
+[INFO] Finished mod initialization for 'STS2_Editor' (STS2_Editor).
+[INFO]  --- RUNNING MODDED! --- Loaded 1 mods (1 total)
+[INFO] Loading locale path=res://localization/eng
+[INFO] Loading locale path=res://localization/zhs
+[INFO] ModelIdSerializationCache initialized. Categories: 19 Entries: 1598 Epochs: 57 Hash: 2448633481
+[Sentry.GDExtension] Initialized: env=playtesters, release=v0.99.1
+[INFO] AtlasManager: Loaded epoch_atlas with 57 sprites
+[INFO] AtlasManager: Loaded relic_atlas with 336 sprites
+[INFO] AtlasManager: Loaded relic_outline_atlas with 336 sprites
+[INFO] AtlasManager: Loaded power_atlas with 268 sprites
+[INFO] AtlasManager: Loaded card_atlas with 840 sprites
+[INFO] AtlasManager: Loaded potion_atlas with 63 sprites
+[INFO] AtlasManager: Loaded potion_outline_atlas with 63 sprites
+[INFO] AtlasManager: Loaded stats_screen_atlas with 16 sprites
+[INFO] AtlasManager: Loaded intent_atlas with 310 sprites
+[INFO] AtlasManager: Loaded era_atlas with 27 sprites
+[INFO] Profile-scoped data path initialized: user://steam/76561198048368656/modded/profile1
+[INFO] [Sentry.NET] Platform branch: public, sample rate: 10%
+[INFO] AtlasManager: Loaded controller_atlas with 112 sprites
+[INFO] Applying display settings...
+  FULLSCREEN: False
+  ASPECT_RATIO: (SixteenByNine)
+  TARGET_DISPLAY: (0)
+  WINDOW_SIZE: (1920, 1061)
+  POSITION: (0, 0)
+[INFO] [Display] Min size: (64, 64) Max size: (16384, 16384)
+[INFO] Window changed! New size: (1920, 1061)
+[INFO] [Display] Attempting WINDOWED mode on Display 1 of 2 at position (0, 0)
+[INFO] [Display] SUCCESS: (1920, 1061) Windowed mode in Display 0: Position (0, 0) ((0, 0))
+[INFO] [Display] New size: (1920, 1061) position: (0, 0)
+[INFO] VSync: Adaptive
+[INFO] Wrote 2397 bytes to path=user://steam/76561198048368656/settings.save save_dir=user://steam/76561198048368656
+[INFO] Wrote 2397 bytes to settings.save in steam remote store
+[INFO] === Godot OS Debug Information ===
+Timestamp: 2026/3/23 星期一 4:23:05
+OS: Windows
+OS Version: 10.0.19045
+Distribution Name: Windows
+Device Model: MS-7B89
+Is Debug Build: False
+Is Sandboxed: False
+Executable Path: F:/SteamLibrary/steamapps/common/Slay the Spire 2/SlayTheSpire2.exe
+Data Directory: C:/Users/Administrator/AppData/Roaming
+User Data Directory: C:/Users/Administrator/AppData/Roaming/SlayTheSpire2
+Command Line Args: --autoslay --seed stage06-proof
+User Command Line Args: 
+OS Locale: zh_CN
+OS Language: zh
+Game Locale: zh_CN
+Is UserFS Persistent: True
+Is Stdout Verbose: False
+Is Low Processor Usage Mode: False
+Architecture: x86_64
+Engine Version: 4.5.1-m.8 (custom_build)
+Is Editor: False
+Release Version: v0.99.1
+Release Commit: 7ac1f450
+Release Date: 2026/3/14 星期六 3:40:28
+Processor Count: 12
+Processor Name: AMD Ryzen 5 3600 6-Core Processor
+Rendering device name: NVIDIA GeForce RTX 4060
+  Graphics adapter 0: NVIDIA GeForce RTX 4060
+  version: 32.0.15.0
+  Graphics adapter 1: NVIDIA GeForce RTX 4060
+  version: 32.0.15.0
+  Graphics adapter 2: Microsoft Basic Render Driver
+  version: 10.0.19041.0
+Screen info (primary 0):
+  Index 0: Size: (1920, 1080) Orientation: Landscape Scale: 1 DPI: 96 Refresh Rate: 60
+  Index 1: Size: (1920, 1080) Orientation: Landscape Scale: 1 DPI: 96 Refresh Rate: 60
+Video Memory Used: 0.0B
+Memory Info:
+  physical: 32.0GB
+  free: 13.4GB
+  available: 35.6GB
+  stack: 8.0MB
+  Static Memory Usage: 0.0B
+  Static Memory Peak Usage: 0.0B
+Important Environment Variables:
+  PATH: C:\Users\Administrator\.codex\tmp\arg0\codex-arg0Tlcbxk;C:\Python314\Scripts\;C:\Python314\;C:\Program Files (x86)\Common Files\Oracle\Java\java8path;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Program Files\VanDyke Software\Clients\;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0\;C:\WINDOWS\System32\OpenSSH\;C:\Program Files\TortoiseSVN\bin;E:\Lilith\P4\;C:\Program Files\Perforce\;C:\Program Files\dotnet\;C:\Program Files\Git\cmd;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\;C:\Program Files (x86)\GnuWin32\bin;F:\MM_Mod\luarocks-3.12.2-windows-64\;F:\Blade_Mod\lua-5.3.4_Win64_bin;F:\MM_Mod\lua-5.4.2_Win64_bin;C:\Users\Administrator\AppData\Roaming\luarocks\bin;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Program Files\MySQL\MySQL Server 8.4\bin;C:\Program Files\nodejs\;C:\ProgramData\chocolatey\bin;C:\Users\Administrator\.local\bin;C:\Users\Administrator\AppData\Local\Programs\Python\Python313\Scripts\;C:\Users\Administrator\AppData\Local\Programs\Python\Python313\;C:\Users\Administrator\AppData\Local\Microsoft\WindowsApps;C:\Users\Administrator\.dotnet\tools;C:\Users\Administrator\AppData\Local\Programs\Microsoft VS Code\bin;E:\JetBrains Rider 2024.1.6\bin;C:\Users\Administrator\AppData\Roaming\npm;F:\Antigravity\bin;C:\Users\Administrator\AppData\Local\OpenAI\Codex\bin;C:\Program Files\WindowsApps\OpenAI.Codex_26.313.5234.0_x64__2p2nqsd0c76g0\app\resources
+  GODOT_ROOT_DIR: 
+  HOME: 
+  DYLD_LIBRARY_PATH: 
+  LD_LIBRARY_PATH: 
+
+[INFO] Preloading 'IntroLogo' assets... count=3 vfx=0
+[INFO] SteamStatsManager: Global stats received (found=True), architect damage = 66299028794
+[INFO] SteamStatsManager: User stats received
+[INFO] Preloading 'IntroLogo' Complete: assets=3 time_elapsed=51ms
+[INFO] Preloading 'MainMenuEssentials' assets... count=5 vfx=0
+[INFO] Preloading 'MainMenuEssentials' Complete: assets=5 time_elapsed=221ms
+[WARN] Asset not cached: res://debug_audio/SOTE_Logo_Echoing_ShortTail.mp3
+[INFO] [Startup] Time to main menu (Godot ticks): 14448ms
+[INFO] Mod Studio main menu entry attached.
+[INFO] [Startup] Time to main menu: 14,592ms
+[INFO] [Startup] Resource stats (main menu loaded (essential)): StaticMem=0B, VRAM=529.5MB, Objects=8,597, Resources=683, Nodes=1,538, CachedAssets=10
+[INFO] Unloading 3 missed cache assets
+[INFO] Command line: --autoslay --seed stage06-proof
+[INFO] Preloading 'Common' assets... count=683 vfx=86
+[INFO] [Startup] Resource stats (main menu loaded (complete)): StaticMem=0B, VRAM=669.1MB, Objects=8,569, Resources=670, Nodes=1,536, CachedAssets=5
+[INFO] Limiting background FPS to 30
+[INFO] Preloading 'Common' Complete: assets=769 time_elapsed=5,410ms
+[INFO] NGame.Quit called
+[INFO] [Display] On exit, saving window size: (1920, 1061) display: 0 position: (0, 0)
+[INFO] Wrote 2397 bytes to path=user://steam/76561198048368656/settings.save save_dir=user://steam/76561198048368656
+[INFO] Wrote 2397 bytes to settings.save in steam remote store
+[INFO] Wrote 245 bytes to path=user://steam/76561198048368656/modded/profile1\saves\prefs.save save_dir=user://steam/76561198048368656
+[INFO] Wrote 245 bytes to modded/profile1/saves/prefs.save in steam remote store
+[INFO] Wrote 56277 bytes to path=user://steam/76561198048368656/modded/profile1\saves\progress.save save_dir=user://steam/76561198048368656
+[INFO] Wrote 56277 bytes to modded/profile1/saves/progress.save in steam remote store
+[INFO] Wrote 52 bytes to path=user://steam/76561198048368656/profile.save save_dir=user://steam/76561198048368656
+[INFO] Wrote 52 bytes to profile.save in steam remote store
+[INFO] Steamworks: shutting down...
+[INFO] Steamworks shutdown succeeded!
+[INFO] [Sentry.NET] Shutting down
+FMOD Sound System: System released
+WARNING: 1050 RIDs of type "CanvasItem" were leaked.
+   at: _free_rids (servers/rendering/renderer_canvas_cull.cpp:2678)
+ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.
+ERROR: 5 shaders of type CanvasShaderRD were never freed
+   at: ~ShaderRD (servers/rendering/renderer_rd/shader_rd.cpp:1044)
+ERROR: 30 RID allocations of type 'N10RendererRD16ParticlesStorage9ParticlesE' were leaked at exit.
+ERROR: 1 shaders of type ParticlesShaderRD were never freed
+   at: ~ShaderRD (servers/rendering/renderer_rd/shader_rd.cpp:1044)
+ERROR: 30 RID allocations of type 'N10RendererRD11MeshStorage4MeshE' were leaked at exit.
+ERROR: 125 RID allocations of type 'N10RendererRD15MaterialStorage8MaterialE' were leaked at exit.
+ERROR: 6 RID allocations of type 'N10RendererRD15MaterialStorage6ShaderE' were leaked at exit.
+ERROR: 25 RID allocations of type 'N10RendererRD14TextureStorage7TextureE' were leaked at exit.
+WARNING: 245 RIDs of type "UniformBuffer" were leaked.
+   at: _free_rids (servers/rendering/rendering_device.cpp:6981)
+WARNING: 46 RIDs of type "Texture" were leaked.
+   at: finalize (servers/rendering/rendering_device.cpp:7191)
+ERROR: 360 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.
+ERROR: 3 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.
+ERROR: 4 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+   at: cleanup (core/object/object.cpp:2514)
+ERROR: 65 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:795)

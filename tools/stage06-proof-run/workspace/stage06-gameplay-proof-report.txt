@@ -1,0 +1,16 @@
+Stage 06 Gameplay Proof Package Generator
+Workspace: F:\sts2_mod\mod_projects\STS2_editor\tools\stage06-proof-run\workspace
+Game user root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2
+Editor root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor
+Saved editor project: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage06_gameplay_proof\project.json
+Exported package: F:\sts2_mod\mod_projects\STS2_editor\tools\stage06-proof-run\workspace\stage06-gameplay-proof.sts2pack
+Copied package to editor exports: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\exports\stage06-gameplay-proof.sts2pack
+Installed package: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage06_gameplay_proof@1.0.0
+Session file: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\session.json
+Package key: stage06_gameplay_proof@1.0.0
+Checksum: d6d8af7a365d640baf7962166382e45eb0cfcce4309629d189be43bcfded5b06
+Expected autoslay evidence:
+  - AutoSlay log contains 'Using potion: BLOCK_POTION'
+  - AutoSlay log contains 'Playing NEUTRALIZE'
+  - Godot log contains '[ModStudio.Graph] STAGE06_POTION_OK'
+  - Godot log contains '[ModStudio.Graph] STAGE06_CARD_OK'

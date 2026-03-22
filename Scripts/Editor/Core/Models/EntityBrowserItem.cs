@@ -6,6 +6,8 @@ public sealed class EntityBrowserItem
 
     public string EntityId { get; set; } = string.Empty;
 
+    public bool IsProjectOnly { get; set; }
+
     public string Title { get; set; } = string.Empty;
 
     public string Summary { get; set; } = string.Empty;

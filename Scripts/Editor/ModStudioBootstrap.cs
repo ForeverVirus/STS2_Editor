@@ -10,6 +10,7 @@ namespace STS2_Editor.Scripts.Editor;
 public static class ModStudioBootstrap
 {
     private static bool _initialized;
+    private static bool _runtimeInitialized;
 
     public static EditorProjectStore ProjectStore { get; private set; } = null!;
 
@@ -21,9 +22,15 @@ public static class ModStudioBootstrap
 
     public static BehaviorGraphRegistry GraphRegistry { get; private set; } = null!;
 
+    public static BehaviorGraphExecutor GraphExecutor { get; private set; } = null!;
+
     public static EditorRuntimeRegistry RuntimeRegistry { get; private set; } = null!;
 
+    public static RuntimeDynamicContentRegistry RuntimeDynamicContentRegistry { get; private set; } = null!;
+
     public static ModelMetadataService ModelMetadataService { get; private set; } = null!;
+
+    public static ProjectAssetBindingService ProjectAssetBindingService { get; private set; } = null!;
 
     public static void Initialize()
     {
@@ -35,6 +42,7 @@ public static class ModStudioBootstrap
         _initialized = true;
 
         ModStudioPaths.EnsureAllDirectories();
+        ModStudioLocalization.Initialize();
 
         ProjectStore = new EditorProjectStore();
         PackageArchiveService = new PackageArchiveService();
@@ -42,10 +50,25 @@ public static class ModStudioBootstrap
         PackageStore = new EditorPackageStore(PackageArchiveService);
         GraphRegistry = new BehaviorGraphRegistry();
         GraphRegistry.RegisterBuiltIns();
+        GraphExecutor = new BehaviorGraphExecutor(GraphRegistry);
         RuntimeRegistry = new EditorRuntimeRegistry(PackageArchiveService, PackageStore);
-        RuntimeRegistry.Initialize();
+        RuntimeDynamicContentRegistry = new RuntimeDynamicContentRegistry();
+        RuntimeRegistry.ResolutionChanged += RuntimeDynamicContentRegistry.Synchronize;
         ModelMetadataService = new ModelMetadataService();
+        ProjectAssetBindingService = new ProjectAssetBindingService();
 
         Log.Info("Mod Studio bootstrap initialized.");
+    }
+
+    public static void EnsureRuntimeInitialized()
+    {
+        if (_runtimeInitialized)
+        {
+            return;
+        }
+
+        _runtimeInitialized = true;
+        RuntimeRegistry.Initialize();
+        Log.Info("Mod Studio runtime registry initialized after core model startup.");
     }
 }

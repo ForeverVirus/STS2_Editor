@@ -34,6 +34,11 @@ public sealed class RuntimePackageCatalog
         }
 
         return packages
+            .GroupBy(package => package.PackageKey, StringComparer.Ordinal)
+            .Select(group => group
+                .OrderByDescending(package => package.IsDirectoryArchive)
+                .ThenBy(package => package.PackageFilePath, StringComparer.OrdinalIgnoreCase)
+                .First())
             .OrderBy(package => package.Manifest.PackageKey, StringComparer.Ordinal)
             .ThenBy(package => package.PackageFilePath, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -63,7 +68,7 @@ public sealed class RuntimePackageCatalog
 
     private IEnumerable<string> EnumeratePackageSources()
     {
-        foreach (var file in Directory.EnumerateFiles(_installedPackagesRootPath, "*.*", SearchOption.AllDirectories))
+        foreach (var file in Directory.EnumerateFiles(_installedPackagesRootPath, "*.*", SearchOption.TopDirectoryOnly))
         {
             var extension = Path.GetExtension(file);
             if (extension.Equals(".sts2pack", StringComparison.OrdinalIgnoreCase) ||
@@ -73,7 +78,7 @@ public sealed class RuntimePackageCatalog
             }
         }
 
-        foreach (var directory in Directory.EnumerateDirectories(_installedPackagesRootPath, "*", SearchOption.AllDirectories))
+        foreach (var directory in Directory.EnumerateDirectories(_installedPackagesRootPath, "*", SearchOption.TopDirectoryOnly))
         {
             if (File.Exists(Path.Combine(directory, "manifest.json")) &&
                 File.Exists(Path.Combine(directory, "project.json")))
@@ -139,6 +144,7 @@ public sealed class RuntimePackageCatalog
         }
 
         using var sha = SHA256.Create();
+        var portableProject = CreatePortableChecksumProject(project);
         var payload = ModStudioJson.Serialize(new
         {
             manifest.PackageId,
@@ -146,11 +152,77 @@ public sealed class RuntimePackageCatalog
             manifest.Version,
             manifest.Author,
             manifest.Description,
-            project.Overrides,
-            project.Graphs,
-            project.ProjectAssets
+            manifest.EditorVersion,
+            manifest.TargetGameVersion,
+            portableProject.SourceOfTruthIsRuntimeModelDb,
+            portableProject.Overrides,
+            portableProject.Graphs,
+            portableProject.ProjectAssets
         });
         var bytes = Encoding.UTF8.GetBytes(payload);
         return Convert.ToHexString(sha.ComputeHash(bytes)).ToLowerInvariant();
+    }
+
+    private static EditorProject CreatePortableChecksumProject(EditorProject source)
+    {
+        var project = new EditorProject
+        {
+            Manifest = source.Manifest,
+            Overrides = source.Overrides.Select(CloneEnvelope).ToList(),
+            Graphs = source.Graphs.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+            ProjectAssets = source.ProjectAssets.Select(CloneAsset).ToList(),
+            SourceOfTruthIsRuntimeModelDb = source.SourceOfTruthIsRuntimeModelDb
+        };
+
+        foreach (var asset in project.ProjectAssets)
+        {
+            if (!string.Equals(asset.SourceType, "res", StringComparison.OrdinalIgnoreCase))
+            {
+                asset.SourcePath = string.Empty;
+                asset.ManagedPath = string.Empty;
+            }
+        }
+
+        foreach (var envelope in project.Overrides)
+        {
+            foreach (var asset in envelope.Assets)
+            {
+                if (!string.Equals(asset.SourceType, "res", StringComparison.OrdinalIgnoreCase))
+                {
+                    asset.SourcePath = string.Empty;
+                    asset.ManagedPath = string.Empty;
+                }
+            }
+        }
+
+        return project;
+    }
+
+    private static EntityOverrideEnvelope CloneEnvelope(EntityOverrideEnvelope source)
+    {
+        return new EntityOverrideEnvelope
+        {
+            EntityKind = source.EntityKind,
+            EntityId = source.EntityId,
+            BehaviorSource = source.BehaviorSource,
+            GraphId = source.GraphId,
+            Notes = source.Notes,
+            Metadata = new Dictionary<string, string>(source.Metadata, StringComparer.Ordinal),
+            Assets = source.Assets.Select(CloneAsset).ToList()
+        };
+    }
+
+    private static AssetRef CloneAsset(AssetRef source)
+    {
+        return new AssetRef
+        {
+            Id = source.Id,
+            SourceType = source.SourceType,
+            LogicalRole = source.LogicalRole,
+            SourcePath = source.SourcePath,
+            ManagedPath = source.ManagedPath,
+            PackagePath = source.PackagePath,
+            FileName = source.FileName
+        };
     }
 }

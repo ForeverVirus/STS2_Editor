@@ -40,6 +40,21 @@ public static class ModStudioPaths
         return Path.Combine(InstalledPackagesPath, fileName);
     }
 
+    public static string GetInstalledPackageDirectory(string packageKey)
+    {
+        return Path.Combine(InstalledPackagesPath, packageKey);
+    }
+
+    public static string GetInstalledPackageAssetsDirectory(string packageKey)
+    {
+        return Path.Combine(GetInstalledPackageDirectory(packageKey), "assets");
+    }
+
+    public static string GetInstalledPackageAssetFilePath(string packageKey, string assetId, string fileName)
+    {
+        return Path.Combine(GetInstalledPackageAssetsDirectory(packageKey), assetId, fileName);
+    }
+
     public static void EnsureAllDirectories()
     {
         Directory.CreateDirectory(RootPath);

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="STS2_Editor">
+      <HintPath>F:\sts2_mod\mod_projects\STS2_editor\.godot\mono\temp\bin\Debug\STS2_Editor.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="sts2">
+      <HintPath>F:\SteamLibrary\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64\sts2.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>F:\SteamLibrary\steamapps\common\Slay the Spire 2\data_sts2_windows_x86_64\0Harmony.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <None Include="Program.template" />
+    <Compile Include="$(IntermediateOutputPath)Program.g.cs" />
+  </ItemGroup>
+
+  <Target Name="GenerateCustomContentProofProgram" BeforeTargets="CoreCompile">
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Copy SourceFiles="Program.template" DestinationFiles="$(IntermediateOutputPath)Program.g.cs" />
+  </Target>
+</Project>

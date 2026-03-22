@@ -33,6 +33,33 @@ public sealed class RemotePeerPackageSnapshot
 
 public readonly record struct RuntimeEntityKey(ModStudioEntityKind Kind, string EntityId);
 
+public sealed class PackageOverrideConflictParticipant
+{
+    public string PackageKey { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public int LoadOrder { get; set; }
+}
+
+public sealed class PackageOverrideConflict
+{
+    private readonly List<PackageOverrideConflictParticipant> _participants = new();
+
+    public ModStudioEntityKind EntityKind { get; set; }
+
+    public string EntityId { get; set; } = string.Empty;
+
+    public string WinningPackageKey { get; set; } = string.Empty;
+
+    public IReadOnlyList<PackageOverrideConflictParticipant> Participants => _participants;
+
+    public void AddParticipant(PackageOverrideConflictParticipant participant)
+    {
+        _participants.Add(participant);
+    }
+}
+
 public sealed class PackageSessionNegotiationResult
 {
     private readonly List<PackageSessionState> _sessionStates = new();
@@ -68,6 +95,7 @@ public sealed class RuntimeOverrideResolutionResult
     private readonly Dictionary<string, BehaviorGraphDefinition> _graphs = new(StringComparer.Ordinal);
     private readonly List<AssetRef> _assets = new();
     private readonly List<string> _appliedPackageKeys = new();
+    private readonly List<PackageOverrideConflict> _conflicts = new();
 
     public IReadOnlyDictionary<RuntimeEntityKey, EntityOverrideEnvelope> Overrides => _overrides;
 
@@ -76,6 +104,8 @@ public sealed class RuntimeOverrideResolutionResult
     public IReadOnlyList<AssetRef> Assets => _assets;
 
     public IReadOnlyList<string> AppliedPackageKeys => _appliedPackageKeys;
+
+    public IReadOnlyList<PackageOverrideConflict> Conflicts => _conflicts;
 
     public void RecordPackage(string packageKey)
     {
@@ -98,5 +128,10 @@ public sealed class RuntimeOverrideResolutionResult
     public void AddAsset(AssetRef asset)
     {
         _assets.Add(asset);
+    }
+
+    public void AddConflict(PackageOverrideConflict conflict)
+    {
+        _conflicts.Add(conflict);
     }
 }

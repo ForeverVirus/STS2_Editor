@@ -5,6 +5,8 @@
     <LangVersion>12.0</LangVersion>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
 
     <Sts2Dir>F:\SteamLibrary\steamapps\common\Slay the Spire 2</Sts2Dir>
     <Sts2DataDir>$(Sts2Dir)\data_sts2_windows_x86_64</Sts2DataDir>
@@ -27,6 +29,8 @@
     <Compile Remove="sts2_guides\**\*.cs" />
     <Compile Remove="STS2_Proj\**\*.cs" />
     <Compile Remove=".godot\**\*.cs" />
+    <Compile Remove=".godot\mono\temp\**\*.cs" />
+    <Compile Remove="tools\**\*.cs" />
     <Compile Remove="recovered\**\*.cs" />
   </ItemGroup>
 

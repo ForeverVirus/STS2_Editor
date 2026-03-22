@@ -13,6 +13,14 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
         yield return Compare();
         yield return RandomChoice();
         yield return LogMessage();
+        yield return DamageTarget();
+        yield return GainBlock();
+        yield return Heal();
+        yield return DrawCards();
+        yield return ApplyPower();
+        yield return GainEnergy();
+        yield return GainStars();
+        yield return GainGold();
     }
 
     private static BehaviorGraphNodeDefinitionDescriptor FlowEntry()
@@ -235,6 +243,13 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
             {
                 new BehaviorGraphPortDefinition
                 {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                },
+                new BehaviorGraphPortDefinition
+                {
                     PortId = "left",
                     DisplayName = "Left",
                     Direction = BehaviorGraphPortDirection.Input,
@@ -252,11 +267,16 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
             {
                 new BehaviorGraphPortDefinition
                 {
-                    PortId = "equal",
-                    DisplayName = "Equal",
+                    PortId = "out",
+                    DisplayName = "Out",
                     Direction = BehaviorGraphPortDirection.Output,
-                    ValueType = "bool"
+                    ValueType = "flow"
                 }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["operator"] = "eq",
+                ["result_key"] = "last_compare"
             }
         };
     }
@@ -327,4 +347,284 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
             }
         };
     }
+
+    private static BehaviorGraphNodeDefinitionDescriptor DamageTarget()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "combat.damage",
+            DisplayName = "Damage",
+            Description = "Deals damage to one or more targets.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["target"] = "current_target",
+                ["props"] = "none"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor GainBlock()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "combat.gain_block",
+            DisplayName = "Gain Block",
+            Description = "Grants block to one or more targets.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["target"] = "self",
+                ["props"] = "none"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor Heal()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "combat.heal",
+            DisplayName = "Heal",
+            Description = "Heals one or more targets.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["target"] = "self"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor DrawCards()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "combat.draw_cards",
+            DisplayName = "Draw Cards",
+            Description = "Draws cards for the owner player.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "1"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ApplyPower()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "combat.apply_power",
+            DisplayName = "Apply Power",
+            Description = "Applies a power model by id to one or more targets.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["power_id"] = string.Empty,
+                ["amount"] = "1",
+                ["target"] = "current_target"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor GainEnergy()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "player.gain_energy",
+            DisplayName = "Gain Energy",
+            Description = "Gives energy to the current owner player.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "1"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor GainStars()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "player.gain_stars",
+            DisplayName = "Gain Stars",
+            Description = "Gives stars to the current owner player.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "1"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor GainGold()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "player.gain_gold",
+            DisplayName = "Gain Gold",
+            Description = "Gives gold to the current owner player.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "1"
+            }
+        };
+    }
+
 }

@@ -7,5 +7,6 @@ public enum ModStudioEntityKind
     Relic = 2,
     Potion = 3,
     Event = 4,
-    Enchantment = 5
+    Enchantment = 5,
+    Monster = 6
 }

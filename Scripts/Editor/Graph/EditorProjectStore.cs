@@ -101,6 +101,8 @@ public sealed class EditorProjectStore
             SourceOfTruthIsRuntimeModelDb = project.SourceOfTruthIsRuntimeModelDb
         };
 
+        RehomeManagedAssetsForDuplicate(project, duplicated);
+
         Save(duplicated);
         return duplicated;
     }
@@ -216,5 +218,63 @@ public sealed class EditorProjectStore
             PackagePath = source.PackagePath,
             FileName = source.FileName
         };
+    }
+
+    private static void RehomeManagedAssetsForDuplicate(EditorProject sourceProject, EditorProject duplicatedProject)
+    {
+        var sourceProjectRoot = ModStudioPaths.GetProjectDirectory(sourceProject.Manifest.ProjectId);
+        var duplicatedAssetsRoot = ModStudioPaths.GetProjectAssetsDirectory(duplicatedProject.Manifest.ProjectId);
+        Directory.CreateDirectory(duplicatedAssetsRoot);
+
+        var pathMap = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var asset in duplicatedProject.ProjectAssets
+                     .Concat(duplicatedProject.Overrides.SelectMany(overrideEnvelope => overrideEnvelope.Assets))
+                     .Where(asset => !string.IsNullOrWhiteSpace(asset.ManagedPath))
+                     .GroupBy(asset => asset.Id, StringComparer.Ordinal)
+                     .Select(group => group.First()))
+        {
+            if (!File.Exists(asset.ManagedPath))
+            {
+                continue;
+            }
+
+            var sourceManagedPath = asset.ManagedPath;
+            var copyManagedAsset = sourceManagedPath.StartsWith(sourceProjectRoot, StringComparison.OrdinalIgnoreCase) ||
+                                   sourceManagedPath.StartsWith(ModStudioPaths.ImportsPath, StringComparison.OrdinalIgnoreCase);
+            if (!copyManagedAsset)
+            {
+                continue;
+            }
+
+            var fileName = string.IsNullOrWhiteSpace(asset.FileName)
+                ? Path.GetFileName(sourceManagedPath)
+                : asset.FileName;
+            var targetDirectory = Path.Combine(duplicatedAssetsRoot, asset.Id);
+            Directory.CreateDirectory(targetDirectory);
+            var targetPath = Path.Combine(targetDirectory, fileName);
+            File.Copy(sourceManagedPath, targetPath, overwrite: true);
+            pathMap[asset.Id] = targetPath;
+        }
+
+        if (pathMap.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var asset in duplicatedProject.ProjectAssets)
+        {
+            if (pathMap.TryGetValue(asset.Id, out var targetPath))
+            {
+                asset.ManagedPath = targetPath;
+            }
+        }
+
+        foreach (var asset in duplicatedProject.Overrides.SelectMany(overrideEnvelope => overrideEnvelope.Assets))
+        {
+            if (pathMap.TryGetValue(asset.Id, out var targetPath))
+            {
+                asset.ManagedPath = targetPath;
+            }
+        }
     }
 }

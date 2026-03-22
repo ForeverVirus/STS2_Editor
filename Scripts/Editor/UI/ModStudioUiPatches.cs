@@ -6,6 +6,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
+using STS2_Editor.Scripts.Editor.Core.Utilities;
 
 namespace STS2_Editor.Scripts.Editor.UI;
 
@@ -15,6 +16,7 @@ internal static class ModStudioUiPatches
     private const string MenuButtonName = "ModStudioButton";
 
     private static readonly Dictionary<ulong, NModStudioScreen> _screenCache = new();
+    private static readonly Dictionary<ulong, NMainMenuTextButton> _buttonCache = new();
     private static readonly FieldInfo? _lastHitButtonField = AccessTools.Field(typeof(NMainMenu), "_lastHitButton");
     private static readonly MethodInfo? _mainMenuButtonFocusedMethod = AccessTools.Method(typeof(NMainMenu), "MainMenuButtonFocused");
     private static readonly MethodInfo? _mainMenuButtonUnfocusedMethod = AccessTools.Method(typeof(NMainMenu), "MainMenuButtonUnfocused");
@@ -37,13 +39,16 @@ internal static class ModStudioUiPatches
             return;
         }
 
-        var modStudioButton = CreateMenuButton();
+        var templateLabel = compendiumButton.GetNodeOrNull<MegaCrit.Sts2.addons.mega_text.MegaLabel>("Label")
+            ?? quitButton.GetNodeOrNull<MegaCrit.Sts2.addons.mega_text.MegaLabel>("Label");
+        var modStudioButton = CreateMenuButton(templateLabel);
         modStudioButton.Name = MenuButtonName;
         modStudioButton.Connect(NClickableControl.SignalName.Released, Callable.From<NButton>(button => OpenModStudio(__instance, button)));
         modStudioButton.Connect(NClickableControl.SignalName.Focused, Callable.From<NClickableControl>(button => HandleFocus(__instance, button as NMainMenuTextButton)));
         modStudioButton.Connect(NClickableControl.SignalName.Unfocused, Callable.From<NClickableControl>(button => HandleUnfocus(__instance, button as NMainMenuTextButton)));
         container.AddChild(modStudioButton);
         container.MoveChild(modStudioButton, quitButton.GetIndex());
+        _buttonCache[__instance.GetInstanceId()] = modStudioButton;
 
         var quitIndex = quitButton.GetIndex();
         if (quitIndex > 0)
@@ -55,6 +60,20 @@ internal static class ModStudioUiPatches
         }
 
         Log.Info("Mod Studio main menu entry attached.");
+    }
+
+    public static void RefreshMenuButtonTexts()
+    {
+        foreach (var pair in _buttonCache.ToList())
+        {
+            if (!GodotObject.IsInstanceValid(pair.Value))
+            {
+                _buttonCache.Remove(pair.Key);
+                continue;
+            }
+
+            ApplyButtonText(pair.Value);
+        }
     }
 
     [HarmonyPrefix]
@@ -79,7 +98,7 @@ internal static class ModStudioUiPatches
         return false;
     }
 
-    private static NMainMenuTextButton CreateMenuButton()
+    private static NMainMenuTextButton CreateMenuButton(MegaCrit.Sts2.addons.mega_text.MegaLabel? templateLabel)
     {
         var button = new NMainMenuTextButton
         {
@@ -92,16 +111,43 @@ internal static class ModStudioUiPatches
         {
             Name = "Label",
             Theme = ResourceLoader.Load<Theme>("res://themes/main_menu_text_button.tres"),
-            Text = "Mod Studio",
+            Text = ModStudioLocalization.T("mod_studio.title"),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             AutoSizeEnabled = false,
             MinFontSize = 18,
             MaxFontSize = 32
         };
+        if (templateLabel != null)
+        {
+            var themeFont = templateLabel.GetThemeFont("font");
+            if (themeFont != null)
+            {
+                label.AddThemeFontOverride("font", themeFont);
+            }
+
+            var fontSize = templateLabel.GetThemeFontSize("font_size");
+            if (fontSize > 0)
+            {
+                label.AddThemeFontSizeOverride("font_size", fontSize);
+            }
+
+            label.SelfModulate = templateLabel.SelfModulate;
+        }
 
         button.AddChild(label);
         return button;
+    }
+
+    private static void ApplyButtonText(NMainMenuTextButton button)
+    {
+        var label = button.GetNodeOrNull<MegaCrit.Sts2.addons.mega_text.MegaLabel>("Label");
+        if (label == null)
+        {
+            return;
+        }
+
+        label.Text = ModStudioLocalization.T("mod_studio.title");
     }
 
     private static void OpenModStudio(NMainMenu menu, NButton button)

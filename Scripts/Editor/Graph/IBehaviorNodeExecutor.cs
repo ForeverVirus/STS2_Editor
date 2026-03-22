@@ -6,5 +6,5 @@ public interface IBehaviorNodeExecutor
 
     bool CanExecute(BehaviorGraphNodeDefinition node);
 
-    void Execute(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context);
+    Task ExecuteAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context);
 }

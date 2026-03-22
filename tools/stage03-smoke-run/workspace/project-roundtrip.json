@@ -1,0 +1,101 @@
+{
+  "manifest": {
+    "projectId": "project-smoke-001",
+    "name": "Stage 03 Smoke Project",
+    "author": "Codex",
+    "description": "Smoke-test project.",
+    "editorVersion": "stage03",
+    "targetGameVersion": "unknown",
+    "createdAtUtc": "2026-03-22T21:20:21.5045368+00:00",
+    "updatedAtUtc": "2026-03-22T21:20:21.504554+00:00"
+  },
+  "overrides": [
+    {
+      "entityKind": 1,
+      "entityId": "strike",
+      "behaviorSource": 1,
+      "graphId": "graph.card.smoke",
+      "metadata": {
+        "title": "Smoke Strike",
+        "description": "Smoke-test card description.",
+        "portrait_path": "res://placeholder.png"
+      },
+      "assets": [
+        {
+          "id": "14322c35ce5f424fba7ab5fcccef174c",
+          "sourceType": "managed-import",
+          "logicalRole": "portrait",
+          "sourcePath": "external/strike.png",
+          "managedPath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\sts2-editor-asset-955a5afd20c74a35afdb3065e057e68c.txt",
+          "packagePath": "",
+          "fileName": "strike.txt"
+        }
+      ]
+    }
+  ],
+  "graphs": {
+    "graph.card.smoke": {
+      "graphId": "graph.card.smoke",
+      "name": "Smoke Card Graph",
+      "description": "Smoke-test graph.",
+      "version": "1.0.0",
+      "entityKind": 1,
+      "entryNodeId": "graph.card.smoke.entry",
+      "nodes": [
+        {
+          "nodeId": "graph.card.smoke.entry",
+          "nodeType": "flow.entry",
+          "displayName": "Entry",
+          "description": "",
+          "properties": {}
+        },
+        {
+          "nodeId": "graph.card.smoke.log",
+          "nodeType": "debug.log",
+          "displayName": "Log",
+          "description": "",
+          "properties": {
+            "message": "Smoke graph for graph.card.smoke"
+          }
+        },
+        {
+          "nodeId": "graph.card.smoke.exit",
+          "nodeType": "flow.exit",
+          "displayName": "Exit",
+          "description": "",
+          "properties": {}
+        }
+      ],
+      "connections": [
+        {
+          "fromNodeId": "graph.card.smoke.entry",
+          "fromPortId": "next",
+          "toNodeId": "graph.card.smoke.log",
+          "toPortId": "in"
+        },
+        {
+          "fromNodeId": "graph.card.smoke.log",
+          "fromPortId": "out",
+          "toNodeId": "graph.card.smoke.exit",
+          "toPortId": "in"
+        }
+      ],
+      "metadata": {
+        "trigger.card.on_play": "graph.card.smoke.entry",
+        "trigger.default": "graph.card.smoke.entry"
+      }
+    }
+  },
+  "projectAssets": [
+    {
+      "id": "a7488439b9354082a1b423cba8cf4b22",
+      "sourceType": "res",
+      "logicalRole": "icon",
+      "sourcePath": "res://ui/icon.png",
+      "managedPath": "",
+      "packagePath": "",
+      "fileName": "icon.png"
+    }
+  ],
+  "sourceOfTruthIsRuntimeModelDb": true
+}
