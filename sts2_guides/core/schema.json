@@ -1,0 +1,67 @@
+{
+  "version": 7,
+  "description": "Canonical Slay the Spire 2 knowledge base schema for core/custom layered loading.",
+  "jsonFiles": {
+    "characters.json": { "type": "CharacterGuideEntry[]", "key": "id" },
+    "builds.json": { "type": "BuildGuideEntry[]", "key": "id" },
+    "cards.json": { "type": "CardGuideEntry[]", "key": "slug" },
+    "relics.json": {
+      "type": "RelicGuideEntry[]",
+      "key": "slug",
+      "notes": [
+        "RelicGuideEntry supports rarity plus triggerTimingEn/Zh, effectSummaryEn/Zh, and conditionSummaryEn/Zh.",
+        "Use triggerTiming to describe the main activation window and conditionSummary to capture notable requirements, symmetry, or drawbacks."
+      ]
+    },
+    "potions.json": {
+      "type": "PotionEntry[]",
+      "key": "slug",
+      "notes": [
+        "PotionEntry supports targetType, effectFormulaEn, and effectFormulaZh.",
+        "Use targetType values that match in-game semantics such as Self, AnyPlayer, or AllEnemies."
+      ]
+    },
+    "powers.json": {
+      "type": "PowerEntry[]",
+      "key": "slug",
+      "notes": [
+        "PowerEntry supports stackType, stackRuleEn, stackRuleZh, resolutionRuleEn, and resolutionRuleZh.",
+        "Use stackType values that match in-game semantics such as Counter or Single."
+      ]
+    },
+    "enemies.json": {
+      "type": "EnemyEntry[]",
+      "key": "slug",
+      "notes": [
+        "EnemyEntry supports hpRange, intentPatternEn/Zh, specialMechanicsEn/Zh, and threatSummaryEn/Zh.",
+        "Use hpRange to capture ascension-sensitive health ranges compactly when exact values differ by difficulty."
+      ]
+    },
+    "events.json": {
+      "type": "EventEntry[]",
+      "key": "slug",
+      "notes": [
+        "EventEntry supports triggerRestrictionEn/Zh plus a structured options list.",
+        "Each option may include localized titles and concise localized result summaries for retrieval and decision support."
+      ]
+    },
+    "enchantments.json": {
+      "type": "EnchantmentEntry[]",
+      "key": "slug",
+      "notes": [
+        "EnchantmentEntry supports applicableToEn/Zh, triggerTimingEn/Zh, effectSummaryEn/Zh, and conditionSummaryEn/Zh.",
+        "Use applicableTo for card-type or tag restrictions and conditionSummary for one-time, permanent-growth, or out-of-combat limitations."
+      ]
+    },
+    "game_mechanics.json": { "type": "MechanicRule[]", "key": "id" }
+  },
+  "guideFiles": [
+    "guides/overview.md",
+    "guides/general_strategy.md",
+    "guides/ironclad.md",
+    "guides/silent.md",
+    "guides/defect.md",
+    "guides/regent.md",
+    "guides/necrobinder.md"
+  ]
+}

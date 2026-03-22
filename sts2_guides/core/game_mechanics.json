@@ -1,0 +1,140 @@
+[
+	{
+		"id": "energy-resource",
+		"title": "Energy resets to max each combat turn by default",
+		"summary": "`PlayerCombatState.ResetEnergy()` sets current energy to `MaxEnergy`, while `GainEnergy()` and `LoseEnergy()` clamp changes so energy never drops below zero. Treat baseline energy as a refreshed per-turn resource unless another effect explicitly preserves or grants more.",
+		"source": "core"
+	},
+	{
+		"id": "resource-checks",
+		"title": "Card play legality checks both energy and stars",
+		"summary": "`PlayerCombatState.HasEnoughResourcesFor()` validates energy cost and star cost together. If a hook allows excess energy to be paid with stars, the deficit converts into extra star cost at 2 stars per missing energy before final legality is checked.",
+		"source": "core"
+	},
+	{
+		"id": "block-default-clear",
+		"title": "Block normally clears when combat ends and usually between turns",
+		"summary": "The default assumption is that block is temporary. `Player.AfterCombatEnd()` explicitly removes all remaining block, and powers such as `BarricadePower` and `BlurPower` only exist because block would otherwise be cleared unless a preventer says not to.",
+		"source": "core"
+	},
+	{
+		"id": "barricade-block-retention",
+		"title": "Barricade prevents its owner from clearing block",
+		"summary": "`BarricadePower.ShouldClearBlock()` returns false for its owner, so the owner keeps block across turns while the power remains active. It is a single-instance buff rather than a stacking duration counter.",
+		"source": "core"
+	},
+	{
+		"id": "blur-block-retention",
+		"title": "Blur preserves block temporarily then counts down",
+		"summary": "`BlurPower.ShouldClearBlock()` also prevents block clear for its owner, but unlike Barricade it is a counter buff. At the start of the player side turn, `BlurPower.AfterSideTurnStart()` decrements the duration, so Blur is temporary block retention rather than permanent persistence.",
+		"source": "core"
+	},
+	{
+		"id": "strength-attack-scaling",
+		"title": "Strength adds flat damage to powered attacks",
+		"summary": "`StrengthPower.ModifyDamageAdditive()` adds the current Strength amount to attacks made by the owner, but only when the value props identify the hit as a powered attack. Strength can be negative, so it can also reduce outgoing attack damage.",
+		"source": "core"
+	},
+	{
+		"id": "dexterity-block-scaling",
+		"title": "Dexterity adds flat block to powered block sources",
+		"summary": "`DexterityPower.ModifyBlockAdditive()` adds the current amount to the owner's powered card or monster-move block gains. Like Strength, Dexterity allows negative values, so it can either raise or lower generated block.",
+		"source": "core"
+	},
+	{
+		"id": "weak-damage-multiplier",
+		"title": "Weak reduces powered attack damage multiplicatively",
+		"summary": "`WeakPower.ModifyDamageMultiplicative()` applies a base multiplier of 0.75 to the owner's powered attacks. Relics and powers can further modify this multiplier, and `WeakPower.AfterTurnEnd()` ticks the duration down at enemy turn end.",
+		"source": "core"
+	},
+	{
+		"id": "vulnerable-damage-multiplier",
+		"title": "Vulnerable increases powered attack damage taken multiplicatively",
+		"summary": "`VulnerablePower.ModifyDamageMultiplicative()` applies a base multiplier of 1.5 when the owner is the attack target and the hit is a powered attack. Paper Phrog, Debilitate, Cruelty, and similar modifiers can alter that multiplier before final damage is resolved.",
+		"source": "core"
+	},
+	{
+		"id": "frail-block-multiplier",
+		"title": "Frail reduces powered block gains to 75%",
+		"summary": "`FrailPower.ModifyBlockMultiplicative()` returns 0.75 for the afflicted owner when the block source is a powered card or monster move. Frail is a counter debuff and its duration also ticks down at enemy turn end.",
+		"source": "core"
+	},
+	{
+		"id": "poison-turn-start-resolution",
+		"title": "Poison deals unblockable damage at the poisoned side's turn start and then decays",
+		"summary": "`PoisonPower.AfterSideTurnStart()` triggers when that side's turn starts. Each trigger deals unblockable, unpowered damage equal to the current Poison amount, then decrements Poison by 1 if the target survives. Extra triggers can be granted by Accelerant on living opponents, up to the current Poison amount.",
+		"source": "core"
+	},
+	{
+		"id": "intangible-damage-cap",
+		"title": "Intangible caps incoming HP loss instead of just reducing attack text",
+		"summary": "`IntangiblePower` overrides both HP-loss and damage-cap modification paths. While active, damage to the owner is capped at 1 by default, or 5 if the attacker has The Boot. This means Intangible applies as a hard ceiling to qualifying damage rather than a small percentage reduction.",
+		"source": "core"
+	},
+	{
+		"id": "no-draw-turn-lock",
+		"title": "No Draw blocks normal draws for the affected player's current turn only",
+		"summary": "`NoDrawPower.ShouldDraw()` returns false for the owning player unless the draw is flagged as `fromHandDraw`. `NoDrawPower.AfterTurnEnd()` removes the power entirely, so it is a one-turn draw lock rather than a lasting counter.",
+		"source": "core"
+	},
+	{
+		"id": "focus-orb-scaling",
+		"title": "Focus shifts orb values but never below zero",
+		"summary": "`FocusPower.ModifyOrbValue()` adds the owner's Focus amount to orb values for that player, then clamps the result at a minimum of zero. Focus therefore boosts or suppresses orb effectiveness directly, but cannot push a final orb value negative.",
+		"source": "core"
+	},
+	{
+		"id": "plating-end-turn-block",
+		"title": "Plating grants end-turn block and then loses layers over time",
+		"summary": "`PlatingPower.BeforeTurnEndEarly()` grants block equal to current Plating when that side's turn ends. Afterwards, `AfterTurnEnd()` reduces the power: players lose 1 layer per enemy turn end, while enemies can lose multiple layers equal to the stored decrement value, which scales with player count when applied to enemies.",
+		"source": "core"
+	},
+	{
+		"id": "regen-end-turn-heal",
+		"title": "Regen heals at end of the owner's turn and then decreases",
+		"summary": "`RegenPower.AfterTurnEnd()` checks for the owner's side turn end, heals the owner for the current Regen amount if alive, then decrements Regen by 1. Regen therefore represents a shrinking end-of-turn heal-over-time buff.",
+		"source": "core"
+	},
+	{
+		"id": "ritual-strength-growth",
+		"title": "Ritual grants recurring Strength at end of turn",
+		"summary": "`RitualPower.AfterTurnEnd()` applies Strength equal to Ritual amount at the end of the owner's side turn. Enemies that were just given Ritual skip the first immediate trigger once, preventing a same-turn bonus on application.",
+		"source": "core"
+	},
+	{
+		"id": "combat-cleanup",
+		"title": "Combat cleanup removes temporary powers and remaining block",
+		"summary": "When combat ends, `Player.AfterCombatEnd()` removes all powers except explicitly preserved ones, runs player combat-state cleanup, and strips all remaining block via `Creature.LoseBlockInternal(Creature.Block)`. Treat leftover combat-only defenses and statuses as ephemeral unless a system explicitly carries them out of combat.",
+		"source": "core"
+	},
+	{
+		"id": "ascension-cumulative-ladder",
+		"title": "Ascension levels are cumulative thresholds up to 10",
+		"summary": "`AscensionManager.maxAscensionAllowed` is 10, and `AscensionManager.HasLevel()` returns true whenever the current ascension is greater than or equal to the queried enum value. Treat higher ascensions as inheriting every lower ascension modifier rather than replacing them.",
+		"source": "core"
+	},
+	{
+		"id": "tight-belt-potion-limit",
+		"title": "Tight Belt reduces maximum potion slots by 1",
+		"summary": "When `AscensionManager.ApplyEffectsTo()` sees `AscensionLevel.TightBelt`, it calls `Player.SubtractFromMaxPotionCount(1)`. This is a persistent run-start penalty to potion capacity, not a temporary combat debuff.",
+		"source": "core"
+	},
+	{
+		"id": "ascenders-bane-starting-curse",
+		"title": "Ascender's Bane is injected into the deck at higher ascension",
+		"summary": "At `AscensionLevel.AscendersBane` or above, `AscensionManager.ApplyEffectsTo()` creates `AscendersBane`, marks it as added on floor 1, and inserts it into the deck. `AscendersBane` itself is an Eternal, Unplayable, Ethereal Curse, so the penalty is both a deck tax and a recurring draw burden until removed or transformed.",
+		"source": "core"
+	},
+	{
+		"id": "poverty-gold-multiplier",
+		"title": "Poverty ascension uses a 0.75 gold multiplier",
+		"summary": "`AscensionHelper.PovertyAscensionGoldMultiplier` is 0.75, which establishes the intended reduced-gold baseline for Poverty-related reward logic. Treat Poverty as a run-economy pressure modifier rather than a one-off event penalty.",
+		"source": "core"
+	},
+	{
+		"id": "ancient-event-heal-and-gating",
+		"title": "Ancient events heal missing HP first, but Weary Traveler reduces that recovery",
+		"summary": "In `AncientEventModel.BeforeEventStarted()`, the owner is healed for missing HP before the ancient event proceeds. If the run has `AscensionLevel.WearyTraveler`, that missing-HP heal is scaled down to 80%. Also, if `Hook.ShouldAllowAncient()` rejects the ancient, the event falls back to a blocked description plus a simple Proceed option instead of exposing its normal choice set.",
+		"source": "core"
+	}
+]

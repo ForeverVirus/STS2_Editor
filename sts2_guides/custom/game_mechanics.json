@@ -1,0 +1,44 @@
+[
+  {
+    "id": "energy-resource",
+    "title": "Unused energy does not carry over by default / 未用完的能量默认不会保留到下一回合",
+    "summary": "In normal combat flow, any unspent energy is lost when the turn ends. On the next turn, energy is reset fresh to MaxEnergy rather than adding leftover energy from the previous turn. Do not make decisions as if ending turn with spare energy can store or bank energy for later. 正常战斗里，回合结束时没用完的能量会直接清空，不会结转到下一回合；下一回合只是重新恢复到 MaxEnergy，而不是在上一回合剩余能量上继续累加。除非某张牌、遗物、能力或特殊规则明确写着可以保留能量，否则不要把“留能量下回合再用”当成合法决策理由。",
+    "source": "custom"
+  },
+  {
+    "id": "block-default-clear",
+    "title": "Block is normally temporary between turns / 格挡默认不会跨回合保留",
+    "summary": "If nothing explicitly prevents block loss, block should be treated as temporary. Effects like Barricade or Blur matter precisely because block would otherwise be cleared by default. Do not plan as if current block can be saved for a later turn unless a present effect explicitly preserves it. 如果没有明确的保留效果，格挡应视为临时资源。像 Barricade 或 Blur 之所以重要，就是因为格挡默认不会自然跨回合保留。除非当前已有明确的保留格挡效果，否则不要把“这点格挡下回合还能继续用”当成决策前提。",
+    "source": "custom"
+  },
+  {
+    "id": "combat-cleanup",
+    "title": "Combat-only state is cleared after combat / 战斗态资源和临时状态在战斗结束后会清理",
+    "summary": "After combat ends, the player loses remaining block, combat piles are cleared, and temporary combat-only state is cleaned up. Do not value leftover hand, discard-pile combat setup, temporary powers, or current block as if they automatically carry into the next room. 战斗结束后，剩余格挡会移除，战斗中的手牌堆叠也会清空，临时战斗态会被收尾处理。不要把当前手牌、弃牌堆中的战斗节奏、临时能力或剩余格挡，当成会自动带入下一个房间的长期资源。",
+    "source": "custom"
+  },
+  {
+    "id": "hand-end-turn-flush",
+    "title": "Non-retained hand cards are discarded at end of turn / 未被保留的手牌会在回合结束时进入弃牌堆",
+    "summary": "At end of turn, cards in hand that are not retained are moved out of the hand, normally into the discard pile. Do not reason as if a normal hand can simply be kept for the next turn. If a line depends on keeping a card, that line needs Retain or another explicit preservation effect. 回合结束时，没有被保留的手牌会离开手牌区，通常进入弃牌堆。不要默认这一回合没打出的普通手牌下回合还会继续在手里；如果某条决策依赖“把牌留到下回合”，那必须有 Retain 或其他明确的保留效果支撑。",
+    "source": "custom"
+  },
+  {
+    "id": "ethereal-hand-end-turn",
+    "title": "Ethereal cards in hand exhaust if still unplayed at turn end / 以太牌若回合结束时仍在手中会被消耗",
+    "summary": "When an Ethereal card is still in hand at end of turn and its trigger is allowed, it exhausts instead of waiting in hand for later. Do not evaluate an unplayed Ethereal card as a safely banked future resource. 如果一张 Ethereal 牌在回合结束时还留在手里，而且其触发生效，它会被直接消耗，而不是安全地留到后面再打。不要把未打出的以太牌当成可以稳定留到后续回合的资源。",
+    "source": "custom"
+  },
+  {
+    "id": "single-turn-retain-expires",
+    "title": "Single-turn retain is temporary and is cleared in end-of-turn cleanup / 单回合保留效果在回合结束清理时会失效",
+    "summary": "One-turn retain granted by effects such as temporary retain is only for that turn's cleanup window. End-of-turn cleanup clears single-turn retain flags. Do not treat temporary retain as a permanent permission to keep that card across later turns unless the card or effect still says Retain next turn as well. 由临时效果赋予的单回合保留，只在当前回合结束时生效一次；回合结束清理会移除这类临时保留标记。不要把一次性的 retain 效果理解成后面每回合都能一直留住这张牌。",
+    "source": "custom"
+  },
+  {
+    "id": "temporary-cost-modifiers-end-turn",
+    "title": "Many temporary cost changes are removed at end of turn / 许多临时费用修正会在回合结束时失效",
+    "summary": "Card cost modifiers that are marked to expire at end of turn are removed during end-of-turn cleanup. Do not assume a temporary discount or temporary extra cost will still be present next turn unless the effect explicitly lasts longer, such as until played or until end of combat. 带有“回合结束失效”标记的费用修正，会在回合结束清理时被移除。不要默认本回合拿到的临时减费或临时加费，下回合还会继续存在；只有在牌面、能力或规则明确写着持续到打出时或持续到战斗结束时，才应继续计入后续回合。",
+    "source": "custom"
+  }
+]

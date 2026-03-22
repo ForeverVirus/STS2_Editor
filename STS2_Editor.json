@@ -1,0 +1,11 @@
+{
+  "id": "STS2_Editor",           
+  "name": "STS2_Editor",
+  "author": "yunxuan",
+  "description": "STS2_Editor",
+  "version": "1.0",
+  "has_pck": true,        
+  "has_dll": true,        
+  "dependencies": [""],     
+  "affects_gameplay": true 
+}
