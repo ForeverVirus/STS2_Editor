@@ -17,6 +17,8 @@ var report = new List<string>();
 var failures = new List<string>();
 
 Run("graph registry and validation", () => TestGraphValidation(report));
+Run("graph description generation", () => TestGraphDescriptionGeneration(report));
+Run("native translation catalog", () => TestNativeTranslationCatalog(report));
 Run("project save/load roundtrip", () => TestProjectRoundtrip(workspace, report));
 Run("package export/import roundtrip", () => TestPackageRoundtrip(workspace, report));
 Run("portable asset install roundtrip", () => TestPortableAssetInstallRoundtrip(workspace, report));
@@ -92,6 +94,67 @@ void TestGraphValidation(List<string> output)
 
     output.Add($"  Definitions: {registry.Definitions.Count}, Executors: {registry.Executors.Count}");
     output.Add($"  Valid graph warnings: {validation.Warnings.Count}, invalid errors: {invalidValidation.Errors.Count}");
+}
+
+void TestGraphDescriptionGeneration(List<string> output)
+{
+    var graph = BehaviorGraphTemplateFactory.CreateDefaultScaffold("graph.description.smoke", ModStudioEntityKind.Card, "Description Smoke", string.Empty, "card.on_play");
+    graph.Nodes.Insert(1, new BehaviorGraphNodeDefinition
+    {
+        NodeId = "damage",
+        NodeType = "combat.damage",
+        DisplayName = "Damage",
+        Properties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["amount"] = "8",
+            ["target"] = "current_target",
+            ["props"] = "none"
+        }
+    });
+    graph.Nodes.Insert(2, new BehaviorGraphNodeDefinition
+    {
+        NodeId = "block",
+        NodeType = "combat.gain_block",
+        DisplayName = "Gain Block",
+        Properties = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["amount"] = "5",
+            ["target"] = "self",
+            ["props"] = "none"
+        }
+    });
+    graph.Connections.Clear();
+    graph.Connections.Add(new BehaviorGraphConnectionDefinition { FromNodeId = graph.EntryNodeId, FromPortId = "next", ToNodeId = "damage", ToPortId = "in" });
+    graph.Connections.Add(new BehaviorGraphConnectionDefinition { FromNodeId = "damage", FromPortId = "out", ToNodeId = "block", ToPortId = "in" });
+    graph.Connections.Add(new BehaviorGraphConnectionDefinition { FromNodeId = "block", FromPortId = "out", ToNodeId = "exit_card", ToPortId = "in" });
+
+    var generator = new GraphDescriptionGenerator();
+    var generated = generator.Generate(graph);
+    AssertTrue(generated.IsComplete, "generated description completeness");
+    AssertTrue(
+        generated.Description.Contains("Deal 8 damage", StringComparison.Ordinal) ||
+        generated.Description.Contains("造成 8 点伤害", StringComparison.Ordinal),
+        "generated damage clause");
+    AssertTrue(
+        generated.Description.Contains("Gain 5 block", StringComparison.Ordinal) ||
+        generated.Description.Contains("获得 5 点格挡", StringComparison.Ordinal),
+        "generated block clause");
+    AssertEqual("Manual override", generator.ResolveDescription(graph, "Manual override"), "manual description priority");
+
+    output.Add($"  Generated description: {generated.Description}");
+}
+
+void TestNativeTranslationCatalog(List<string> output)
+{
+    var service = new NativeBehaviorAutoGraphService();
+    var catalog = service.SupportCatalog;
+    AssertTrue(catalog.Count > 0, "translation catalog count");
+    AssertTrue(catalog.Any(item => item.Key == "combat.damage" && item.Status == NativeBehaviorTranslationStatus.Supported), "damage catalog support");
+    AssertTrue(catalog.Any(item => item.Key == "combat.apply_power" && item.Status == NativeBehaviorTranslationStatus.Supported), "power catalog support");
+    AssertTrue(catalog.Any(item => item.Key == "event.reward" && item.Status == NativeBehaviorTranslationStatus.Partial), "event reward partial support");
+    AssertTrue(catalog.Any(item => item.Key == "monster.ai" && item.Status == NativeBehaviorTranslationStatus.Unsupported), "monster ai unsupported");
+
+    output.Add($"  Catalog entries: {catalog.Count}");
 }
 
 void TestProjectRoundtrip(string workspaceRoot, List<string> output)

@@ -19,6 +19,8 @@ namespace STS2_Editor.Scripts.Editor.Runtime;
 [HarmonyPatch]
 internal static class RuntimeOverridePatches
 {
+    private static readonly HashSet<string> LoggedTextureOverrideApplications = new(StringComparer.OrdinalIgnoreCase);
+
 [HarmonyPrefix]
     [HarmonyPatch(typeof(LocString), nameof(LocString.GetRawText))]
     private static bool LocString_GetRawText_Prefix(LocString __instance, ref string __result)
@@ -76,7 +78,7 @@ internal static class RuntimeOverridePatches
     [HarmonyPatch(typeof(CardModel), "get_PortraitPath")]
     private static void CardModel_get_PortraitPath_Postfix(CardModel __instance, ref string __result)
     {
-        if (TryGetOverriddenPath(ModStudioEntityKind.Card, __instance.Id.Entry, "portrait_path", out var path))
+        if (TryGetOverriddenResourcePath(ModStudioEntityKind.Card, __instance.Id.Entry, "portrait_path", out var path))
         {
             __result = path;
         }
@@ -86,7 +88,7 @@ internal static class RuntimeOverridePatches
     [HarmonyPatch(typeof(CardModel), "get_AllPortraitPaths")]
     private static void CardModel_get_AllPortraitPaths_Postfix(CardModel __instance, ref IEnumerable<string> __result)
     {
-        if (TryGetOverriddenPath(ModStudioEntityKind.Card, __instance.Id.Entry, "portrait_path", out var path))
+        if (TryGetOverriddenResourcePath(ModStudioEntityKind.Card, __instance.Id.Entry, "portrait_path", out var path))
         {
             __result = new[] { path };
         }
@@ -196,7 +198,7 @@ internal static class RuntimeOverridePatches
     [HarmonyPatch(typeof(RelicModel), "get_PackedIconPath")]
     private static void RelicModel_get_PackedIconPath_Postfix(RelicModel __instance, ref string __result)
     {
-        if (TryGetOverriddenPath(ModStudioEntityKind.Relic, __instance.Id.Entry, "icon_path", out var path))
+        if (TryGetOverriddenResourcePath(ModStudioEntityKind.Relic, __instance.Id.Entry, "icon_path", out var path))
         {
             __result = path;
         }
@@ -206,7 +208,7 @@ internal static class RuntimeOverridePatches
     [HarmonyPatch(typeof(RelicModel), "get_IconPath")]
     private static void RelicModel_get_IconPath_Postfix(RelicModel __instance, ref string __result)
     {
-        if (TryGetOverriddenPath(ModStudioEntityKind.Relic, __instance.Id.Entry, "icon_path", out var path))
+        if (TryGetOverriddenResourcePath(ModStudioEntityKind.Relic, __instance.Id.Entry, "icon_path", out var path))
         {
             __result = path;
         }
@@ -254,7 +256,7 @@ internal static class RuntimeOverridePatches
     [HarmonyPatch(typeof(PotionModel), "get_ImagePath")]
     private static void PotionModel_get_ImagePath_Postfix(PotionModel __instance, ref string __result)
     {
-        if (TryGetOverriddenPath(ModStudioEntityKind.Potion, __instance.Id.Entry, "image_path", out var path))
+        if (TryGetOverriddenResourcePath(ModStudioEntityKind.Potion, __instance.Id.Entry, "image_path", out var path))
         {
             __result = path;
         }
@@ -534,6 +536,19 @@ internal static class RuntimeOverridePatches
         return true;
     }
 
+    private static bool TryGetOverriddenResourcePath(ModStudioEntityKind kind, string entityId, string metadataKey, out string path)
+    {
+        path = string.Empty;
+        if (!TryGetOverriddenPath(kind, entityId, metadataKey, out var normalized) ||
+            !normalized.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        path = normalized;
+        return true;
+    }
+
     private static bool TryLoadTextureOverride(ModStudioEntityKind kind, string entityId, string metadataKey, out Texture2D texture)
     {
         texture = null!;
@@ -549,7 +564,20 @@ internal static class RuntimeOverridePatches
         }
 
         texture = loaded;
+        TryLogTextureOverrideApplied(kind, entityId, metadataKey, path, loaded);
         return true;
+    }
+
+    private static void TryLogTextureOverrideApplied(ModStudioEntityKind kind, string entityId, string metadataKey, string path, Texture2D texture)
+    {
+        var key = $"{kind}:{entityId}:{metadataKey}";
+        if (!LoggedTextureOverrideApplications.Add(key))
+        {
+            return;
+        }
+
+        var size = texture.GetSize();
+        Log.Info($"[ModStudio.Asset] Applied texture override {kind}:{entityId}:{metadataKey} -> {path} size={size.X:0}x{size.Y:0}");
     }
 
     private static bool TryResolveCardPool(ModStudioEntityKind kind, string entityId, string metadataKey, out CardPoolModel pool)

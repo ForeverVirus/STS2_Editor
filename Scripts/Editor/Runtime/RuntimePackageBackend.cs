@@ -1,4 +1,5 @@
 using STS2_Editor.Scripts.Editor.Core.Models;
+using STS2_Editor.Scripts.Editor.Core.Utilities;
 using STS2_Editor.Scripts.Editor.Packaging;
 
 namespace STS2_Editor.Scripts.Editor.Runtime;
@@ -47,6 +48,7 @@ public sealed class RuntimePackageBackend
     {
         _installedPackages.Clear();
         _installedPackages.AddRange(_catalog.DiscoverInstalledPackages());
+        CleanupStalePackageCaches(_installedPackages.Select(package => package.PackageKey));
     }
 
     public void LoadSessionStates()
@@ -156,6 +158,7 @@ public sealed class RuntimePackageBackend
         RefreshInstalledPackages();
         LoadSessionStates();
         NormalizeSessionStates();
+        CleanupStalePackageCaches(_installedPackages.Select(package => package.PackageKey));
         ResolveCurrentSession();
         SaveSessionStates();
     }
@@ -252,5 +255,49 @@ public sealed class RuntimePackageBackend
                 DisabledReason = state.DisabledReason
             })
             .ToList();
+    }
+
+    private static void CleanupStalePackageCaches(IEnumerable<string> packageKeys)
+    {
+        var rootPath = ModStudioPaths.RuntimePackageCachePath;
+        if (!Directory.Exists(rootPath))
+        {
+            return;
+        }
+
+        var knownPackageKeys = new HashSet<string>(packageKeys.Where(key => !string.IsNullOrWhiteSpace(key)), StringComparer.Ordinal);
+        if (knownPackageKeys.Count == 0)
+        {
+            foreach (var directory in Directory.EnumerateDirectories(rootPath))
+            {
+                try
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+                catch
+                {
+                    // Best effort cleanup only.
+                }
+            }
+            return;
+        }
+
+        foreach (var directory in Directory.EnumerateDirectories(rootPath))
+        {
+            var packageKey = Path.GetFileName(directory);
+            if (string.IsNullOrWhiteSpace(packageKey) || knownPackageKeys.Contains(packageKey))
+            {
+                continue;
+            }
+
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch
+            {
+                // Best effort cleanup only.
+            }
+        }
     }
 }

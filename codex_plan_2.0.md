@@ -1,0 +1,196 @@
+# Mod Studio 2.0
+
+## Summary
+- `Mod Studio` 改为“先选模式，再进入独立窗体”：
+  - 进入主菜单后先弹 `Mode Chooser`
+  - `Project Mode` 和 `Package Mode` 解耦成两个独立窗体
+- `Project Mode`：
+  - 全屏
+  - 顶部窄菜单栏
+  - 左 `20%` 实体列表
+  - 中 `60%` 编辑区
+  - 右 `20%` 详情区
+- `Package Mode`：
+  - 居中窗体
+  - 占屏幕约 `2/3`
+  - 左右比例 `4:6`
+  - 做成常规 mod 管理器
+- 文件工作流重构：
+  - 项目工程改为真实本地目录工程
+  - 包管理改为扫描游戏根目录 `/mods/STS2_Editor/mods/` 下递归出现的 `.sts2pack`
+  - `user://` 仅保留设置、缓存、最近项目、包启用状态和顺序
+
+## Implementation Changes
+- 模式入口：
+  - 新增 `ModStudioModeChooserDialog`
+  - 从主菜单点击 `Mod Studio` 后先弹模式选择
+  - 选 `Project Mode` 打开全屏编辑窗体
+  - 选 `Package Mode` 打开居中管理窗体
+- `Project Mode` UI：
+  - 新增 `ModStudioProjectWindow`
+  - 顶部窄菜单栏：`File / Edit / Language` + 右上角 `Exit`
+  - 强制隐藏游戏原本左下角红色返回按钮
+  - 关闭只走右上角 `Exit`
+  - 有未保存内容时，退出/切项目时弹 `保存并继续 / 不保存 / 取消`
+- `Project Mode` 左栏：
+  - 分类页签：角色 / 卡牌 / 遗物 / 药水 / 事件 / 附魔
+  - 搜索框：普通“名称包含”过滤
+  - 范围筛选：`All / Modified / Project New`
+  - 高密度滚动列表
+- `Project Mode` 中栏：
+  - `Basic`
+    - 只保留结构化字段表单
+    - 动作栏只保留 `保存`、`还原`
+    - 不再有 JSON、备注、运行时捕获
+    - `还原` = 清除该实体基础属性覆盖并恢复游戏原始值
+    - 角色字段至少支持：名字、描述、初始能量、初始血量、初始卡组、初始遗物、初始药水
+    - 卡牌字段至少支持：所属角色 ID、名字、描述、基础数值字段
+    - 其他实体支持：名字、描述、基础元数据字段
+  - `Assets`
+    - 中央只做“当前生效预览 vs 候选预览”并排对比
+    - 底部只保留 `保存应用`、`还原`
+    - `还原` = 立即清除素材覆盖并恢复原版素材
+  - `Graph`
+    - 使用 `GraphEdit + GraphNode`
+    - 支持拖拽、连线、删点、加点、自动布局、缩放
+    - 工具条包含 `Import`
+    - `Import` 可从当前项目已有对象或游戏内已有对象复制 graph
+- `Project Mode` 右栏：
+  - `Basic` 时显示原版只读信息
+  - `Assets` 时只有两个平级页签：
+    - 游戏内素材
+    - 导入的外部素材
+  - 两个页签都带普通搜索框，按“名称包含”过滤
+  - 两个页签下都是滚动列表
+  - 导入的外部素材第一项永远是 `添加外部素材`
+  - 点击素材只更新中栏候选预览，不立即写入项目
+  - `Graph` 时显示当前选中节点的属性编辑器和图级设置
+- Graph 自动化：
+  - 新增 `NativeBehaviorGraphTranslator`
+  - 打开已有卡牌/遗物/药水/事件时，优先尝试把原版常见效果自动翻译成 graph
+  - Phase 1 首批覆盖：伤害、格挡、抽牌、治疗、能量、金币/星数、施加能力、常见事件奖惩/分支
+  - 不支持的对象显示“暂不支持自动转 graph”，允许手动新建或导入 graph
+  - 新增 `GraphDescriptionGenerator`
+  - 当 graph 仅使用受支持节点时自动生成描述
+  - 用户手动填写描述时，手动值优先
+  - 同步维护一份“已支持/未支持自动转 graph 模式清单”
+- 项目工程改造：
+  - `EditorProjectStore` 改为按真实路径打开/保存项目
+  - 项目固定格式：
+    - `<ProjectRoot>/project.json`
+    - `<ProjectRoot>/assets/`
+  - 新建项目时由用户选择本地目录
+  - 打开项目时支持目录或 `project.json`
+  - 最近项目、语言、上次路径继续存 `user://`
+- `Package Mode`：
+  - 新增 `ModStudioPackageWindow`
+  - 居中显示，占屏幕约 `2/3`
+  - 顶部窄菜单栏，至少提供 `热重载`
+  - 左侧 `40%`：
+    - 搜索框
+    - mod 列表
+    - 每项含启用/禁用开关、标题、版本、拖拽排序手柄
+  - 支持上下拖拽修改顺序，顺序直接决定加载优先级
+  - 右侧 `60%`：
+    - 作者
+    - mod 描述
+    - 版本
+    - 包路径
+    - checksum
+    - override/graph/asset 摘要
+    - 冲突/禁用原因
+- 包扫描与热重载：
+  - 新增 `PublishedPackageLocator`
+  - `PackageMode` 只递归扫描：`<GameRoot>/mods/STS2_Editor/mods/`
+  - 只识别 `.sts2pack`
+  - `RuntimePackageCatalog` 改为从该真实目录读取包
+  - 运行时加载包时，将包内托管资源解压到 `user://cache/runtime_packages/...`
+  - `热重载` 的行为固定为：
+    - 重新递归扫描包目录
+    - 重建包索引
+    - 尽量保留未变化包的启用状态和顺序
+    - 移除已删除包的状态
+    - 重新解析运行时覆盖并刷新注册
+- 运行时生效：
+  - `Basic` 修改要求在新开一局时生效
+  - 函数级效果统一归到 `graph`
+  - 运行时 patch 层在开局时应用基础属性覆盖，在逻辑执行时优先走 graph 覆盖
+- 阶段实施顺序：
+  - `Stage 20`: 重建模式入口、`ProjectMode`/`PackageMode` 窗体壳层、隐藏红色返回按钮、退出确认、阶段文档
+  - `Stage 21`: 项目真实目录工作流、最近项目、目录打开/保存、导出目录策略、阶段文档
+  - `Stage 22`: `PackageMode` 真实目录递归扫描、列表拖拽、热重载、状态持久化、阶段文档
+  - `Stage 23`: `ProjectMode` 左栏/Basic/Assets 三栏完整接线、阶段文档
+  - `Stage 24`: Graph 画布重建、导入 graph、节点属性编辑、阶段文档
+  - `Stage 25`: 原版效果自动转 graph、描述自动生成、支持清单文档、阶段文档
+  - `Stage 26`: 实机测试、回归修复、交付文档
+- 阶段文档要求：
+  - 每完成一个阶段，在 `docs/progress` 新增一篇阶段文档
+  - 固定包含：
+    - 已开发内容
+    - 未开发内容
+    - 遇到的问题
+    - 后续如何解决
+    - 验证结果
+
+## Public Interfaces / Types
+- 新增：
+  - `ModStudioModeChooserDialog`
+  - `ModStudioProjectWindow`
+  - `ModStudioPackageWindow`
+  - `ModStudioProjectMenuBar`
+  - `ModStudioPackageMenuBar`
+  - `PublishedPackageLocator`
+  - `WorkspaceSessionState`
+  - `EntityDraft`
+  - `BasicDraft`
+  - `AssetDraft`
+  - `GraphDraft`
+  - `NativeBehaviorGraphTranslator`
+  - `GraphDescriptionGenerator`
+- 调整：
+  - `EditorProjectStore`：从 `user://projects` 模式改为真实路径工程模式
+  - `RuntimePackageCatalog`：从 `user://installed` 改为扫描游戏目录 `/mods/STS2_Editor/mods/`
+  - `RuntimePackageBackend`：支持真实目录热重载和状态保留
+  - `ModStudioPaths`：保留 `user://` 给缓存/设置/状态，并新增发布包根目录解析
+
+## Test Plan
+- 模式入口：
+  - 点击 `Mod Studio` 后先出现模式选择窗体
+  - 两种模式分别打开不同窗体
+- `Project Mode`：
+  - 真正全屏，无缩角、无只占 `2/3` 的问题
+  - 左/中/右三栏比例稳定
+  - 左下角红色返回按钮始终不可见
+  - `Basic` 只有结构化字段、保存、还原
+  - `Assets` 右栏只有两个平级页签和普通搜索框
+  - 外部素材页第一项始终是 `添加外部素材`
+  - `Graph` 为可拖拽节点图，不是文本列表
+- 项目目录：
+  - 新建项目可在任意本地目录初始化
+  - 打开项目支持目录或 `project.json`
+  - 保存后目录结构正确
+- `Package Mode`：
+  - 递归读取游戏目录 `/mods/STS2_Editor/mods/` 下所有 `.sts2pack`
+  - 搜索可按名称包含过滤
+  - 开关可启用/禁用
+  - 拖拽可改变顺序，顺序改变后覆盖优先级同步变化
+  - `热重载` 后新增/删除/替换的包能反映到列表和运行时
+  - 作者、描述、版本、路径、摘要等信息显示正确
+- Graph：
+  - 常见原版对象能自动转 graph
+  - 不支持对象明确提示
+  - graph 导入、保存、重新打开一致
+  - 受支持节点图可自动生成描述，手填描述优先
+- 运行时：
+  - `Basic` 修改在新开局真实生效
+  - graph 修改在运行中真实生效
+  - 多包覆盖逻辑不因 UI/目录重构回归
+- 文档：
+  - 每个阶段都有对应进度文档
+
+## Assumptions
+- `PackageMode` 的唯一真值源是游戏根目录 `/mods/STS2_Editor/mods/` 下递归扫描出的 `.sts2pack`。
+- `user://` 仅用于设置、缓存、最近项目、Package 启用状态和顺序。
+- 项目工程始终是本地真实目录，不再以 `user://projects` 作为主存储。
+- 外部素材导入按单图片文件处理。
+- graph 自动翻译和自动描述生成采用“常见模式优先、未支持项明确列出”的策略，不要求一次覆盖全部原版硬编码逻辑。

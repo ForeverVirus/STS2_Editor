@@ -1,4 +1,5 @@
 using STS2_Editor.Scripts.Editor.Core.Utilities;
+using Godot;
 
 namespace STS2_Editor.Scripts.Editor.Core.Utilities;
 
@@ -77,7 +78,7 @@ public static class ModStudioAssetReference
         }
 
         var root = string.IsNullOrWhiteSpace(installedPackagesRootPath)
-            ? ModStudioPaths.InstalledPackagesPath
+            ? ModStudioPaths.RuntimePackageCachePath
             : installedPackagesRootPath;
         return Path.Combine(root, packageKey, "assets", assetId, fileName);
     }
@@ -90,13 +91,42 @@ public static class ModStudioAssetReference
         }
 
         if (path.StartsWith("res://", StringComparison.OrdinalIgnoreCase) ||
-            path.StartsWith("user://", StringComparison.OrdinalIgnoreCase) ||
-            Path.IsPathRooted(path))
+            path.StartsWith("user://", StringComparison.OrdinalIgnoreCase))
         {
             return path;
         }
 
+        if (Path.IsPathRooted(path))
+        {
+            return TryLocalizeUserPath(path);
+        }
+
         var resolved = ResolveInstalledPackageAssetPath(path, installedPackagesRootPath);
-        return resolved is null ? null : Path.GetFullPath(resolved);
+        return resolved is null ? null : TryLocalizeUserPath(resolved);
+    }
+
+    private static string TryLocalizeUserPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var modStudioRoot = Path.GetFullPath(ModStudioPaths.RootPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (fullPath.StartsWith(modStudioRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            var relativePath = Path.GetRelativePath(modStudioRoot, fullPath)
+                .Replace(Path.DirectorySeparatorChar, '/')
+                .Replace(Path.AltDirectorySeparatorChar, '/');
+            return string.IsNullOrWhiteSpace(relativePath)
+                ? "user://sts2_editor"
+                : $"user://sts2_editor/{relativePath}";
+        }
+
+        var localized = ProjectSettings.LocalizePath(fullPath);
+        if (localized.StartsWith("user://", StringComparison.OrdinalIgnoreCase) ||
+            localized.StartsWith("res://", StringComparison.OrdinalIgnoreCase))
+        {
+            return localized;
+        }
+
+        return fullPath;
     }
 }

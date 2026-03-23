@@ -1,0 +1,236 @@
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:263)
+   C# backtrace (most recent call first):
+       [0] int Godot.NativeCalls.godot_icall_4_684(nint, nint, Godot.NativeInterop.godot_string_name, int, Godot.NativeInterop.godot_string_name, int)
+       [1] Godot.Error Godot.GraphEdit.ConnectNode(Godot.StringName, int, Godot.StringName, int)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnections()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnectionsSafe()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:263)
+   C# backtrace (most recent call first):
+       [0] int Godot.NativeCalls.godot_icall_4_684(nint, nint, Godot.NativeInterop.godot_string_name, int, Godot.NativeInterop.godot_string_name, int)
+       [1] Godot.Error Godot.GraphEdit.ConnectNode(Godot.StringName, int, Godot.StringName, int)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnections()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnectionsSafe()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:263)
+   C# backtrace (most recent call first):
+       [0] int Godot.NativeCalls.godot_icall_4_684(nint, nint, Godot.NativeInterop.godot_string_name, int, Godot.NativeInterop.godot_string_name, int)
+       [1] Godot.Error Godot.GraphEdit.ConnectNode(Godot.StringName, int, Godot.StringName, int)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnections()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnectionsSafe()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:263)
+   C# backtrace (most recent call first):
+       [0] int Godot.NativeCalls.godot_icall_4_684(nint, nint, Godot.NativeInterop.godot_string_name, int, Godot.NativeInterop.godot_string_name, int)
+       [1] Godot.Error Godot.GraphEdit.ConnectNode(Godot.StringName, int, Godot.StringName, int)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnections()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnectionsSafe()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:263)
+   C# backtrace (most recent call first):
+       [0] int Godot.NativeCalls.godot_icall_4_684(nint, nint, Godot.NativeInterop.godot_string_name, int, Godot.NativeInterop.godot_string_name, int)
+       [1] Godot.Error Godot.GraphEdit.ConnectNode(Godot.StringName, int, Godot.StringName, int)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnections()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnectionsSafe()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:263)
+   C# backtrace (most recent call first):
+       [0] int Godot.NativeCalls.godot_icall_4_684(nint, nint, Godot.NativeInterop.godot_string_name, int, Godot.NativeInterop.godot_string_name, int)
+       [1] Godot.Error Godot.GraphEdit.ConnectNode(Godot.StringName, int, Godot.StringName, int)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnections()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnectionsSafe()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.Node.AddChild(Godot.Node, bool, Godot.Node+InternalMode)
+       [1] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.RebuildCanvasNow()
+       [2] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [3] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:263)
+   C# backtrace (most recent call first):
+       [0] int Godot.NativeCalls.godot_icall_4_684(nint, nint, Godot.NativeInterop.godot_string_name, int, Godot.NativeInterop.godot_string_name, int)
+       [1] Godot.Error Godot.GraphEdit.ConnectNode(Godot.StringName, int, Godot.StringName, int)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnections()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnectionsSafe()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:263)
+   C# backtrace (most recent call first):
+       [0] int Godot.NativeCalls.godot_icall_4_684(nint, nint, Godot.NativeInterop.godot_string_name, int, Godot.NativeInterop.godot_string_name, int)
+       [1] Godot.Error Godot.GraphEdit.ConnectNode(Godot.StringName, int, Godot.StringName, int)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnections()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.ApplyConnectionsSafe()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:443)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:664)
+[INFO] Limiting background FPS to 30
+[INFO] Restored foreground FPS
+[INFO] Limiting background FPS to 30
+[INFO] Restored foreground FPS
+[INFO] Limiting background FPS to 30
+[INFO] Restored foreground FPS
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.GraphElement.SetPositionOffset(Godot.Vector2)
+       [1] void Godot.GraphElement.set_PositionOffset(Godot.Vector2)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.AutoLayout()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphEditor.<BuildUi>b__21_3()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.GraphElement.SetPositionOffset(Godot.Vector2)
+       [1] void Godot.GraphElement.set_PositionOffset(Godot.Vector2)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.AutoLayout()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphEditor.<BuildUi>b__21_3()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)
+ERROR: connections_layer is missing.
+   at: (scene/gui/graph_edit.cpp:639)
+   C# backtrace (most recent call first):
+       [0] void Godot.GraphElement.SetPositionOffset(Godot.Vector2)
+       [1] void Godot.GraphElement.set_PositionOffset(Godot.Vector2)
+       [2] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphCanvasView.AutoLayout()
+       [3] void STS2_Editor.Scripts.Editor.UI.ModStudioGraphEditor.<BuildUi>b__21_3()
+       [4] void Godot.Callable.<From>g__Trampoline|1_0(object, Godot.NativeInterop.NativeVariantPtrArgs, Godot.NativeInterop.godot_variant&)
+       [5] void Godot.DelegateUtils.InvokeWithVariantArgs(nint, System.Void*, Godot.NativeInterop.godot_variant**, int, Godot.NativeInterop.godot_variant*)

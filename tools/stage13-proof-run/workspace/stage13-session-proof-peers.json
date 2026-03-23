@@ -1,0 +1,44 @@
+{
+  "peerSnapshots": [
+    {
+      "peerId": "peer-ab",
+      "packages": [
+        {
+          "packageKey": "stage06_gameplay_proof@1.0.0",
+          "checksum": "d6d8af7a365d640baf7962166382e45eb0cfcce4309629d189be43bcfded5b06"
+        },
+        {
+          "packageKey": "stage09_custom_content_proof@1.0.0",
+          "checksum": "1b45131605c0e9e09e0fc46136596100e74285b24df20eac2e48324f32695838"
+        },
+        {
+          "packageKey": "stage10_external_asset_proof@1.0.0",
+          "checksum": "0aec9fd7d26783d2f61e37db2ac18410cd3d9c5d56d00e178d8956f4840f5b25"
+        },
+        {
+          "packageKey": "stage12_event_template_proof@1.0.0",
+          "checksum": "f1fac3a5d44677ddb57c51220544a3f2fdf1425f7ab72971bad039c3cb6368a6"
+        },
+        {
+          "packageKey": "stage13_session_a@1.0.0",
+          "checksum": "8d3ba34a95efb32c4534e0d711fb1f675b317debf0d74208db20876bad76f5a0"
+        },
+        {
+          "packageKey": "stage13_session_b@1.0.0",
+          "checksum": "62216dd9694d465187ea0e2d0565365c1269aa481659043e07b90ce60bf8fcc4"
+        }
+      ]
+    }
+  ],
+  "focusPackageKeys": [
+    "stage13_session_a@1.0.0",
+    "stage13_session_b@1.0.0",
+    "stage13_session_c@1.0.0"
+  ],
+  "focusEntities": [
+    {
+      "entityKind": "Card",
+      "entityId": "COOLHEADED"
+    }
+  ]
+}

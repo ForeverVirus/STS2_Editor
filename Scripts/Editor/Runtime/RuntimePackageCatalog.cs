@@ -9,23 +9,18 @@ namespace STS2_Editor.Scripts.Editor.Runtime;
 public sealed class RuntimePackageCatalog
 {
     private readonly PackageArchiveService _archiveService;
-    private readonly string _installedPackagesRootPath;
+    private readonly PublishedPackageLocator _locator;
 
     public RuntimePackageCatalog(PackageArchiveService archiveService)
     {
         _archiveService = archiveService ?? throw new ArgumentNullException(nameof(archiveService));
-        _installedPackagesRootPath = ModStudioPaths.InstalledPackagesPath;
+        _locator = new PublishedPackageLocator();
     }
 
     public IReadOnlyList<RuntimeInstalledPackage> DiscoverInstalledPackages()
     {
-        if (!Directory.Exists(_installedPackagesRootPath))
-        {
-            return Array.Empty<RuntimeInstalledPackage>();
-        }
-
         var packages = new List<RuntimeInstalledPackage>();
-        foreach (var sourcePath in EnumeratePackageSources())
+        foreach (var sourcePath in _locator.DiscoverPublishedPackageFiles())
         {
             if (TryLoadPackage(sourcePath, out var package))
             {
@@ -36,7 +31,9 @@ public sealed class RuntimePackageCatalog
         return packages
             .GroupBy(package => package.PackageKey, StringComparer.Ordinal)
             .Select(group => group
-                .OrderByDescending(package => package.IsDirectoryArchive)
+                .OrderByDescending(package => File.Exists(package.PackageFilePath)
+                    ? File.GetLastWriteTimeUtc(package.PackageFilePath)
+                    : DateTime.MinValue)
                 .ThenBy(package => package.PackageFilePath, StringComparer.OrdinalIgnoreCase)
                 .First())
             .OrderBy(package => package.Manifest.PackageKey, StringComparer.Ordinal)
@@ -58,34 +55,7 @@ public sealed class RuntimePackageCatalog
             return false;
         }
 
-        if (TryLoadArchivePackage(packagePath, out package))
-        {
-            return true;
-        }
-
-        return TryLoadDirectoryPackage(packagePath, out package);
-    }
-
-    private IEnumerable<string> EnumeratePackageSources()
-    {
-        foreach (var file in Directory.EnumerateFiles(_installedPackagesRootPath, "*.*", SearchOption.TopDirectoryOnly))
-        {
-            var extension = Path.GetExtension(file);
-            if (extension.Equals(".sts2pack", StringComparison.OrdinalIgnoreCase) ||
-                extension.Equals(".zip", StringComparison.OrdinalIgnoreCase))
-            {
-                yield return file;
-            }
-        }
-
-        foreach (var directory in Directory.EnumerateDirectories(_installedPackagesRootPath, "*", SearchOption.TopDirectoryOnly))
-        {
-            if (File.Exists(Path.Combine(directory, "manifest.json")) &&
-                File.Exists(Path.Combine(directory, "project.json")))
-            {
-                yield return directory;
-            }
-        }
+        return TryLoadArchivePackage(packagePath, out package);
     }
 
     private bool TryLoadArchivePackage(string packagePath, out RuntimeInstalledPackage package)
@@ -107,33 +77,26 @@ public sealed class RuntimePackageCatalog
         package.DisplayName = manifest.DisplayName;
         package.Checksum = NormalizeChecksum(manifest.Checksum, package.Manifest, package.Project);
         package.IsDirectoryArchive = false;
+        ExtractManagedAssets(packagePath, manifest, project);
         return true;
     }
 
-    private bool TryLoadDirectoryPackage(string packagePath, out RuntimeInstalledPackage package)
+    private void ExtractManagedAssets(string packagePath, EditorPackageManifest manifest, EditorProject project)
     {
-        package = new RuntimeInstalledPackage();
-        var manifestPath = Path.Combine(packagePath, "manifest.json");
-        var projectPath = Path.Combine(packagePath, "project.json");
-
-        if (!File.Exists(manifestPath) || !File.Exists(projectPath))
+        var cacheDirectory = ModStudioPaths.GetRuntimePackageDirectory(manifest.PackageKey);
+        try
         {
-            return false;
+            if (Directory.Exists(cacheDirectory))
+            {
+                Directory.Delete(cacheDirectory, recursive: true);
+            }
+        }
+        catch
+        {
+            // Best effort cleanup; stale cache files will be overwritten when possible.
         }
 
-        var manifest = ModStudioJson.LoadOrDefault(manifestPath, () => new EditorPackageManifest());
-        var project = ModStudioJson.LoadOrDefault(projectPath, () => new EditorProject());
-
-        package.Manifest = manifest;
-        package.Project = project;
-        package.PackageFilePath = Path.GetFullPath(packagePath);
-        package.PackageKey = manifest.PackageKey;
-        package.PackageId = manifest.PackageId;
-        package.Version = manifest.Version;
-        package.DisplayName = manifest.DisplayName;
-        package.Checksum = NormalizeChecksum(manifest.Checksum, package.Manifest, package.Project);
-        package.IsDirectoryArchive = true;
-        return true;
+        _archiveService.ExtractManagedAssets(packagePath, manifest, project, ModStudioPaths.RuntimePackageCachePath);
     }
 
     private static string NormalizeChecksum(string checksum, EditorPackageManifest manifest, EditorProject project)

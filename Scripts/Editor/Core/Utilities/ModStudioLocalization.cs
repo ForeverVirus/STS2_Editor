@@ -9,8 +9,6 @@ public static class ModStudioLocalization
     public const string ChineseLanguageCode = "zh-CN";
     public const string EnglishLanguageCode = "en-US";
 
-    private static readonly string SettingsFilePath = Path.Combine(ModStudioPaths.RootPath, "settings.json");
-
     private static readonly IReadOnlyDictionary<string, ModStudioLocalizedText> Texts = CreateTexts();
 
     private static bool _initialized;
@@ -31,18 +29,19 @@ public static class ModStudioLocalization
 
         _initialized = true;
         ModStudioPaths.EnsureAllDirectories();
-        _settings = LoadSettings();
+        _settings = ModStudioSettingsStore.Load();
         CurrentLanguageCode = NormalizeLanguageCode(_settings.UiLanguageCode);
         if (!string.Equals(_settings.UiLanguageCode, CurrentLanguageCode, StringComparison.OrdinalIgnoreCase))
         {
             _settings.UiLanguageCode = CurrentLanguageCode;
-            SaveSettings(_settings);
+            ModStudioSettingsStore.Save(_settings);
         }
     }
 
     public static bool SetLanguage(string languageCode)
     {
         Initialize();
+        _settings = ModStudioSettingsStore.Load();
         var normalized = NormalizeLanguageCode(languageCode);
         if (string.Equals(CurrentLanguageCode, normalized, StringComparison.OrdinalIgnoreCase))
         {
@@ -51,7 +50,7 @@ public static class ModStudioLocalization
 
         CurrentLanguageCode = normalized;
         _settings.UiLanguageCode = normalized;
-        SaveSettings(_settings);
+        ModStudioSettingsStore.Save(_settings);
         LanguageChanged?.Invoke();
         return true;
     }
@@ -90,29 +89,6 @@ public static class ModStudioLocalization
             ModStudioEntityKind.Monster => T("entity.monster"),
             _ => kind.ToString()
         };
-    }
-
-    private static ModStudioSettings LoadSettings()
-    {
-        try
-        {
-            if (!File.Exists(SettingsFilePath))
-            {
-                return new ModStudioSettings();
-            }
-
-            return JsonSerializer.Deserialize<ModStudioSettings>(File.ReadAllText(SettingsFilePath), ModStudioJson.Options)
-                ?? new ModStudioSettings();
-        }
-        catch
-        {
-            return new ModStudioSettings();
-        }
-    }
-
-    private static void SaveSettings(ModStudioSettings settings)
-    {
-        ModStudioJson.Save(SettingsFilePath, settings);
     }
 
     private static string NormalizeLanguageCode(string? languageCode)
@@ -177,6 +153,7 @@ public static class ModStudioLocalization
         Add(texts, "label.override_editor", "覆盖编辑器", "Override Editor");
         Add(texts, "label.graph_id", "Graph ID", "Graph Id");
         Add(texts, "label.quick_presets", "快速模板", "Quick Presets");
+        Add(texts, "label.graph_canvas", "可视化 Graph", "Visual Graph");
         Add(texts, "label.graph_json", "Graph JSON", "Graph JSON");
         Add(texts, "label.graph_validation", "Graph 校验", "Graph Validation");
         Add(texts, "label.node_catalog", "节点目录", "Node Catalog");
@@ -367,6 +344,7 @@ public static class ModStudioLocalization
         Add(texts, "misc.unavailable", "<不可用：{0}>", "<unavailable: {0}>");
 
         Add(texts, "label.asset_binding", "\u8d44\u4ea7\u7ed1\u5b9a", "Asset Binding");
+        Add(texts, "label.asset_preview", "\u8d44\u4ea7\u9884\u89c8", "Asset Preview");
         Add(texts, "label.asset_catalog", "\u539f\u7248\u8d44\u4ea7\u76ee\u5f55", "Runtime Asset Catalog");
         Add(texts, "button.use_runtime_asset", "\u4f7f\u7528\u5f53\u524d\u539f\u7248\u8d44\u4ea7", "Use Runtime Asset");
         Add(texts, "button.apply_asset_path", "\u5e94\u7528\u8def\u5f84", "Apply Path");
@@ -616,6 +594,7 @@ public static class ModStudioLocalization
         Add(texts, "bool.false", "否", "False");
         Add(texts, "misc.unknown", "未知", "unknown");
         Add(texts, "misc.unavailable", "<不可用：{0}>", "<unavailable: {0}>");
+        Add(texts, "list.project_only", "项目自定义", "Project Custom");
 
         Add(texts, "button.new_entry", "\u65b0\u5efa\u6761\u76ee", "New Entry");
         Add(texts, "placeholder.project_only_entry", "\u9879\u76ee\u6682\u5b58\u81ea\u5b9a\u4e49\u6761\u76ee", "Project-staged custom entry");
@@ -641,7 +620,88 @@ public static class ModStudioLocalization
         Add(texts, "default.enchantment_title", "\u65b0\u9644\u9b54 {0}", "New Enchantment {0}");
         Add(texts, "default.enchantment_description", "Mod Studio \u65b0\u9644\u9b54\u63cf\u8ff0\u3002", "Mod Studio custom enchantment description.");
         Add(texts, "default.entry_notes", "\u901a\u8fc7 Mod Studio \u65b0\u5efa\u7684\u6761\u76ee\u3002", "Created through Mod Studio.");
+        Add(texts, "tab.project_home", "\u9879\u76ee\u9996\u9875", "Project Home");
+        Add(texts, "tab.project_workspace", "\u7f16\u8f91\u5de5\u4f5c\u533a", "Editor Workspace");
+        Add(texts, "tab.overview", "\u6982\u89c8", "Overview");
+        Add(texts, "tab.metadata", "\u5143\u6570\u636e", "Metadata");
+        Add(texts, "tab.assets", "\u8d44\u6e90", "Assets");
+        Add(texts, "tab.graph", "Graph", "Graph");
+        Add(texts, "button.enter_workspace", "\u8fdb\u5165\u7f16\u8f91", "Enter Editor");
+        Add(texts, "button.back_to_projects", "\u8fd4\u56de\u9879\u76ee\u9875", "Back To Projects");
+        Add(texts, "label.workspace_project", "\u5f53\u524d\u7f16\u8f91\u9879\u76ee", "Current Editing Project");
+        Add(texts, "label.entity_browser", "\u53ef\u7f16\u8f91\u5185\u5bb9", "Editable Content");
+        Add(texts, "label.selected_object", "\u9009\u4e2d\u6761\u76ee\u5de5\u4f5c\u533a", "Selected Entry Workspace");
+        Add(texts, "label.structured_fields", "\u5e38\u7528\u5b57\u6bb5", "Common Fields");
+        Add(texts, "label.advanced_json", "\u9ad8\u7ea7 JSON", "Advanced JSON");
+        Add(texts, "placeholder.project_home_intro", "\u7b2c\u4e00\u6b65\uff1a\u5148\u65b0\u5efa\u6216\u6253\u5f00\u4e00\u4e2a\u9879\u76ee\u3002\u9879\u76ee\u662f\u5236\u4f5c Mod \u7684\u5de5\u7a0b\u6587\u4ef6\uff0c\u540e\u7eed\u7684\u6240\u6709\u7f16\u8f91\u3001\u5bfc\u51fa\u3001\u7ef4\u62a4\u90fd\u56f4\u7ed5\u9879\u76ee\u8fdb\u884c\u3002", "Step 1: create or open a project. A project is the editable workspace for building and maintaining a mod.");
+        Add(texts, "placeholder.project_home_guide", "\u63a8\u8350\u6d41\u7a0b\uff1a1. \u65b0\u5efa/\u6253\u5f00\u9879\u76ee  2. \u8fdb\u5165\u7f16\u8f91\u5de5\u4f5c\u533a  3. \u9009\u62e9\u7c7b\u578b\u548c\u5177\u4f53\u6761\u76ee  4. \u5206\u522b\u5728\u300c\u5143\u6570\u636e\u300d\u300c\u8d44\u6e90\u300d\u300cGraph\u300d\u9875\u7b7e\u5b8c\u6210\u4fee\u6539\u3002", "Recommended flow: 1. Create/Open a project. 2. Enter the editor workspace. 3. Choose a content type and entry. 4. Edit it in the Metadata, Assets, and Graph tabs.");
+        Add(texts, "placeholder.workspace_intro", "\u7b2c\u4e8c\u6b65\uff1a\u5148\u9009\u62e9\u7c7b\u578b\uff0c\u518d\u5728\u5217\u8868\u4e2d\u9009\u4e2d\u4e00\u4e2a\u5177\u4f53\u6761\u76ee\u3002\u5de6\u4fa7\u662f\u5217\u8868\uff0c\u53f3\u4fa7\u6309\u300c\u6982\u89c8 / \u5143\u6570\u636e / \u8d44\u6e90 / Graph\u300d\u5206\u5f00\u7f16\u8f91\u3002", "Step 2: choose a content type, then select an entry from the list. The left side is the browser, and the right side separates Overview, Metadata, Assets, and Graph editing.");
+        Add(texts, "placeholder.search_entities", "\u641c\u7d22 ID\u3001\u540d\u79f0\u6216\u6458\u8981", "Search by id, title, or summary");
+        Add(texts, "placeholder.metadata_fields_empty", "\u5f53\u524d\u6ca1\u6709\u53ef\u751f\u6210\u7684\u5143\u6570\u636e\u5b57\u6bb5\u3002", "No editable metadata fields are available for the current selection.");
+        Add(texts, "placeholder.no_workspace_project", "\u8bf7\u5148\u5728\u300c\u9879\u76ee\u9996\u9875\u300d\u65b0\u5efa\u6216\u6253\u5f00\u4e00\u4e2a\u9879\u76ee\uff0c\u518d\u8fdb\u5165\u7f16\u8f91\u5de5\u4f5c\u533a\u3002", "Create or open a project from Project Home before entering the editor workspace.");
+        Add(texts, "status.select_project_before_workspace", "\u8bf7\u5148\u65b0\u5efa\u6216\u6253\u5f00\u4e00\u4e2a\u9879\u76ee\uff0c\u518d\u8fdb\u5165\u7f16\u8f91\u5de5\u4f5c\u533a\u3002", "Create or open a project before entering the editor workspace.");
+        Add(texts, "status.browser_summary", "{0} 列表：{1} 项", "{0} list: {1} items");
 
+        Add(texts, "button.apply_selected_runtime_asset", "\u5e94\u7528\u9009\u4e2d\u6e38\u620f\u7d20\u6750", "Apply Selected Game Asset");
+        Add(texts, "button.apply_selected_project_asset", "\u5e94\u7528\u9009\u4e2d\u9879\u76ee\u7d20\u6750", "Apply Selected Project Asset");
+        Add(texts, "label.asset_binding_path", "\u5f53\u524d\u7ed1\u5b9a\u8def\u5f84", "Current Binding Path");
+        Add(texts, "label.project_asset_library", "\u9879\u76ee\u7d20\u6750\u5e93", "Project Asset Library");
+        Add(texts, "tab.details", "\u8be6\u60c5", "Details");
+        Add(texts, "tab.graph_tools", "Graph \u5de5\u5177", "Graph Tools");
+        Add(texts, "tab.actions", "\u64cd\u4f5c", "Actions");
+        Add(texts, "tab.asset_current", "\u5f53\u524d\u7ed1\u5b9a", "Current Binding");
+        Add(texts, "tab.asset_runtime", "\u6e38\u620f\u5185\u7d20\u6750", "Game Assets");
+        Add(texts, "tab.asset_project", "\u9879\u76ee\u5df2\u5bfc\u5165", "Imported Assets");
+        Add(texts, "filter.browser_scope_all", "\u5168\u90e8\u6761\u76ee", "All Entries");
+        Add(texts, "filter.browser_scope_modified", "\u4ec5\u770b\u5df2\u4fee\u6539", "Modified Only");
+        Add(texts, "filter.browser_scope_project_only", "\u4ec5\u770b\u9879\u76ee\u65b0\u5efa", "Project New Only");
+        Add(texts, "browser.badge.project_only", "\u9879\u76ee\u65b0\u5efa", "Project New");
+        Add(texts, "browser.badge.override", "\u5df2\u8986\u76d6", "Override");
+        Add(texts, "browser.badge.graph", "Graph", "Graph");
+        Add(texts, "browser.badge.native", "\u539f\u7248\u903b\u8f91", "Native");
+        Add(texts, "browser.badge.assets", "\u7d20\u6750", "Assets");
+        Add(texts, "placeholder.asset_workflow_intro", "\u8d44\u6e90\u9875\u7b7e\u5df2\u6309\u300c\u5f53\u524d\u7ed1\u5b9a / \u6e38\u620f\u5185\u7d20\u6750 / \u9879\u76ee\u5df2\u5bfc\u5165\u300d\u62c6\u5f00\u3002\u5148\u770b\u5f53\u524d\u7ed1\u5b9a\uff0c\u518d\u51b3\u5b9a\u662f\u4ece\u6e38\u620f\u5185\u7d20\u6750\u91cc\u9009\uff0c\u8fd8\u662f\u4ece\u5916\u90e8\u5bfc\u5165\u5e76\u7ba1\u7406\u9879\u76ee\u7d20\u6750\u3002", "The asset tab is split into Current Binding, Game Assets, and Imported Assets. Start by checking the current binding, then decide whether to reuse an in-game asset or import/manage a project asset.");
+        Add(texts, "placeholder.asset_runtime_intro", "\u7b2c\u4e00\u79cd\u65b9\u5f0f\uff1a\u4ece\u6e38\u620f\u539f\u6709\u7d20\u6750\u4e2d\u9009\u62e9\u3002\u5de6\u4fa7\u662f\u53ef\u9009\u7d20\u6750\u5217\u8868\uff0c\u53f3\u4fa7\u4f1a\u9884\u89c8\u4f60\u5f53\u524d\u9009\u4e2d\u7684\u7d20\u6750\u3002", "Path 1: choose from assets already shipped with the game. The left side lists candidates, and the right side previews the currently selected asset.");
+        Add(texts, "placeholder.asset_project_library_intro", "\u7b2c\u4e8c\u79cd\u65b9\u5f0f\uff1a\u5bfc\u5165\u5916\u90e8\u56fe\u7247\u5230\u9879\u76ee\u7d20\u6750\u5e93\uff0c\u7136\u540e\u518d\u590d\u7528\u5230\u4e0d\u540c\u7684\u5361\u724c/\u9057\u7269/\u836f\u6c34\u4e0a\u3002", "Path 2: import an external image into the project asset library, then reuse it across cards, relics, potions, and other supported entries.");
+        Add(texts, "placeholder.asset_runtime_select", "\u4ece\u5de6\u4fa7\u5217\u8868\u9009\u4e2d\u4e00\u4e2a\u6e38\u620f\u5185\u7d20\u6750\u540e\uff0c\u8fd9\u91cc\u4f1a\u663e\u793a\u8be6\u60c5\u548c\u9884\u89c8\u3002", "Select an in-game asset from the left list to inspect its details and preview here.");
+        Add(texts, "placeholder.asset_project_select", "\u4ece\u5de6\u4fa7\u7684\u9879\u76ee\u7d20\u6750\u5e93\u9009\u4e2d\u4e00\u4e2a\u5df2\u5bfc\u5165\u56fe\u7247\uff0c\u7136\u540e\u53ef\u4ee5\u76f4\u63a5\u5e94\u7528\u5230\u5f53\u524d\u6761\u76ee\u3002", "Select an imported project asset from the left library to preview it here and apply it to the current entry.");
+        Add(texts, "placeholder.asset_project_library_empty", "\u5f53\u524d\u9879\u76ee\u8fd8\u6ca1\u6709\u8fd9\u4e2a\u7d20\u6750\u89d2\u8272\u7684\u5df2\u5bfc\u5165\u56fe\u7247\u3002", "The current project does not have any imported assets for this asset role yet.");
+        Add(texts, "placeholder.workspace_actions_intro", "\u8fd9\u91cc\u662f\u5f53\u524d\u6761\u76ee\u7684\u5feb\u6377\u64cd\u4f5c\u533a\u3002\u5148\u770b\u5de6\u4fa7\u5217\u8868\uff0c\u5728\u4e2d\u95f4\u4e3b\u821e\u53f0\u7f16\u8f91\uff0c\u518d\u5728\u53f3\u4fa7\u68c0\u89c6\u533a\u4fdd\u5b58\u3001\u5957\u6a21\u677f\u6216\u8c03\u8bd5 Graph\u3002", "This is the quick action area for the current entry. Browse on the left, edit on the center stage, then save or debug from the right-side drawer.");
+        Add(texts, "status.select_runtime_asset_from_catalog", "\u8bf7\u5148\u4ece\u300c\u6e38\u620f\u5185\u7d20\u6750\u300d\u5217\u8868\u9009\u4e2d\u4e00\u4e2a\u56fe\u7247\u3002", "Select an asset from the Game Assets list first.");
+        Add(texts, "status.select_project_asset_from_library", "\u8bf7\u5148\u4ece\u300c\u9879\u76ee\u5df2\u5bfc\u5165\u300d\u5217\u8868\u9009\u4e2d\u4e00\u4e2a\u56fe\u7247\u3002", "Select an asset from the Imported Assets list first.");
+        Add(texts, "status.applied_project_asset", "\u5df2\u5c06\u9879\u76ee\u7d20\u6750 {0} \u5e94\u7528\u5230 {1}\u3002", "Applied project asset {0} to {1}.");
+        Add(texts, "status.apply_project_asset_failed", "\u5e94\u7528\u9879\u76ee\u7d20\u6750\u5931\u8d25\uff1a{0}", "Apply project asset failed: {0}");
+        Add(texts, "detail.path", "\u8def\u5f84\uff1a{0}", "Path: {0}");
+        Add(texts, "detail.file_name", "\u6587\u4ef6\u540d\uff1a{0}", "File Name: {0}");
+        Add(texts, "detail.source_path", "\u6765\u6e90\u8def\u5f84\uff1a{0}", "Source Path: {0}");
+        Add(texts, "detail.managed_path", "\u9879\u76ee\u7ba1\u7406\u8def\u5f84\uff1a{0}", "Managed Path: {0}");
+        Add(texts, "detail.logical_role", "\u7d20\u6750\u89d2\u8272\uff1a{0}", "Asset Role: {0}");
+        Add(texts, "detail.preview_state", "\u9884\u89c8\u53ef\u7528\uff1a{0}", "Preview Available: {0}");
+        Add(texts, "asset.catalog_click_to_preview", "\u70b9\u51fb\u9884\u89c8", "Click to preview");
+        Add(texts, "asset.catalog_selected", "\u5df2\u9009\u4e2d\uff0c\u53ef\u4ee5\u76f4\u63a5\u5e94\u7528", "Selected, ready to apply");
+        Add(texts, "button.close_editor", "\u9000\u51fa", "Exit");
+        Add(texts, "button.save_and_exit", "\u4fdd\u5b58\u5e76\u9000\u51fa", "Save and Exit");
+        Add(texts, "button.discard_and_exit", "\u4e0d\u4fdd\u5b58\u9000\u51fa", "Discard and Exit");
+        Add(texts, "button.cancel_close", "\u53d6\u6d88", "Cancel");
+        Add(texts, "tab.basic", "\u57fa\u7840\u4fe1\u606f", "Basic");
+        Add(texts, "label.details_panel", "\u8be6\u7ec6\u4fe1\u606f", "Details");
+        Add(texts, "label.asset_original_preview", "\u5f53\u524d\u8d44\u6e90", "Current Asset");
+        Add(texts, "label.asset_candidate_preview", "\u5019\u9009\u9884\u89c8", "Candidate Preview");
+        Add(texts, "label.node_properties", "\u8282\u70b9\u5c5e\u6027", "Node Properties");
+        Add(texts, "label.name", "\u540d\u79f0", "Name");
+        Add(texts, "dialog.unsaved_changes_title", "\u672a\u4fdd\u5b58\u7684\u4fee\u6539", "Unsaved Changes");
+        Add(texts, "dialog.unsaved_changes_body", "\u5f53\u524d\u8fd8\u6709\u672a\u4fdd\u5b58\u7684\u4fee\u6539\u3002\u5173\u95ed Mod Studio \u524d\uff0c\u4f60\u53ef\u4ee5\u5148\u4fdd\u5b58\uff0c\u6216\u8005\u76f4\u63a5\u4e22\u5f03\u8fd9\u4e9b\u4fee\u6539\u3002", "There are unsaved changes in Mod Studio. Save them before closing, or discard them.");
+        Add(texts, "placeholder.asset_compare_intro", "\u5de6\u4fa7\u663e\u793a\u5f53\u524d\u751f\u6548\u7684\u8d44\u6e90\uff0c\u53f3\u4fa7\u663e\u793a\u4f60\u6b63\u5728\u6311\u9009\u6216\u8f93\u5165\u7684\u5019\u9009\u8d44\u6e90\u3002\u786e\u8ba4\u540e\u518d\u4fdd\u5b58\u3002", "Left shows the current resolved asset. Right shows the candidate asset you are staging before applying.");
+        Add(texts, "placeholder.asset_compare_select_candidate", "\u4ece\u53f3\u4fa7\u8d44\u6e90\u9762\u677f\u9009\u62e9\u4e00\u4e2a\u6e38\u620f\u5185\u8d44\u6e90\u3001\u9879\u76ee\u8d44\u6e90\uff0c\u6216\u8005\u8f93\u5165\u8def\u5f84\u6765\u9884\u89c8\u3002", "Select a runtime asset, project asset, or type a path on the right to preview it here.");
+        Add(texts, "placeholder.asset_compare_ready", "\u5019\u9009\u8d44\u6e90\u5df2\u7ecf\u51c6\u5907\u597d\uff0c\u786e\u8ba4\u65e0\u8bef\u540e\u70b9\u51fb\u4fdd\u5b58\u6216\u5e94\u7528\u3002", "The candidate asset is ready. Apply or save it after confirming the comparison.");
+        Add(texts, "placeholder.graph_node_type", "\u8282\u70b9\u7c7b\u578b\uff1a\u672a\u9009\u4e2d", "Node Type: none");
+        Add(texts, "placeholder.graph_node_id", "\u8282\u70b9 ID\uff1a\u672a\u9009\u4e2d", "Node Id: none");
+        Add(texts, "placeholder.graph_node_select", "\u5728\u4e2d\u95f4\u753b\u5e03\u91cc\u9009\u62e9\u4e00\u4e2a\u8282\u70b9\u540e\uff0c\u8fd9\u91cc\u4f1a\u663e\u793a\u5b83\u7684\u8be6\u7ec6\u5c5e\u6027\u3002", "Select a node in the graph canvas to edit its details here.");
+        Add(texts, "placeholder.graph_node_properties_empty", "\u5f53\u524d\u8282\u70b9\u6ca1\u6709\u989d\u5916\u5c5e\u6027\u3002", "The selected node does not expose extra properties.");
+        Add(texts, "detail.original_path", "\u5f53\u524d\u8def\u5f84\uff1a{0}", "Current Path: {0}");
+        Add(texts, "detail.candidate_path", "\u5019\u9009\u8def\u5f84\uff1a{0}", "Candidate Path: {0}");
+        Add(texts, "detail.node_type", "\u8282\u70b9\u7c7b\u578b\uff1a{0}", "Node Type: {0}");
+        Add(texts, "detail.node_id", "\u8282\u70b9 ID\uff1a{0}", "Node Id: {0}");
         return texts;
     }
 

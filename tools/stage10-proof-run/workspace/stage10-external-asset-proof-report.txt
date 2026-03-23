@@ -1,0 +1,30 @@
+Stage 10 External Asset Proof Package Generator
+Workspace: F:\sts2_mod\mod_projects\STS2_editor\tools\stage10-proof-run\workspace
+Game user root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2
+Editor root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor
+Saved editor project: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage10_external_asset_proof\project.json
+Generated PNG: F:\sts2_mod\mod_projects\STS2_editor\tools\stage10-proof-run\workspace\generated-assets\stage10_card.png
+Generated PNG: F:\sts2_mod\mod_projects\STS2_editor\tools\stage10-proof-run\workspace\generated-assets\stage10_relic.png
+Generated PNG: F:\sts2_mod\mod_projects\STS2_editor\tools\stage10-proof-run\workspace\generated-assets\stage10_potion.png
+Managed asset path (card): C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage10_external_asset_proof\assets\4e85c3989cf1419f9ceeacc2179986d0\stage10_card.png
+Managed asset path (relic): C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage10_external_asset_proof\assets\c0007bc6a0f44fae8d51c18b82d74796\stage10_relic.png
+Managed asset path (potion): C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage10_external_asset_proof\assets\40fd273363ed43bb915e85e41f4599b2\stage10_potion.png
+Exported package: F:\sts2_mod\mod_projects\STS2_editor\tools\stage10-proof-run\workspace\stage10-external-asset-proof.sts2pack
+Copied package to editor exports: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\exports\stage10-external-asset-proof.sts2pack
+Installed package: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage10_external_asset_proof@1.0.0
+Session file: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\session.json
+Package key: stage10_external_asset_proof@1.0.0
+Checksum: 0aec9fd7d26783d2f61e37db2ac18410cd3d9c5d56d00e178d8956f4840f5b25
+Verified install-time asset paths:
+  - C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage10_external_asset_proof@1.0.0\assets\4e85c3989cf1419f9ceeacc2179986d0\stage10_card.png
+  - C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage10_external_asset_proof@1.0.0\assets\c0007bc6a0f44fae8d51c18b82d74796\stage10_relic.png
+  - C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage10_external_asset_proof@1.0.0\assets\40fd273363ed43bb915e85e41f4599b2\stage10_potion.png
+Verified package metadata asset refs:
+  - card => modstudio://asset/stage10_external_asset_proof%401.0.0/4e85c3989cf1419f9ceeacc2179986d0/stage10_card.png
+  - relic => modstudio://asset/stage10_external_asset_proof%401.0.0/c0007bc6a0f44fae8d51c18b82d74796/stage10_relic.png
+  - potion => modstudio://asset/stage10_external_asset_proof%401.0.0/40fd273363ed43bb915e85e41f4599b2/stage10_potion.png
+Expected autoslay evidence:
+  - Godot log contains '[INFO] [ModStudio.Graph] STAGE10_CARD_OK'
+  - Godot log contains '[INFO] [ModStudio.Graph] STAGE10_POTION_OK'
+  - Godot log contains '[INFO] [ModStudio.Graph] STAGE10_RELIC_OK'
+  - Runtime asset loading should resolve modstudio://asset/... references from the imported package

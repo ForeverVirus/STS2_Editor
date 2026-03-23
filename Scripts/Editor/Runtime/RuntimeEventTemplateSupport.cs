@@ -4,10 +4,12 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.Helpers;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Rewards;
+using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves.Runs;
@@ -25,6 +27,7 @@ internal static class RuntimeEventTemplateSupport
         typeof(EventModel),
         "SetEventState",
         new[] { typeof(LocString), typeof(IEnumerable<EventOption>) })!;
+    private static readonly MethodInfo? SetEventOptionIsProceedMethod = AccessTools.PropertySetter(typeof(EventOption), nameof(EventOption.IsProceed));
     private static readonly MethodInfo? EnterRoomWithoutExitingCurrentRoomMethod = AccessTools.Method(
         typeof(RunManager),
         nameof(RunManager.EnterRoomWithoutExitingCurrentRoom),
@@ -48,6 +51,7 @@ internal static class RuntimeEventTemplateSupport
         }
 
         var initialPageId = ResolveStartPageId(template, isPreFinished);
+        Log.Info($"[ModStudio.Event] Initializing template event {eventModel.Id.Entry} -> page {initialPageId}");
         return TrySetPage(eventModel, template, initialPageId);
     }
 
@@ -72,6 +76,7 @@ internal static class RuntimeEventTemplateSupport
 
         state.PendingResumePageId = null;
         state.LastExitedRoomType = exitedRoom.RoomType.ToString();
+        Log.Info($"[ModStudio.Event] Resuming template event {eventModel.Id.Entry} -> page {resumePageId}");
         return TrySetPage(eventModel, template, resumePageId!);
     }
 
@@ -176,6 +181,7 @@ internal static class RuntimeEventTemplateSupport
         var descriptionKey = BuildPageDescriptionKey(eventModel.Id.Entry, page.PageId);
         var description = new LocString("events", descriptionKey);
         SetEventStateMethod.Invoke(eventModel, new object[] { description, options });
+        Log.Info($"[ModStudio.Event] Applied template page {eventModel.Id.Entry}:{page.PageId} options={options.Count}");
 
         var state = RuntimeStates.GetOrCreateValue(eventModel);
         state.CurrentPageId = page.PageId;
@@ -193,9 +199,15 @@ internal static class RuntimeEventTemplateSupport
             var eventOption = new EventOption(
                 eventModel,
                 () => ExecuteOptionAsync(eventModel, template, page.PageId, option),
+                BuildOptionTitleLocString(optionKey),
+                BuildOptionDescriptionLocString(optionKey),
                 optionKey,
-                disableOnChosen: true,
-                isProceed: option.IsProceed);
+                Array.Empty<IHoverTip>());
+
+            if (option.IsProceed)
+            {
+                SetEventOptionIsProceedMethod?.Invoke(eventOption, new object?[] { true });
+            }
 
             if (!option.ShouldSaveChoiceToHistory)
             {
@@ -212,6 +224,7 @@ internal static class RuntimeEventTemplateSupport
         string currentPageId,
         RuntimeEventTemplateOptionDefinition option)
     {
+        Log.Info($"[ModStudio.Event] Executing option {eventModel.Id.Entry}:{currentPageId}:{option.OptionId}");
         if (!string.IsNullOrWhiteSpace(option.NextPageId))
         {
             TrySetPage(eventModel, template, option.NextPageId);
@@ -220,6 +233,13 @@ internal static class RuntimeEventTemplateSupport
         if (!string.IsNullOrWhiteSpace(option.EncounterId))
         {
             await StartCombatAsync(eventModel, option);
+            return;
+        }
+
+        if (option.IsProceed && string.IsNullOrWhiteSpace(option.NextPageId))
+        {
+            Log.Info($"[ModStudio.Event] Proceeding out of template event {eventModel.Id.Entry} via option {option.OptionId}");
+            await NEventRoom.Proceed();
         }
     }
 
@@ -242,6 +262,7 @@ internal static class RuntimeEventTemplateSupport
         var state = RuntimeStates.GetOrCreateValue(eventModel);
         state.PendingResumePageId = option.ResumePageId;
         SetPersistedResumePage(eventModel.Id.Entry, option.ResumePageId);
+        Log.Info($"[ModStudio.Event] Starting template combat {eventModel.Id.Entry} encounter={option.EncounterId} resume={option.ResumePageId ?? "<none>"}");
 
         InvokeEnteringEventCombat(eventModel);
         EventNodeSetter?.Invoke(eventModel, new object?[] { null });
@@ -442,6 +463,16 @@ internal static class RuntimeEventTemplateSupport
     private static string BuildOptionRootKey(string eventId, string pageId, string optionId)
     {
         return $"{eventId}.pages.{pageId}.options.{optionId}";
+    }
+
+    private static LocString BuildOptionTitleLocString(string optionKey)
+    {
+        return new LocString("events", optionKey + ".title");
+    }
+
+    private static LocString BuildOptionDescriptionLocString(string optionKey)
+    {
+        return new LocString("events", optionKey + ".description");
     }
 
     private static void SetPersistedResumePage(string eventId, string? pageId)

@@ -1,0 +1,729 @@
+- generic [ref=e2]:
+  - region
+  - generic [ref=e3]:
+    - link "Skip to content" [ref=e4] [cursor=pointer]:
+      - /url: "#start-of-content"
+    - banner [ref=e6]:
+      - heading "Navigation Menu" [level=2] [ref=e7]
+      - generic [ref=e9]:
+        - button "Toggle navigation" [ref=e11] [cursor=pointer]
+        - link "Homepage" [ref=e17] [cursor=pointer]:
+          - /url: /
+          - img [ref=e18]
+        - generic [ref=e20]:
+          - link "Sign in" [ref=e21] [cursor=pointer]:
+            - /url: /login?return_to=https%3A%2F%2Fgithub.com%2F2145057603%2Fsts2-CardArtEditor
+          - button "Appearance settings" [ref=e24] [cursor=pointer]:
+            - img
+  - main [ref=e28]:
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e32]:
+          - img [ref=e33]
+          - link "2145057603" [ref=e36] [cursor=pointer]:
+            - /url: /2145057603
+          - generic [ref=e37]: /
+          - strong [ref=e38]:
+            - link "sts2-CardArtEditor" [ref=e39] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor
+          - generic [ref=e40]: Public
+        - generic [ref=e41]:
+          - list:
+            - listitem [ref=e42]:
+              - link "You must be signed in to change notification settings" [ref=e43] [cursor=pointer]:
+                - /url: /login?return_to=%2F2145057603%2Fsts2-CardArtEditor
+                - img [ref=e44]
+                - text: Notifications
+            - listitem [ref=e46]:
+              - link "Fork 0" [ref=e47] [cursor=pointer]:
+                - /url: /login?return_to=%2F2145057603%2Fsts2-CardArtEditor
+                - img [ref=e48]
+                - text: Fork
+                - generic "0" [ref=e50]
+            - listitem [ref=e51]:
+              - link "You must be signed in to star a repository" [ref=e53] [cursor=pointer]:
+                - /url: /login?return_to=%2F2145057603%2Fsts2-CardArtEditor
+                - img [ref=e54]
+                - text: Star
+                - generic "2 users starred this repository" [ref=e56]: "2"
+      - navigation "Repository" [ref=e57]:
+        - list [ref=e58]:
+          - listitem [ref=e59]:
+            - link "Code" [ref=e60] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor
+              - img [ref=e61]
+              - generic [ref=e63]: Code
+          - listitem [ref=e64]:
+            - link "Issues" [ref=e65] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/issues
+              - img [ref=e66]
+              - generic [ref=e69]: Issues
+          - listitem [ref=e70]:
+            - link "Pull requests" [ref=e71] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/pulls
+              - img [ref=e72]
+              - generic [ref=e74]: Pull requests
+          - listitem [ref=e75]:
+            - link "Actions" [ref=e76] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/actions
+              - img [ref=e77]
+              - generic [ref=e79]: Actions
+          - listitem [ref=e80]:
+            - link "Projects" [ref=e81] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/projects
+              - img [ref=e82]
+              - generic [ref=e84]: Projects
+          - listitem [ref=e85]:
+            - link "Security" [ref=e86] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/security
+              - img [ref=e87]
+              - generic [ref=e89]: Security
+          - listitem [ref=e90]:
+            - link "Insights" [ref=e91] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/pulse
+              - img [ref=e92]
+              - generic [ref=e94]: Insights
+    - generic [ref=e107]:
+      - heading "2145057603/sts2-CardArtEditor" [level=1] [ref=e109]
+      - generic [ref=e110]:
+        - generic [ref=e113]:
+          - generic [ref=e114]:
+            - generic [ref=e115]:
+              - button "main branch" [ref=e117] [cursor=pointer]:
+                - generic [ref=e118]:
+                  - generic [ref=e120]:
+                    - img [ref=e122]
+                    - generic [ref=e125]: main
+                  - generic:
+                    - img
+              - generic [ref=e126]:
+                - link "Go to Branches page" [ref=e127] [cursor=pointer]:
+                  - /url: /2145057603/sts2-CardArtEditor/branches
+                  - img [ref=e128]
+                - link "Go to Tags page" [ref=e130] [cursor=pointer]:
+                  - /url: /2145057603/sts2-CardArtEditor/tags
+                  - img [ref=e131]
+            - generic [ref=e133]:
+              - button "Go to file" [ref=e136] [cursor=pointer]:
+                - generic [ref=e138]: Go to file
+              - button "Code" [ref=e139] [cursor=pointer]:
+                - generic [ref=e140]:
+                  - generic:
+                    - img
+                  - generic [ref=e141]: Code
+                  - generic:
+                    - img
+          - generic [ref=e142]:
+            - generic [ref=e143]:
+              - heading "Folders and files" [level=2] [ref=e144]
+              - table "Folders and files" [ref=e145]:
+                - rowgroup:
+                  - row "Name Last commit message Last commit date":
+                    - columnheader "Name"
+                    - columnheader "Last commit message":
+                      - generic "Last commit message"
+                    - columnheader "Last commit date":
+                      - generic "Last commit date"
+                - rowgroup [ref=e146]:
+                  - row "Latest commit 2145057603 commits by 2145057603 Update mod_update_manifest.json Commit cad0b17 · Mar 20, 20264 days ago History View commit history for this file." [ref=e147]:
+                    - cell "Latest commit 2145057603 commits by 2145057603 Update mod_update_manifest.json Commit cad0b17 · Mar 20, 20264 days ago History View commit history for this file." [ref=e148]:
+                      - generic [ref=e149]:
+                        - heading "Latest commit" [level=2] [ref=e150]
+                        - generic [ref=e151]:
+                          - generic [ref=e153]:
+                            - link "2145057603" [ref=e154] [cursor=pointer]:
+                              - /url: /2145057603
+                              - img "2145057603" [ref=e155]
+                            - link "commits by 2145057603" [ref=e156] [cursor=pointer]:
+                              - /url: /2145057603/sts2-CardArtEditor/commits?author=2145057603
+                              - text: "2145057603"
+                          - link "Update mod_update_manifest.json" [ref=e160] [cursor=pointer]:
+                            - /url: /2145057603/sts2-CardArtEditor/commit/cad0b1753757bf0dbdc64dedeabf1df467976b86
+                        - generic [ref=e161]:
+                          - generic [ref=e163]:
+                            - link "Commit cad0b17" [ref=e164] [cursor=pointer]:
+                              - /url: /2145057603/sts2-CardArtEditor/commit/cad0b1753757bf0dbdc64dedeabf1df467976b86
+                              - text: cad0b17
+                            - text: ·
+                            - generic "Mar 20, 2026, 12:54 AM GMT+8" [ref=e165]: Mar 20, 20264 days ago
+                          - generic [ref=e166]:
+                            - heading "History" [level=2] [ref=e167]
+                            - link "View commit history for this file." [ref=e169] [cursor=pointer]:
+                              - /url: /2145057603/sts2-CardArtEditor/commits/main/
+                              - generic [ref=e170]:
+                                - generic:
+                                  - img
+                  - row "PackSystem, (Directory) Initial source import Mar 16, 2026last week" [ref=e171]:
+                    - cell "PackSystem, (Directory)" [ref=e172]:
+                      - generic [ref=e173]:
+                        - img [ref=e174]
+                        - link "PackSystem, (Directory)" [ref=e179] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/tree/main/PackSystem
+                          - text: PackSystem
+                    - cell "Initial source import" [ref=e180]:
+                      - link "Initial source import" [ref=e183] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e184]:
+                      - generic [ref=e185]: Mar 16, 2026last week
+                  - row "Properties/PublishProfiles, (Directory) Initial source import Mar 16, 2026last week" [ref=e186]:
+                    - cell "Properties/PublishProfiles, (Directory)" [ref=e187]:
+                      - generic [ref=e188]:
+                        - img [ref=e189]
+                        - link "Properties/PublishProfiles, (Directory)" [ref=e194] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/tree/main/Properties/PublishProfiles
+                          - text: Properties/PublishProfiles
+                    - cell "Initial source import" [ref=e195]:
+                      - link "Initial source import" [ref=e198] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e199]:
+                      - generic [ref=e200]: Mar 16, 2026last week
+                  - row "UIV2, (Directory) Initial source import Mar 16, 2026last week" [ref=e201]:
+                    - cell "UIV2, (Directory)" [ref=e202]:
+                      - generic [ref=e203]:
+                        - img [ref=e204]
+                        - link "UIV2, (Directory)" [ref=e209] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/tree/main/UIV2
+                          - text: UIV2
+                    - cell "Initial source import" [ref=e210]:
+                      - link "Initial source import" [ref=e213] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e214]:
+                      - generic [ref=e215]: Mar 16, 2026last week
+                  - row ".gitignore, (File) Initial source import Mar 16, 2026last week" [ref=e216]:
+                    - cell ".gitignore, (File)" [ref=e217]:
+                      - generic [ref=e218]:
+                        - img [ref=e219]
+                        - link ".gitignore, (File)" [ref=e224] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/.gitignore
+                          - text: .gitignore
+                    - cell "Initial source import" [ref=e225]:
+                      - link "Initial source import" [ref=e228] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e229]:
+                      - generic [ref=e230]: Mar 16, 2026last week
+                  - row "BatchMappingModels.cs, (File) Initial source import Mar 16, 2026last week" [ref=e231]:
+                    - cell "BatchMappingModels.cs, (File)" [ref=e232]:
+                      - generic [ref=e233]:
+                        - img [ref=e234]
+                        - link "BatchMappingModels.cs, (File)" [ref=e239] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/BatchMappingModels.cs
+                          - text: BatchMappingModels.cs
+                    - cell "Initial source import" [ref=e240]:
+                      - link "Initial source import" [ref=e243] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e244]:
+                      - generic [ref=e245]: Mar 16, 2026last week
+                  - row "BatchMappingModels.cs.uid, (File) Initial source import Mar 16, 2026last week" [ref=e246]:
+                    - cell "BatchMappingModels.cs.uid, (File)" [ref=e247]:
+                      - generic [ref=e248]:
+                        - img [ref=e249]
+                        - link "BatchMappingModels.cs.uid, (File)" [ref=e254] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/BatchMappingModels.cs.uid
+                          - text: BatchMappingModels.cs.uid
+                    - cell "Initial source import" [ref=e255]:
+                      - link "Initial source import" [ref=e258] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e259]:
+                      - generic [ref=e260]: Mar 16, 2026last week
+                  - row "CardArtEditor.sln, (File) Initial source import Mar 16, 2026last week" [ref=e261]:
+                    - cell "CardArtEditor.sln, (File)" [ref=e262]:
+                      - generic [ref=e263]:
+                        - img [ref=e264]
+                        - link "CardArtEditor.sln, (File)" [ref=e269] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardArtEditor.sln
+                          - text: CardArtEditor.sln
+                    - cell "Initial source import" [ref=e270]:
+                      - link "Initial source import" [ref=e273] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e274]:
+                      - generic [ref=e275]: Mar 16, 2026last week
+                  - row "CardArtEditorSettings.cs, (File) Initial source import Mar 16, 2026last week" [ref=e276]:
+                    - cell "CardArtEditorSettings.cs, (File)" [ref=e277]:
+                      - generic [ref=e278]:
+                        - img [ref=e279]
+                        - link "CardArtEditorSettings.cs, (File)" [ref=e284] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardArtEditorSettings.cs
+                          - text: CardArtEditorSettings.cs
+                    - cell "Initial source import" [ref=e285]:
+                      - link "Initial source import" [ref=e288] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e289]:
+                      - generic [ref=e290]: Mar 16, 2026last week
+                  - row "CardArtEditorSettings.cs.uid, (File) Initial source import Mar 16, 2026last week" [ref=e291]:
+                    - cell "CardArtEditorSettings.cs.uid, (File)" [ref=e292]:
+                      - generic [ref=e293]:
+                        - img [ref=e294]
+                        - link "CardArtEditorSettings.cs.uid, (File)" [ref=e299] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardArtEditorSettings.cs.uid
+                          - text: CardArtEditorSettings.cs.uid
+                    - cell "Initial source import" [ref=e300]:
+                      - link "Initial source import" [ref=e303] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e304]:
+                      - generic [ref=e305]: Mar 16, 2026last week
+                  - row "CardArtHistoryRegistry.cs, (File) Initial source import Mar 16, 2026last week" [ref=e306]:
+                    - cell "CardArtHistoryRegistry.cs, (File)" [ref=e307]:
+                      - generic [ref=e308]:
+                        - img [ref=e309]
+                        - link "CardArtHistoryRegistry.cs, (File)" [ref=e314] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardArtHistoryRegistry.cs
+                          - text: CardArtHistoryRegistry.cs
+                    - cell "Initial source import" [ref=e315]:
+                      - link "Initial source import" [ref=e318] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e319]:
+                      - generic [ref=e320]: Mar 16, 2026last week
+                  - row "CardArtHistoryRegistry.cs.uid, (File) Initial source import Mar 16, 2026last week" [ref=e321]:
+                    - cell "CardArtHistoryRegistry.cs.uid, (File)" [ref=e322]:
+                      - generic [ref=e323]:
+                        - img [ref=e324]
+                        - link "CardArtHistoryRegistry.cs.uid, (File)" [ref=e329] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardArtHistoryRegistry.cs.uid
+                          - text: CardArtHistoryRegistry.cs.uid
+                    - cell "Initial source import" [ref=e330]:
+                      - link "Initial source import" [ref=e333] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e334]:
+                      - generic [ref=e335]: Mar 16, 2026last week
+                  - row "CardArtOverrideRegistry.cs, (File) Initial source import Mar 16, 2026last week" [ref=e336]:
+                    - cell "CardArtOverrideRegistry.cs, (File)" [ref=e337]:
+                      - generic [ref=e338]:
+                        - img [ref=e339]
+                        - link "CardArtOverrideRegistry.cs, (File)" [ref=e344] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardArtOverrideRegistry.cs
+                          - text: CardArtOverrideRegistry.cs
+                    - cell "Initial source import" [ref=e345]:
+                      - link "Initial source import" [ref=e348] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e349]:
+                      - generic [ref=e350]: Mar 16, 2026last week
+                  - row "CardArtOverrideRegistry.cs.uid, (File) Initial source import Mar 16, 2026last week" [ref=e351]:
+                    - cell "CardArtOverrideRegistry.cs.uid, (File)" [ref=e352]:
+                      - generic [ref=e353]:
+                        - img [ref=e354]
+                        - link "CardArtOverrideRegistry.cs.uid, (File)" [ref=e359] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardArtOverrideRegistry.cs.uid
+                          - text: CardArtOverrideRegistry.cs.uid
+                    - cell "Initial source import" [ref=e360]:
+                      - link "Initial source import" [ref=e363] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e364]:
+                      - generic [ref=e365]: Mar 16, 2026last week
+                  - row "CardCatalogRegistry.cs, (File) Initial source import Mar 16, 2026last week" [ref=e366]:
+                    - cell "CardCatalogRegistry.cs, (File)" [ref=e367]:
+                      - generic [ref=e368]:
+                        - img [ref=e369]
+                        - link "CardCatalogRegistry.cs, (File)" [ref=e374] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardCatalogRegistry.cs
+                          - text: CardCatalogRegistry.cs
+                    - cell "Initial source import" [ref=e375]:
+                      - link "Initial source import" [ref=e378] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e379]:
+                      - generic [ref=e380]: Mar 16, 2026last week
+                  - row "CardCatalogRegistry.cs.uid, (File) Initial source import Mar 16, 2026last week" [ref=e381]:
+                    - cell "CardCatalogRegistry.cs.uid, (File)" [ref=e382]:
+                      - generic [ref=e383]:
+                        - img [ref=e384]
+                        - link "CardCatalogRegistry.cs.uid, (File)" [ref=e389] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/CardCatalogRegistry.cs.uid
+                          - text: CardCatalogRegistry.cs.uid
+                    - cell "Initial source import" [ref=e390]:
+                      - link "Initial source import" [ref=e393] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e394]:
+                      - generic [ref=e395]: Mar 16, 2026last week
+                  - row "InfectionPortraitPatch.cs, (File) Initial source import Mar 16, 2026last week" [ref=e396]:
+                    - cell "InfectionPortraitPatch.cs, (File)" [ref=e397]:
+                      - generic [ref=e398]:
+                        - img [ref=e399]
+                        - link "InfectionPortraitPatch.cs, (File)" [ref=e404] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/InfectionPortraitPatch.cs
+                          - text: InfectionPortraitPatch.cs
+                    - cell "Initial source import" [ref=e405]:
+                      - link "Initial source import" [ref=e408] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e409]:
+                      - generic [ref=e410]: Mar 16, 2026last week
+                  - row "InfectionPortraitPatch.cs.uid, (File) Initial source import Mar 16, 2026last week" [ref=e411]:
+                    - cell "InfectionPortraitPatch.cs.uid, (File)" [ref=e412]:
+                      - generic [ref=e413]:
+                        - img [ref=e414]
+                        - link "InfectionPortraitPatch.cs.uid, (File)" [ref=e419] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/InfectionPortraitPatch.cs.uid
+                          - text: InfectionPortraitPatch.cs.uid
+                    - cell "Initial source import" [ref=e420]:
+                      - link "Initial source import" [ref=e423] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e424]:
+                      - generic [ref=e425]: Mar 16, 2026last week
+                  - row "MainFile.cs, (File) Initial source import Mar 16, 2026last week" [ref=e426]:
+                    - cell "MainFile.cs, (File)" [ref=e427]:
+                      - generic [ref=e428]:
+                        - img [ref=e429]
+                        - link "MainFile.cs, (File)" [ref=e434] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/MainFile.cs
+                          - text: MainFile.cs
+                    - cell "Initial source import" [ref=e435]:
+                      - link "Initial source import" [ref=e438] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e439]:
+                      - generic [ref=e440]: Mar 16, 2026last week
+                  - row "MainFile.cs.uid, (File) Initial source import Mar 16, 2026last week" [ref=e441]:
+                    - cell "MainFile.cs.uid, (File)" [ref=e442]:
+                      - generic [ref=e443]:
+                        - img [ref=e444]
+                        - link "MainFile.cs.uid, (File)" [ref=e449] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/MainFile.cs.uid
+                          - text: MainFile.cs.uid
+                    - cell "Initial source import" [ref=e450]:
+                      - link "Initial source import" [ref=e453] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e454]:
+                      - generic [ref=e455]: Mar 16, 2026last week
+                  - row "ModTemplate.csproj, (File) Initial source import Mar 16, 2026last week" [ref=e456]:
+                    - cell "ModTemplate.csproj, (File)" [ref=e457]:
+                      - generic [ref=e458]:
+                        - img [ref=e459]
+                        - link "ModTemplate.csproj, (File)" [ref=e464] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/ModTemplate.csproj
+                          - text: ModTemplate.csproj
+                    - cell "Initial source import" [ref=e465]:
+                      - link "Initial source import" [ref=e468] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e469]:
+                      - generic [ref=e470]: Mar 16, 2026last week
+                  - row "README.md, (File) Initial source import Mar 16, 2026last week" [ref=e471]:
+                    - cell "README.md, (File)" [ref=e472]:
+                      - generic [ref=e473]:
+                        - img [ref=e474]
+                        - link "README.md, (File)" [ref=e479] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/README.md
+                          - text: README.md
+                    - cell "Initial source import" [ref=e480]:
+                      - link "Initial source import" [ref=e483] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e484]:
+                      - generic [ref=e485]: Mar 16, 2026last week
+                  - row "export_presets.cfg, (File) Initial source import Mar 16, 2026last week" [ref=e486]:
+                    - cell "export_presets.cfg, (File)" [ref=e487]:
+                      - generic [ref=e488]:
+                        - img [ref=e489]
+                        - link "export_presets.cfg, (File)" [ref=e494] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/export_presets.cfg
+                          - text: export_presets.cfg
+                    - cell "Initial source import" [ref=e495]:
+                      - link "Initial source import" [ref=e498] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e499]:
+                      - generic [ref=e500]: Mar 16, 2026last week
+                  - row "mod_manifest.json, (File) Initial source import Mar 16, 2026last week" [ref=e501]:
+                    - cell "mod_manifest.json, (File)" [ref=e502]:
+                      - generic [ref=e503]:
+                        - img [ref=e504]
+                        - link "mod_manifest.json, (File)" [ref=e509] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/mod_manifest.json
+                          - text: mod_manifest.json
+                    - cell "Initial source import" [ref=e510]:
+                      - link "Initial source import" [ref=e513] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e514]:
+                      - generic [ref=e515]: Mar 16, 2026last week
+                  - row "mod_update_manifest.json, (File) Update mod_update_manifest.json Mar 20, 20264 days ago" [ref=e516]:
+                    - cell "mod_update_manifest.json, (File)" [ref=e517]:
+                      - generic [ref=e518]:
+                        - img [ref=e519]
+                        - link "mod_update_manifest.json, (File)" [ref=e524] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/mod_update_manifest.json
+                          - text: mod_update_manifest.json
+                    - cell "Update mod_update_manifest.json" [ref=e525]:
+                      - link "Update mod_update_manifest.json" [ref=e528] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/cad0b1753757bf0dbdc64dedeabf1df467976b86
+                    - cell "Mar 20, 20264 days ago" [ref=e529]:
+                      - generic [ref=e530]: Mar 20, 20264 days ago
+                  - row "nuget.config, (File) Initial source import Mar 16, 2026last week" [ref=e531]:
+                    - cell "nuget.config, (File)" [ref=e532]:
+                      - generic [ref=e533]:
+                        - img [ref=e534]
+                        - link "nuget.config, (File)" [ref=e539] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/nuget.config
+                          - text: nuget.config
+                    - cell "Initial source import" [ref=e540]:
+                      - link "Initial source import" [ref=e543] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e544]:
+                      - generic [ref=e545]: Mar 16, 2026last week
+                  - row "project.godot, (File) Initial source import Mar 16, 2026last week" [ref=e546]:
+                    - cell "project.godot, (File)" [ref=e547]:
+                      - generic [ref=e548]:
+                        - img [ref=e549]
+                        - link "project.godot, (File)" [ref=e554] [cursor=pointer]:
+                          - /url: /2145057603/sts2-CardArtEditor/blob/main/project.godot
+                          - text: project.godot
+                    - cell "Initial source import" [ref=e555]:
+                      - link "Initial source import" [ref=e558] [cursor=pointer]:
+                        - /url: /2145057603/sts2-CardArtEditor/commit/ae0e8bf2c36f86a38f771c6b1f86c6316e94ec96
+                    - cell "Mar 16, 2026last week" [ref=e559]:
+                      - generic [ref=e560]: Mar 16, 2026last week
+            - generic [ref=e562]:
+              - generic [ref=e563]:
+                - heading "Repository files navigation" [level=2] [ref=e564]
+                - navigation "Repository files" [ref=e565]:
+                  - list [ref=e566]:
+                    - listitem [ref=e567]:
+                      - link "README" [ref=e568] [cursor=pointer]:
+                        - /url: "#"
+                        - img [ref=e570]
+                        - generic [ref=e572]: README
+                - button "Outline" [ref=e573] [cursor=pointer]:
+                  - img [ref=e574]
+              - article [ref=e577]:
+                - generic [ref=e578]:
+                  - heading "CardArtEditor" [level=1] [ref=e579]
+                  - 'link "Permalink: CardArtEditor" [ref=e580] [cursor=pointer]':
+                    - /url: "#cardarteditor"
+                    - img [ref=e581]
+                - paragraph [ref=e583]: 《杀戮尖塔 2》卡面管理器 Mod。
+                - paragraph [ref=e584]: 这个项目的目标不是只替换单张卡图，而是提供一整套卡面管理流程，包括单卡替换、卡包导入、右侧快速选图、批量替换任务、发布包导入与一键应用。
+                - generic [ref=e585]:
+                  - heading "当前功能" [level=2] [ref=e586]
+                  - 'link "Permalink: 当前功能" [ref=e587] [cursor=pointer]':
+                    - /url: "#当前功能"
+                    - img [ref=e588]
+                - list [ref=e590]:
+                  - listitem [ref=e591]: 单卡替换
+                  - listitem [ref=e592]: 恢复默认卡图
+                  - listitem [ref=e593]: 卡包浏览与管理
+                  - listitem [ref=e594]: 素材包导入
+                  - listitem [ref=e595]: 发布包导入
+                  - listitem [ref=e596]: 右侧选图栏快速换图
+                  - listitem [ref=e597]: 批量替换任务流
+                  - listitem [ref=e598]: 发布包一键替换
+                  - listitem [ref=e599]: 快捷键自定义
+                  - listitem [ref=e600]: 安装器脚本安装 / 卸载
+                - generic [ref=e601]:
+                  - heading "使用教程" [level=2] [ref=e602]
+                  - 'link "Permalink: 使用教程" [ref=e603] [cursor=pointer]':
+                    - /url: "#使用教程"
+                    - img [ref=e604]
+                - paragraph [ref=e606]: B 站视频教程：
+                - paragraph [ref=e607]:
+                  - text: 【杀戮尖塔2卡面终于能这么改了】
+                  - link "https://www.bilibili.com/video/BV1nDwxzwEtd?vd_source=e31ad477618362cafd0a0196e98adb2c" [ref=e608] [cursor=pointer]:
+                    - /url: https://www.bilibili.com/video/BV1nDwxzwEtd?vd_source=e31ad477618362cafd0a0196e98adb2c
+                - paragraph [ref=e609]: 如果你是第一次使用，建议先直接看视频，再回来看仓库结构。
+                - generic [ref=e610]:
+                  - heading "默认快捷键" [level=2] [ref=e611]
+                  - 'link "Permalink: 默认快捷键" [ref=e612] [cursor=pointer]':
+                    - /url: "#默认快捷键"
+                    - img [ref=e613]
+                - list [ref=e615]:
+                  - listitem [ref=e616]:
+                    - code [ref=e617]: F7
+                    - text: ：打开 / 关闭主界面
+                  - listitem [ref=e618]:
+                    - code [ref=e619]: Ctrl + R
+                    - text: ：恢复当前卡牌默认图片
+                  - listitem [ref=e620]:
+                    - code [ref=e621]: Ctrl + B
+                    - text: ：打开 / 关闭卡包浏览
+                  - listitem [ref=e622]:
+                    - code [ref=e623]: Ctrl + P
+                    - text: ：打开 / 关闭右侧选图栏
+                - paragraph [ref=e624]: 这些快捷键后续都可以在游戏内设置界面里修改。
+                - generic [ref=e625]:
+                  - heading "安装说明" [level=2] [ref=e626]
+                  - 'link "Permalink: 安装说明" [ref=e627] [cursor=pointer]':
+                    - /url: "#安装说明"
+                    - img [ref=e628]
+                - paragraph [ref=e630]: 如果你是普通玩家，推荐直接使用仓库里的安装器：
+                - list [ref=e631]:
+                  - listitem [ref=e632]:
+                    - text: 打开
+                    - code [ref=e633]: 安装器/
+                  - listitem [ref=e634]:
+                    - text: 运行
+                    - code [ref=e635]: 卡面修改器安装卸载脚本.bat
+                  - listitem [ref=e636]: 按菜单选择安装或卸载
+                - paragraph [ref=e637]:
+                  - text: 安装器会负责把模组文件复制到游戏的
+                  - code [ref=e638]: mods
+                  - text: 目录。
+                - generic [ref=e639]:
+                  - heading "项目结构" [level=2] [ref=e640]
+                  - 'link "Permalink: 项目结构" [ref=e641] [cursor=pointer]':
+                    - /url: "#项目结构"
+                    - img [ref=e642]
+                - paragraph [ref=e644]: 推荐优先阅读下面几个目录：
+                - list [ref=e645]:
+                  - listitem [ref=e646]:
+                    - code [ref=e647]: UIV2/
+                    - list [ref=e648]:
+                      - listitem [ref=e649]: 当前新的主 UI 结构
+                  - listitem [ref=e650]:
+                    - code [ref=e651]: PackSystem/
+                    - list [ref=e652]:
+                      - listitem [ref=e653]: 卡包、发布包、导入导出、卡包状态与浏览逻辑
+                  - listitem [ref=e654]:
+                    - code [ref=e655]: 安装器/
+                    - list [ref=e656]:
+                      - listitem [ref=e657]: 模组安装 / 卸载脚本
+                  - listitem [ref=e658]:
+                    - code [ref=e659]: 方案/
+                    - list [ref=e660]:
+                      - listitem [ref=e661]: 设计文档、任务清单、视频脚本等说明文档
+                - paragraph [ref=e662]: 下面这些内容属于过渡或历史实现：
+                - list [ref=e663]:
+                  - listitem [ref=e664]:
+                    - code [ref=e665]: CardArtEditorUiV9.cs
+                    - list [ref=e666]:
+                      - listitem [ref=e667]: 旧 UI 大文件，当前仍保留部分迁移历史，不建议作为新代码结构范例
+                - generic [ref=e668]:
+                  - heading "仓库说明" [level=2] [ref=e669]
+                  - 'link "Permalink: 仓库说明" [ref=e670] [cursor=pointer]':
+                    - /url: "#仓库说明"
+                    - img [ref=e671]
+                - paragraph [ref=e673]: 这个仓库是实际开发中的项目源码，不是通用模板工程。
+                - paragraph [ref=e674]: 请按下面的理解来使用它：
+                - list [ref=e675]:
+                  - listitem [ref=e676]:
+                    - code [ref=e677]: UIV2/
+                    - text: 和
+                    - code [ref=e678]: PackSystem/
+                    - text: 是当前推荐参考的主结构
+                  - listitem [ref=e679]: 旧版大文件和迁移文档保留是为了继续迭代，不代表它们是最佳实践
+                  - listitem [ref=e680]: 部分实现由 AI 辅助生成，但都已经按当前项目目标整合使用
+                  - listitem [ref=e681]: 如果你要参考本仓库继续开发，建议优先参考模块边界和功能流程，而不是直接照抄所有细节
+                - generic [ref=e682]:
+                  - heading "交流" [level=2] [ref=e683]
+                  - 'link "Permalink: 交流" [ref=e684] [cursor=pointer]':
+                    - /url: "#交流"
+                    - img [ref=e685]
+                - paragraph [ref=e687]:
+                  - text: QQ 群：
+                  - code [ref=e688]: "627586879"
+                  - text: 密码：
+                  - code [ref=e689]: 卡面修改
+                - generic [ref=e690]:
+                  - heading "版权与说明" [level=2] [ref=e691]
+                  - 'link "Permalink: 版权与说明" [ref=e692] [cursor=pointer]':
+                    - /url: "#版权与说明"
+                    - img [ref=e693]
+                - list [ref=e695]:
+                  - listitem [ref=e696]: 本仓库主要提供 Mod 代码与相关说明
+                  - listitem [ref=e697]: 卡包图片、第三方资源、玩家自定义图片请自行确认授权与使用范围
+                  - listitem [ref=e698]: 如果你准备二次分发卡包或发布包，请确保对应图片资源具备可分发权限
+        - generic [ref=e702]:
+          - generic [ref=e705]:
+            - heading "About" [level=2] [ref=e706]
+            - generic [ref=e707]: No description, website, or topics provided.
+            - heading "Resources" [level=3] [ref=e708]
+            - link "Readme" [ref=e710] [cursor=pointer]:
+              - /url: "#readme-ov-file"
+              - img [ref=e711]
+              - text: Readme
+            - link "Activity" [ref=e714] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/activity
+              - img [ref=e715]
+              - text: Activity
+            - heading "Stars" [level=3] [ref=e717]
+            - link "2 stars" [ref=e719] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/stargazers
+              - img [ref=e720]
+              - strong [ref=e722]: "2"
+              - text: stars
+            - heading "Watchers" [level=3] [ref=e723]
+            - link "0 watching" [ref=e725] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/watchers
+              - img [ref=e726]
+              - strong [ref=e728]: "0"
+              - text: watching
+            - heading "Forks" [level=3] [ref=e729]
+            - link "0 forks" [ref=e731] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/forks
+              - img [ref=e732]
+              - strong [ref=e734]: "0"
+              - text: forks
+            - link "Report repository" [ref=e736] [cursor=pointer]:
+              - /url: /contact/report-content?content_url=https%3A%2F%2Fgithub.com%2F2145057603%2Fsts2-CardArtEditor&report=2145057603+%28user%29
+          - generic [ref=e738]:
+            - heading "Releases 4" [level=2] [ref=e739]:
+              - link "Releases 4" [ref=e740] [cursor=pointer]:
+                - /url: /2145057603/sts2-CardArtEditor/releases
+                - text: Releases
+                - generic "4" [ref=e741]
+            - link "v1.2.3 Latest Mar 23, 20265 hours ago" [ref=e742] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/releases/tag/v1.2.3
+              - img [ref=e743]
+              - generic [ref=e745]:
+                - generic [ref=e746]:
+                  - generic [ref=e747]: v1.2.3
+                  - 'generic "Label: Latest" [ref=e748]': Latest
+                - generic [ref=e749]: Mar 23, 20265 hours ago
+            - link "+ 3 releases" [ref=e751] [cursor=pointer]:
+              - /url: /2145057603/sts2-CardArtEditor/releases
+          - generic [ref=e753]:
+            - heading "Packages" [level=2] [ref=e754]:
+              - link "Packages" [ref=e755] [cursor=pointer]:
+                - /url: /users/2145057603/packages?repo_name=sts2-CardArtEditor
+            - generic [ref=e756]: No packages published
+          - generic [ref=e758]:
+            - heading "Contributors 1" [level=2] [ref=e759]:
+              - link "Contributors 1" [ref=e760] [cursor=pointer]:
+                - /url: /2145057603/sts2-CardArtEditor/graphs/contributors
+                - text: Contributors
+                - generic "1" [ref=e761]
+            - list [ref=e762]:
+              - listitem [ref=e763]:
+                - link "@2145057603" [ref=e764] [cursor=pointer]:
+                  - /url: https://github.com/2145057603
+                  - img "@2145057603" [ref=e765]
+                - link "2145057603 YOUyyg" [ref=e767] [cursor=pointer]:
+                  - /url: https://github.com/2145057603
+                  - strong [ref=e768]: "2145057603"
+                  - text: YOUyyg
+          - generic [ref=e770]:
+            - heading "Languages" [level=2] [ref=e771]
+            - list [ref=e775]:
+              - listitem [ref=e776]:
+                - link "C# 100.0%" [ref=e777] [cursor=pointer]:
+                  - /url: /2145057603/sts2-CardArtEditor/search?l=c%23
+                  - img [ref=e778]
+                  - generic [ref=e780]: C#
+                  - generic [ref=e781]: 100.0%
+  - contentinfo [ref=e783]:
+    - heading "Footer" [level=2] [ref=e784]
+    - generic [ref=e785]:
+      - generic [ref=e786]:
+        - link "GitHub Homepage" [ref=e787] [cursor=pointer]:
+          - /url: https://github.com
+          - img [ref=e788]
+        - generic [ref=e790]: © 2026 GitHub, Inc.
+      - navigation "Footer" [ref=e791]:
+        - heading "Footer navigation" [level=3] [ref=e792]
+        - list "Footer navigation" [ref=e793]:
+          - listitem [ref=e794]:
+            - link "Terms" [ref=e795] [cursor=pointer]:
+              - /url: https://docs.github.com/site-policy/github-terms/github-terms-of-service
+          - listitem [ref=e796]:
+            - link "Privacy" [ref=e797] [cursor=pointer]:
+              - /url: https://docs.github.com/site-policy/privacy-policies/github-privacy-statement
+          - listitem [ref=e798]:
+            - link "Security" [ref=e799] [cursor=pointer]:
+              - /url: https://github.com/security
+          - listitem [ref=e800]:
+            - link "Status" [ref=e801] [cursor=pointer]:
+              - /url: https://www.githubstatus.com/
+          - listitem [ref=e802]:
+            - link "Community" [ref=e803] [cursor=pointer]:
+              - /url: https://github.community/
+          - listitem [ref=e804]:
+            - link "Docs" [ref=e805] [cursor=pointer]:
+              - /url: https://docs.github.com/
+          - listitem [ref=e806]:
+            - link "Contact" [ref=e807] [cursor=pointer]:
+              - /url: https://support.github.com?tags=dotcom-footer
+          - listitem [ref=e808]:
+            - button "Manage cookies" [ref=e810] [cursor=pointer]
+          - listitem [ref=e811]:
+            - button "Do not share my personal information" [ref=e813] [cursor=pointer]

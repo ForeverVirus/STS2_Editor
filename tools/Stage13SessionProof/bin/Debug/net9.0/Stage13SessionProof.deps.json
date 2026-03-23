@@ -1,0 +1,210 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "Stage13SessionProof/1.0.0": {
+        "dependencies": {
+          "0Harmony": "2.4.2.0",
+          "sts2": "0.1.0.0",
+          "STS2_Editor": "0.0.0.0"
+        },
+        "runtime": {
+          "Stage13SessionProof.dll": {}
+        }
+      },
+      "0Harmony/2.4.2.0": {
+        "runtime": {
+          "0Harmony.dll": {
+            "assemblyVersion": "2.4.2.0",
+            "fileVersion": "2.4.2.0"
+          }
+        }
+      },
+      "sts2/0.1.0.0": {
+        "runtime": {
+          "sts2.dll": {
+            "assemblyVersion": "0.1.0.0",
+            "fileVersion": "0.1.0.0"
+          }
+        }
+      },
+      "STS2_Editor/0.0.0.0": {
+        "runtime": {
+          "STS2_Editor.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "GodotSharp/4.5.1.0": {
+        "runtime": {
+          "GodotSharp.dll": {
+            "assemblyVersion": "4.5.1.0",
+            "fileVersion": "4.5.1.0"
+          }
+        }
+      },
+      "Steamworks.NET/1.0.0.0": {
+        "runtime": {
+          "Steamworks.NET.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "System.IO.Hashing/9.0.0.0": {
+        "runtime": {
+          "System.IO.Hashing.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.24.52809"
+          }
+        }
+      },
+      "Sentry/5.0.0.0": {
+        "runtime": {
+          "Sentry.dll": {
+            "assemblyVersion": "5.0.0.0",
+            "fileVersion": "5.0.0.0"
+          }
+        }
+      },
+      "SmartFormat/3.0.0.0": {
+        "runtime": {
+          "SmartFormat.dll": {
+            "assemblyVersion": "3.0.0.0",
+            "fileVersion": "3.3.0.704"
+          }
+        }
+      },
+      "Vortice.DXGI/3.6.2.0": {
+        "runtime": {
+          "Vortice.DXGI.dll": {
+            "assemblyVersion": "3.6.2.0",
+            "fileVersion": "3.6.2.0"
+          }
+        }
+      },
+      "SharpGen.Runtime/2.2.0.0": {
+        "runtime": {
+          "SharpGen.Runtime.dll": {
+            "assemblyVersion": "2.2.0.0",
+            "fileVersion": "2.2.0.0"
+          }
+        }
+      },
+      "SmartFormat.ZString/3.0.0.0": {
+        "runtime": {
+          "SmartFormat.ZString.dll": {
+            "assemblyVersion": "3.0.0.0",
+            "fileVersion": "3.3.0.704"
+          }
+        }
+      },
+      "Vortice.Mathematics/1.9.2.0": {
+        "runtime": {
+          "Vortice.Mathematics.dll": {
+            "assemblyVersion": "1.9.2.0",
+            "fileVersion": "1.9.2.0"
+          }
+        }
+      },
+      "Vortice.DirectX/3.6.2.0": {
+        "runtime": {
+          "Vortice.DirectX.dll": {
+            "assemblyVersion": "3.6.2.0",
+            "fileVersion": "3.6.2.0"
+          }
+        }
+      },
+      "SharpGen.Runtime.COM/2.2.0.0": {
+        "runtime": {
+          "SharpGen.Runtime.COM.dll": {
+            "assemblyVersion": "2.2.0.0",
+            "fileVersion": "2.2.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Stage13SessionProof/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "0Harmony/2.4.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "sts2/0.1.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "STS2_Editor/0.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "GodotSharp/4.5.1.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Steamworks.NET/1.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "System.IO.Hashing/9.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Sentry/5.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "SmartFormat/3.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Vortice.DXGI/3.6.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "SharpGen.Runtime/2.2.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "SmartFormat.ZString/3.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Vortice.Mathematics/1.9.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Vortice.DirectX/3.6.2.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "SharpGen.Runtime.COM/2.2.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

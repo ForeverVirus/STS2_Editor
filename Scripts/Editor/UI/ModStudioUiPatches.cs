@@ -1,8 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens.MainMenu;
@@ -15,11 +14,18 @@ internal static class ModStudioUiPatches
 {
     private const string MenuButtonName = "ModStudioButton";
 
-    private static readonly Dictionary<ulong, NModStudioScreen> _screenCache = new();
-    private static readonly Dictionary<ulong, NMainMenuTextButton> _buttonCache = new();
-    private static readonly FieldInfo? _lastHitButtonField = AccessTools.Field(typeof(NMainMenu), "_lastHitButton");
-    private static readonly MethodInfo? _mainMenuButtonFocusedMethod = AccessTools.Method(typeof(NMainMenu), "MainMenuButtonFocused");
-    private static readonly MethodInfo? _mainMenuButtonUnfocusedMethod = AccessTools.Method(typeof(NMainMenu), "MainMenuButtonUnfocused");
+    private static readonly Dictionary<ulong, NModStudioModeChooserDialog> ChooserCache = new();
+    private static readonly Dictionary<ulong, NModStudioProjectWindow> ProjectCache = new();
+    private static readonly Dictionary<ulong, NModStudioPackageWindow> PackageCache = new();
+    private static readonly Dictionary<ulong, NMainMenuTextButton> ButtonCache = new();
+    private static readonly FieldInfo? LastHitButtonField = AccessTools.Field(typeof(NMainMenu), "_lastHitButton");
+    private static readonly MethodInfo? MainMenuButtonFocusedMethod = AccessTools.Method(typeof(NMainMenu), "MainMenuButtonFocused");
+    private static readonly MethodInfo? MainMenuButtonUnfocusedMethod = AccessTools.Method(typeof(NMainMenu), "MainMenuButtonUnfocused");
+
+    static ModStudioUiPatches()
+    {
+        ModStudioLocalization.LanguageChanged += RefreshMenuButtonTexts;
+    }
 
     [HarmonyPostfix]
     [HarmonyPatch(typeof(NMainMenu), nameof(NMainMenu._Ready))]
@@ -48,27 +54,24 @@ internal static class ModStudioUiPatches
         modStudioButton.Connect(NClickableControl.SignalName.Unfocused, Callable.From<NClickableControl>(button => HandleUnfocus(__instance, button as NMainMenuTextButton)));
         container.AddChild(modStudioButton);
         container.MoveChild(modStudioButton, quitButton.GetIndex());
-        _buttonCache[__instance.GetInstanceId()] = modStudioButton;
+        ButtonCache[__instance.GetInstanceId()] = modStudioButton;
 
-        var quitIndex = quitButton.GetIndex();
-        if (quitIndex > 0)
-        {
-            modStudioButton.FocusNeighborTop = compendiumButton.GetPath();
-            modStudioButton.FocusNeighborBottom = quitButton.GetPath();
-            compendiumButton.FocusNeighborBottom = modStudioButton.GetPath();
-            quitButton.FocusNeighborTop = modStudioButton.GetPath();
-        }
+        modStudioButton.FocusNeighborTop = compendiumButton.GetPath();
+        modStudioButton.FocusNeighborBottom = quitButton.GetPath();
+        compendiumButton.FocusNeighborBottom = modStudioButton.GetPath();
+        quitButton.FocusNeighborTop = modStudioButton.GetPath();
 
+        ApplyButtonText(modStudioButton);
         Log.Info("Mod Studio main menu entry attached.");
     }
 
     public static void RefreshMenuButtonTexts()
     {
-        foreach (var pair in _buttonCache.ToList())
+        foreach (var pair in ButtonCache.ToList())
         {
             if (!GodotObject.IsInstanceValid(pair.Value))
             {
-                _buttonCache.Remove(pair.Key);
+                ButtonCache.Remove(pair.Key);
                 continue;
             }
 
@@ -80,21 +83,49 @@ internal static class ModStudioUiPatches
     [HarmonyPatch(typeof(NMainMenuSubmenuStack), nameof(NMainMenuSubmenuStack.GetSubmenuType), new[] { typeof(Type) })]
     private static bool AddModStudioSubmenu(NMainMenuSubmenuStack __instance, Type type, ref NSubmenu __result)
     {
-        if (type != typeof(NModStudioScreen))
+        if (type != typeof(NModStudioModeChooserDialog) && type != typeof(NModStudioProjectWindow) && type != typeof(NModStudioPackageWindow))
         {
             return true;
         }
 
         var stackId = __instance.GetInstanceId();
-        if (!_screenCache.TryGetValue(stackId, out var screen) || !GodotObject.IsInstanceValid(screen))
+        if (type == typeof(NModStudioModeChooserDialog))
         {
-            screen = NModStudioScreen.Create();
-            screen.Visible = false;
-            __instance.AddChild(screen);
-            _screenCache[stackId] = screen;
+            if (!ChooserCache.TryGetValue(stackId, out var chooser) || !GodotObject.IsInstanceValid(chooser))
+            {
+                chooser = NModStudioModeChooserDialog.Create();
+                chooser.Visible = false;
+                __instance.AddChildSafely(chooser);
+                ChooserCache[stackId] = chooser;
+            }
+
+            __result = chooser;
+            return false;
         }
 
-        __result = screen;
+        if (type == typeof(NModStudioProjectWindow))
+        {
+            if (!ProjectCache.TryGetValue(stackId, out var projectWindow) || !GodotObject.IsInstanceValid(projectWindow))
+            {
+                projectWindow = NModStudioProjectWindow.Create();
+                projectWindow.Visible = false;
+                __instance.AddChildSafely(projectWindow);
+                ProjectCache[stackId] = projectWindow;
+            }
+
+            __result = projectWindow;
+            return false;
+        }
+
+        if (!PackageCache.TryGetValue(stackId, out var window) || !GodotObject.IsInstanceValid(window))
+        {
+            window = NModStudioPackageWindow.Create();
+            window.Visible = false;
+            __instance.AddChildSafely(window);
+            PackageCache[stackId] = window;
+        }
+
+        __result = window;
         return false;
     }
 
@@ -111,7 +142,7 @@ internal static class ModStudioUiPatches
         {
             Name = "Label",
             Theme = ResourceLoader.Load<Theme>("res://themes/main_menu_text_button.tres"),
-            Text = ModStudioLocalization.T("mod_studio.title"),
+            Text = ModStudioPackageUi.T("\u6a21\u7ec4\u5de5\u574a", "Mod Studio"),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             AutoSizeEnabled = false,
@@ -142,18 +173,16 @@ internal static class ModStudioUiPatches
     private static void ApplyButtonText(NMainMenuTextButton button)
     {
         var label = button.GetNodeOrNull<MegaCrit.Sts2.addons.mega_text.MegaLabel>("Label");
-        if (label == null)
+        if (label != null)
         {
-            return;
+            label.Text = ModStudioPackageUi.T("\u6a21\u7ec4\u5de5\u574a", "Mod Studio");
         }
-
-        label.Text = ModStudioLocalization.T("mod_studio.title");
     }
 
     private static void OpenModStudio(NMainMenu menu, NButton button)
     {
-        _lastHitButtonField?.SetValue(menu, button as NMainMenuTextButton);
-        menu.SubmenuStack.PushSubmenuType<NModStudioScreen>();
+        LastHitButtonField?.SetValue(menu, button as NMainMenuTextButton);
+        menu.SubmenuStack.PushSubmenuType<NModStudioModeChooserDialog>();
     }
 
     private static void HandleFocus(NMainMenu menu, NMainMenuTextButton? button)
@@ -163,7 +192,7 @@ internal static class ModStudioUiPatches
             return;
         }
 
-        _mainMenuButtonFocusedMethod?.Invoke(menu, new object[] { button });
+        MainMenuButtonFocusedMethod?.Invoke(menu, new object[] { button });
     }
 
     private static void HandleUnfocus(NMainMenu menu, NMainMenuTextButton? button)
@@ -173,6 +202,6 @@ internal static class ModStudioUiPatches
             return;
         }
 
-        _mainMenuButtonUnfocusedMethod?.Invoke(menu, new object[] { button });
+        MainMenuButtonUnfocusedMethod?.Invoke(menu, new object[] { button });
     }
 }

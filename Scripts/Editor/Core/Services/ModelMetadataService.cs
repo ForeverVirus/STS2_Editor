@@ -168,7 +168,7 @@ public sealed partial class ModelMetadataService
             Detail("detail.rarity", card.Rarity),
             Detail("detail.pool", card.Pool.Id.Entry),
             Detail("detail.target_type", card.TargetType),
-            Detail("detail.energy_cost", card.EnergyCost.GetAmountToSpend()),
+            Detail("detail.energy_cost", SafeCardEnergyCostText(card)),
             Detail("detail.portrait_path", SafeAssetPath(() => card.PortraitPath)),
             Detail("detail.description_text", SafeLocText(card.Description)))
     };
@@ -184,8 +184,8 @@ public sealed partial class ModelMetadataService
             ["portrait_path"] = SafeAssetPath(() => card.PortraitPath),
             ["description"] = SafeLocText(card.Description),
             ["target_type"] = card.TargetType.ToString(),
-            ["energy_cost"] = card.EnergyCost.CostsX ? "0" : card.EnergyCost.GetAmountToSpend().ToString(),
-            ["energy_cost_x"] = card.EnergyCost.CostsX.ToString(),
+            ["energy_cost"] = SafeCardEnergyCostValue(card),
+            ["energy_cost_x"] = SafeCardCostsX(card).ToString(),
             ["canonical_star_cost"] = card.CanonicalStarCost.ToString(),
             ["star_cost_x"] = card.HasStarCostX.ToString(),
             ["can_be_generated_in_combat"] = card.CanBeGeneratedInCombat.ToString()
@@ -512,6 +512,42 @@ public sealed partial class ModelMetadataService
         if (locString == null) return string.Empty;
         try { return locString.GetRawText(); }
         catch (Exception ex) { return ModStudioLocalization.F("misc.unavailable", ex.GetType().Name); }
+    }
+
+    private static string SafeCardEnergyCostText(CardModel card)
+    {
+        try
+        {
+            return card.EnergyCost.CostsX ? "X" : card.EnergyCost.Canonical.ToString();
+        }
+        catch (Exception ex)
+        {
+            return ModStudioLocalization.F("misc.unavailable", ex.GetType().Name);
+        }
+    }
+
+    private static string SafeCardEnergyCostValue(CardModel card)
+    {
+        try
+        {
+            return card.EnergyCost.CostsX ? "0" : card.EnergyCost.Canonical.ToString();
+        }
+        catch
+        {
+            return "0";
+        }
+    }
+
+    private static bool SafeCardCostsX(CardModel card)
+    {
+        try
+        {
+            return card.EnergyCost.CostsX;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string SafeAssetPath(Func<string> getter)

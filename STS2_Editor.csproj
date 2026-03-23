@@ -32,6 +32,7 @@
     <Compile Remove=".godot\mono\temp\**\*.cs" />
     <Compile Remove="tools\**\*.cs" />
     <Compile Remove="recovered\**\*.cs" />
+    <Compile Remove="references\**\*.cs" />
   </ItemGroup>
 
   <Target Name="Copy Mod" AfterTargets="PostBuildEvent">

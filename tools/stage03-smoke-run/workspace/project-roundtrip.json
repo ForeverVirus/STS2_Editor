@@ -6,8 +6,8 @@
     "description": "Smoke-test project.",
     "editorVersion": "stage03",
     "targetGameVersion": "unknown",
-    "createdAtUtc": "2026-03-22T21:20:21.5045368+00:00",
-    "updatedAtUtc": "2026-03-22T21:20:21.504554+00:00"
+    "createdAtUtc": "2026-03-23T20:47:30.6808852+00:00",
+    "updatedAtUtc": "2026-03-23T20:47:30.680903+00:00"
   },
   "overrides": [
     {
@@ -22,11 +22,11 @@
       },
       "assets": [
         {
-          "id": "14322c35ce5f424fba7ab5fcccef174c",
+          "id": "d6120699828244eb91ec911a4e56861b",
           "sourceType": "managed-import",
           "logicalRole": "portrait",
           "sourcePath": "external/strike.png",
-          "managedPath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\sts2-editor-asset-955a5afd20c74a35afdb3065e057e68c.txt",
+          "managedPath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\sts2-editor-asset-398e6cd491b74298a653e6351b760350.txt",
           "packagePath": "",
           "fileName": "strike.txt"
         }
@@ -88,7 +88,7 @@
   },
   "projectAssets": [
     {
-      "id": "a7488439b9354082a1b423cba8cf4b22",
+      "id": "80d1e7a439614e4485df2fa3a6de672b",
       "sourceType": "res",
       "logicalRole": "icon",
       "sourcePath": "res://ui/icon.png",

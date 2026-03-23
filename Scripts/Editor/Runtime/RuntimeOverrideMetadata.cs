@@ -148,18 +148,7 @@ internal static class RuntimeOverrideMetadata
     private static bool TryEventText(string key, out string value)
     {
         value = string.Empty;
-        if (TryMatchSimpleKey(key, ".title", out var entityId))
-        {
-            return TryGetMetadata(ModStudioEntityKind.Event, entityId, "title", out value);
-        }
-
-        const string initialDescriptionSuffix = ".pages.INITIAL.description";
-        if (TryMatchSimpleKey(key, initialDescriptionSuffix, out entityId))
-        {
-            return TryGetMetadata(ModStudioEntityKind.Event, entityId, "initial_description", out value);
-        }
-
-        if (TryMatchEventPageDescriptionKey(key, out entityId, out _) &&
+        if (TryMatchEventPageDescriptionKey(key, out var entityId, out _) &&
             RuntimeEventTemplateSupport.TryGetEventText(entityId, key, out value))
         {
             return true;
@@ -175,6 +164,17 @@ internal static class RuntimeOverrideMetadata
             RuntimeEventTemplateSupport.TryGetEventText(entityId, key, out value))
         {
             return true;
+        }
+
+        const string initialDescriptionSuffix = ".pages.INITIAL.description";
+        if (TryMatchSimpleKey(key, initialDescriptionSuffix, out entityId))
+        {
+            return TryGetMetadata(ModStudioEntityKind.Event, entityId, "initial_description", out value);
+        }
+
+        if (TryMatchSimpleKey(key, ".title", out entityId))
+        {
+            return TryGetMetadata(ModStudioEntityKind.Event, entityId, "title", out value);
         }
 
         return false;

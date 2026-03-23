@@ -1,0 +1,67 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "graphcheck/1.0.0": {
+        "dependencies": {
+          "GodotSharp": "4.5.1.0",
+          "GodotSharpEditor": "4.5.1.0",
+          "STS2_Editor": "0.0.0.0"
+        },
+        "runtime": {
+          "graphcheck.dll": {}
+        }
+      },
+      "GodotSharp/4.5.1.0": {
+        "runtime": {
+          "GodotSharp.dll": {
+            "assemblyVersion": "4.5.1.0",
+            "fileVersion": "4.5.1.0"
+          }
+        }
+      },
+      "GodotSharpEditor/4.5.1.0": {
+        "runtime": {
+          "GodotSharpEditor.dll": {
+            "assemblyVersion": "4.5.1.0",
+            "fileVersion": "4.5.1.0"
+          }
+        }
+      },
+      "STS2_Editor/0.0.0.0": {
+        "runtime": {
+          "STS2_Editor.dll": {
+            "assemblyVersion": "0.0.0.0",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "graphcheck/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "GodotSharp/4.5.1.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "GodotSharpEditor/4.5.1.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "STS2_Editor/0.0.0.0": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
