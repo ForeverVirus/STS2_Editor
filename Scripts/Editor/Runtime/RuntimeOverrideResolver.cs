@@ -1,10 +1,13 @@
 using STS2_Editor.Scripts.Editor.Core.Models;
 using STS2_Editor.Scripts.Editor.Packaging;
+using STS2_Editor.Scripts.Editor.Graph;
 
 namespace STS2_Editor.Scripts.Editor.Runtime;
 
 public sealed class RuntimeOverrideResolver
 {
+    private static readonly EventGraphCompiler EventGraphCompiler = new();
+
     public RuntimeOverrideResolutionResult Resolve(
         IReadOnlyCollection<RuntimeInstalledPackage> installedPackages,
         IReadOnlyCollection<PackageSessionState> sessionStates)
@@ -32,7 +35,8 @@ public sealed class RuntimeOverrideResolver
             {
                 var key = new RuntimeEntityKey(envelope.EntityKind, envelope.EntityId);
                 TrackConflict(conflictMap, key, state);
-                result.SetOverride(key, CloneEnvelope(envelope));
+                var graph = TryGetGraph(package, envelope.GraphId);
+                result.SetOverride(key, CloneEnvelope(envelope, graph));
             }
 
             foreach (var graphPair in package.Project.Graphs)
@@ -78,9 +82,19 @@ public sealed class RuntimeOverrideResolver
         conflict.WinningPackageKey = state.PackageKey;
     }
 
-    private static EntityOverrideEnvelope CloneEnvelope(EntityOverrideEnvelope source)
+    private static BehaviorGraphDefinition? TryGetGraph(RuntimeInstalledPackage package, string? graphId)
     {
-        return new EntityOverrideEnvelope
+        if (string.IsNullOrWhiteSpace(graphId))
+        {
+            return null;
+        }
+
+        return package.Project.Graphs.TryGetValue(graphId, out var graph) ? graph : null;
+    }
+
+    private static EntityOverrideEnvelope CloneEnvelope(EntityOverrideEnvelope source, BehaviorGraphDefinition? graph = null)
+    {
+        var clone = new EntityOverrideEnvelope
         {
             EntityKind = source.EntityKind,
             EntityId = source.EntityId,
@@ -90,6 +104,27 @@ public sealed class RuntimeOverrideResolver
             Metadata = new Dictionary<string, string>(source.Metadata, StringComparer.Ordinal),
             Assets = source.Assets.Select(CloneAsset).ToList()
         };
+
+        if (clone.EntityKind == ModStudioEntityKind.Event &&
+            clone.BehaviorSource == BehaviorSource.Graph &&
+            graph is not null)
+        {
+            var compiled = EventGraphCompiler.Compile(graph);
+            foreach (var pair in compiled.Metadata)
+            {
+                clone.Metadata[pair.Key] = pair.Value;
+            }
+
+            if (!compiled.IsValid)
+            {
+                var errors = string.Join(" | ", compiled.Errors);
+                clone.Notes = string.IsNullOrWhiteSpace(clone.Notes)
+                    ? $"Event graph compilation errors: {errors}"
+                    : clone.Notes + " | Event graph compilation errors: " + errors;
+            }
+        }
+
+        return clone;
     }
 
     private static AssetRef CloneAsset(AssetRef source)

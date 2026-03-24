@@ -1,4 +1,5 @@
 using Godot;
+using MegaCrit.Sts2.Core.Models;
 using STS2_Editor.Scripts.Editor.Graph;
 using static STS2_Editor.Scripts.Editor.UI.ModStudioUiFactory;
 
@@ -56,9 +57,19 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
     {
         BuildUi();
         _basicEditor?.EnsureBuilt();
-        _assetEditor?.EnsureBuilt();
-        _graphEditor?.EnsureBuilt();
         RefreshTexts();
+    }
+
+    public void EnsureAssetsBuilt()
+    {
+        EnsureBuilt();
+        _assetEditor?.EnsureBuilt();
+    }
+
+    public void EnsureGraphBuilt()
+    {
+        EnsureBuilt();
+        _graphEditor?.EnsureBuilt();
     }
 
     public void RefreshTexts()
@@ -75,9 +86,14 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
         _graphEditor?.RefreshTexts();
     }
 
-    public void BindGraph(BehaviorGraphDefinition graph, BehaviorGraphRegistry registry)
+    public void BindGraph(BehaviorGraphDefinition graph, BehaviorGraphRegistry registry, AbstractModel? sourceModel = null, DynamicPreviewContext? previewContext = null)
     {
-        _graphEditor?.BindGraph(graph, registry);
+        _graphEditor?.BindGraph(graph, registry, sourceModel, previewContext);
+    }
+
+    public void UpdateGraphPreviewContext(AbstractModel? sourceModel = null, DynamicPreviewContext? previewContext = null)
+    {
+        _graphEditor?.UpdatePreviewContext(sourceModel, previewContext);
     }
 
     public void ClearGraph()

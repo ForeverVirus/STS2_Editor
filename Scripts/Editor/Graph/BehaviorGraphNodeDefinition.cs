@@ -10,5 +10,7 @@ public sealed class BehaviorGraphNodeDefinition
 
     public string Description { get; set; } = string.Empty;
 
-    public Dictionary<string, string> Properties { get; set; } = new();
+    public Dictionary<string, string> Properties { get; set; } = new(StringComparer.Ordinal);
+
+    public Dictionary<string, DynamicValueDefinition> DynamicValues { get; set; } = new(StringComparer.Ordinal);
 }

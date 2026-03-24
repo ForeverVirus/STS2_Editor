@@ -63,6 +63,7 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
                 LineEdit lineEdit => lineEdit.Text ?? string.Empty,
                 TextEdit textEdit => textEdit.Text ?? string.Empty,
                 CheckBox checkBox => checkBox.ButtonPressed.ToString(),
+                ChoiceFieldEditor choiceFieldEditor => choiceFieldEditor.GetSerializedValue(),
                 ListFieldEditor listFieldEditor => listFieldEditor.GetSerializedValue(),
                 _ => string.Empty
             };
@@ -84,6 +85,7 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             LineEdit lineEdit => lineEdit.Text ?? string.Empty,
             TextEdit textEdit => textEdit.Text ?? string.Empty,
             CheckBox checkBox => checkBox.ButtonPressed.ToString(),
+            ChoiceFieldEditor choiceFieldEditor => choiceFieldEditor.GetSerializedValue(),
             ListFieldEditor listFieldEditor => listFieldEditor.GetSerializedValue(),
             _ => string.Empty
         };
@@ -109,6 +111,9 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
                     break;
                 case CheckBox checkBox when bool.TryParse(value, out var boolValue):
                     checkBox.ButtonPressed = boolValue;
+                    break;
+                case ChoiceFieldEditor choiceFieldEditor:
+                    choiceFieldEditor.SetValue(value ?? string.Empty);
                     break;
             }
         });
@@ -136,6 +141,11 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         foreach (var listEditor in _fieldControls.Values.OfType<ListFieldEditor>())
         {
             listEditor.RefreshTexts();
+        }
+
+        foreach (var choiceEditor in _fieldControls.Values.OfType<ChoiceFieldEditor>())
+        {
+            choiceEditor.RefreshTexts();
         }
     }
 
@@ -214,6 +224,12 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             return listFieldEditor;
         }
 
+        if (TryCreateChoiceFieldEditor(key, value, out var choiceFieldEditor))
+        {
+            choiceFieldEditor.ValueChanged += RaiseFieldChanged;
+            return choiceFieldEditor;
+        }
+
         if (bool.TryParse(value, out var boolValue))
         {
             var checkBox = new CheckBox
@@ -257,6 +273,19 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         }
 
         editor = new ListFieldEditor(options, ParseListValue(value));
+        return true;
+    }
+
+    private static bool TryCreateChoiceFieldEditor(string key, string value, out ChoiceFieldEditor editor)
+    {
+        editor = null!;
+        var options = FieldChoiceProvider.GetBasicChoices(key);
+        if (options.Count == 0)
+        {
+            return false;
+        }
+
+        editor = new ChoiceFieldEditor(key, options, value);
         return true;
     }
 
@@ -448,6 +477,116 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             _rowsHost.RemoveChild(row);
             row.QueueFree();
             ValueChanged?.Invoke();
+        }
+    }
+
+    private sealed partial class ChoiceFieldEditor : VBoxContainer
+    {
+        private readonly string _key;
+        private readonly OptionButton _picker;
+        private string _currentValue;
+
+        public ChoiceFieldEditor(string key, IReadOnlyList<(string Value, string Display)> options, string value)
+        {
+            _key = key;
+            _currentValue = value ?? string.Empty;
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+
+            _picker = new OptionButton
+            {
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+            };
+            _picker.ItemSelected += OnItemSelected;
+            AddChild(_picker);
+
+            RefreshTexts(options);
+            SetValue(_currentValue);
+        }
+
+        public event Action? ValueChanged;
+
+        public string GetSerializedValue()
+        {
+            if (_picker.Selected < 0 || _picker.Selected >= _picker.ItemCount)
+            {
+                return _currentValue;
+            }
+
+            return _picker.GetItemMetadata(_picker.Selected).AsString();
+        }
+
+        public void SetValue(string value)
+        {
+            _currentValue = value ?? string.Empty;
+            for (var index = 0; index < _picker.ItemCount; index++)
+            {
+                if (string.Equals(_picker.GetItemMetadata(index).AsString(), _currentValue, StringComparison.Ordinal))
+                {
+                    _picker.Select(index);
+                    return;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(_currentValue))
+            {
+                _picker.AddItem(BuildDisplayText(_currentValue, _currentValue));
+                _picker.SetItemMetadata(_picker.ItemCount - 1, _currentValue);
+                _picker.Select(_picker.ItemCount - 1);
+            }
+            else if (_picker.ItemCount > 0)
+            {
+                _picker.Select(0);
+            }
+        }
+
+        public void RefreshTexts()
+        {
+            RefreshTexts(FieldChoiceProvider.GetBasicChoices(_key));
+        }
+
+        private void RefreshTexts(IReadOnlyList<(string Value, string Display)> options)
+        {
+            var selected = GetSerializedValue();
+            _picker.Clear();
+
+            foreach (var option in options)
+            {
+                _picker.AddItem(option.Display);
+                _picker.SetItemMetadata(_picker.ItemCount - 1, option.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(selected))
+            {
+                SetValue(selected);
+                return;
+            }
+
+            if (_picker.ItemCount > 0)
+            {
+                _picker.Select(0);
+            }
+        }
+
+        private void OnItemSelected(long index)
+        {
+            if (index < 0 || index >= _picker.ItemCount)
+            {
+                return;
+            }
+
+            _currentValue = _picker.GetItemMetadata((int)index).AsString();
+            ValueChanged?.Invoke();
+        }
+
+        private static string BuildDisplayText(string value, string fallback)
+        {
+            var display = ModStudioFieldDisplayNames.FormatValue(value);
+            if (string.IsNullOrWhiteSpace(display))
+            {
+                display = fallback;
+            }
+
+            return display == value ? display : $"{display} [{value}]";
         }
     }
 

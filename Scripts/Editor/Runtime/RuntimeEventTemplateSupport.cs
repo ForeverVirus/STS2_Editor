@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.Helpers;
@@ -13,6 +14,8 @@ using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves.Runs;
+using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.ValueProps;
 
 namespace STS2_Editor.Scripts.Editor.Runtime;
 
@@ -33,10 +36,15 @@ internal static class RuntimeEventTemplateSupport
         nameof(RunManager.EnterRoomWithoutExitingCurrentRoom),
         new[] { typeof(AbstractRoom), typeof(bool) });
     private static readonly MethodInfo? EventNodeSetter = AccessTools.PropertySetter(typeof(EventModel), "Node");
-    private static readonly FieldInfo? EnteringEventCombatField = AccessTools.Field(typeof(EventModel), "EnteringEventCombat");
-    private static readonly ConditionalWeakTable<EventModel, RuntimeEventTemplateState> RuntimeStates = new();
-    private static readonly Dictionary<string, string> PersistedResumePageIds = new(StringComparer.Ordinal);
-    private static readonly object PersistedResumePageSync = new();
+        private static readonly FieldInfo? EnteringEventCombatField = AccessTools.Field(typeof(EventModel), "EnteringEventCombat");
+        private static readonly ConditionalWeakTable<EventModel, RuntimeEventTemplateState> RuntimeStates = new();
+        private static readonly Dictionary<string, string> PersistedResumePageIds = new(StringComparer.Ordinal);
+        private static readonly object PersistedResumePageSync = new();
+    private const string RewardKindKey = "reward_kind";
+    private const string RewardAmountKey = "reward_amount";
+    private const string RewardTargetKey = "reward_target";
+    private const string RewardPropsKey = "reward_props";
+    private const string RewardPowerIdKey = "reward_power_id";
 
     public static bool HasTemplate(EventModel eventModel)
     {
@@ -225,6 +233,7 @@ internal static class RuntimeEventTemplateSupport
         RuntimeEventTemplateOptionDefinition option)
     {
         Log.Info($"[ModStudio.Event] Executing option {eventModel.Id.Entry}:{currentPageId}:{option.OptionId}");
+        await ApplyRewardAsync(eventModel, option);
         if (!string.IsNullOrWhiteSpace(option.NextPageId))
         {
             TrySetPage(eventModel, template, option.NextPageId);
@@ -241,6 +250,93 @@ internal static class RuntimeEventTemplateSupport
             Log.Info($"[ModStudio.Event] Proceeding out of template event {eventModel.Id.Entry} via option {option.OptionId}");
             await NEventRoom.Proceed();
         }
+    }
+
+    private static async Task ApplyRewardAsync(EventModel eventModel, RuntimeEventTemplateOptionDefinition option)
+    {
+        if (eventModel.Owner == null || string.IsNullOrWhiteSpace(option.RewardKind))
+        {
+            return;
+        }
+
+        var rewardKind = option.RewardKind.Trim().ToLowerInvariant();
+        var amount = ParseDecimal(option.RewardAmount, 1m);
+        var target = ResolveRewardTarget(eventModel, option);
+        switch (rewardKind)
+        {
+            case "gold":
+                await PlayerCmd.GainGold(amount, eventModel.Owner);
+                return;
+            case "energy":
+                await PlayerCmd.GainEnergy(amount, eventModel.Owner);
+                return;
+            case "stars":
+                await PlayerCmd.GainStars(amount, eventModel.Owner);
+                return;
+            case "block":
+                if (target != null)
+                {
+                    await CreatureCmd.GainBlock(target, amount, ParseValueProps(option.RewardProps), cardPlay: null);
+                }
+                return;
+            case "heal":
+                if (target != null)
+                {
+                    await CreatureCmd.Heal(target, amount);
+                }
+                return;
+            case "max_hp":
+                if (target != null)
+                {
+                    await CreatureCmd.GainMaxHp(target, amount);
+                }
+                return;
+            case "power":
+                if (target != null)
+                {
+                    var powerId = option.RewardPowerId;
+                    if (!string.IsNullOrWhiteSpace(powerId))
+                    {
+                        var canonicalPower = ModelDb.AllPowers.FirstOrDefault(item =>
+                            string.Equals(item.Id.Entry, powerId, StringComparison.OrdinalIgnoreCase));
+                        if (canonicalPower != null)
+                        {
+                            await PowerCmd.Apply(canonicalPower.ToMutable(), target, amount, eventModel.Owner.Creature, cardSource: null);
+                        }
+                    }
+                }
+                return;
+            case "damage":
+            case "draw":
+            case "card":
+            case "relic":
+            case "potion":
+            case "remove_card":
+            case "special_card":
+                Log.Warn($"[ModStudio.Event] Reward kind '{rewardKind}' on event '{eventModel.Id.Entry}' is not supported for immediate runtime application.");
+                return;
+            default:
+                Log.Warn($"[ModStudio.Event] Unknown reward kind '{rewardKind}' on event '{eventModel.Id.Entry}'.");
+                return;
+        }
+    }
+
+    private static Creature? ResolveRewardTarget(EventModel eventModel, RuntimeEventTemplateOptionDefinition option)
+    {
+        if (eventModel.Owner == null)
+        {
+            return null;
+        }
+
+        var selector = string.IsNullOrWhiteSpace(option.RewardTarget)
+            ? "self"
+            : option.RewardTarget.Trim().ToLowerInvariant();
+        return selector switch
+        {
+            "self" or "owner" or "owner_creature" or "source_creature" => eventModel.Owner.Creature,
+            "current_target" or "target" => eventModel.Owner.Creature,
+            _ => eventModel.Owner.Creature
+        };
     }
 
     private static async Task StartCombatAsync(EventModel eventModel, RuntimeEventTemplateOptionDefinition option)
@@ -394,7 +490,39 @@ internal static class RuntimeEventTemplateSupport
                     option.ShouldSaveChoiceToHistory = shouldSaveChoice;
                 }
                 break;
+            case RewardKindKey:
+                option.RewardKind = value.Trim();
+                break;
+            case RewardAmountKey:
+                option.RewardAmount = value.Trim();
+                break;
+            case RewardTargetKey:
+                option.RewardTarget = value.Trim();
+                break;
+            case RewardPropsKey:
+                option.RewardProps = value.Trim();
+                break;
+            case RewardPowerIdKey:
+                option.RewardPowerId = value.Trim();
+                break;
         }
+    }
+
+    private static decimal ParseDecimal(string? value, decimal fallback)
+    {
+        return decimal.TryParse(value, out var parsed) ? parsed : fallback;
+    }
+
+    private static ValueProp ParseValueProps(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue) || string.Equals(rawValue, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        return Enum.TryParse<ValueProp>(rawValue.Replace("|", ",", StringComparison.Ordinal), ignoreCase: true, out var props)
+            ? props
+            : 0;
     }
 
     private static bool TryGetPage(RuntimeEventTemplateDefinition template, string pageId, out RuntimeEventTemplatePageDefinition page)
@@ -609,5 +737,15 @@ internal static class RuntimeEventTemplateSupport
         public bool IsProceed { get; set; }
 
         public bool ShouldSaveChoiceToHistory { get; set; } = true;
+
+        public string? RewardKind { get; set; }
+
+        public string? RewardAmount { get; set; }
+
+        public string? RewardTarget { get; set; }
+
+        public string? RewardProps { get; set; }
+
+        public string? RewardPowerId { get; set; }
     }
 }

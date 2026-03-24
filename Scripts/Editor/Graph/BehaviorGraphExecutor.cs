@@ -68,9 +68,16 @@ public sealed class BehaviorGraphExecutor
                 await executor.ExecuteAsync(node, context);
             }
 
-            foreach (var nextNodeId in ResolveNextNodeIds(node, outgoingConnections, context))
+            var repeatCount = string.Equals(node.NodeType, "combat.repeat", StringComparison.Ordinal)
+                ? Math.Max(0, (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "count", context, 1m))
+                : 1;
+            var nextNodeIds = ResolveNextNodeIds(node, outgoingConnections, context).ToList();
+            for (var repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++)
             {
-                await ExecuteNodeAsync(nextNodeId, nodesById, outgoingConnections, context, activeNodes);
+                foreach (var nextNodeId in nextNodeIds)
+                {
+                    await ExecuteNodeAsync(nextNodeId, nodesById, outgoingConnections, context, activeNodes);
+                }
             }
         }
         finally

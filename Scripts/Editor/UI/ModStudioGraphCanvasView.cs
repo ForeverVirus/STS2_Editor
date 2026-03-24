@@ -1,5 +1,7 @@
 using System.Globalization;
 using Godot;
+using MegaCrit.Sts2.Core.Models;
+using STS2_Editor.Scripts.Editor.Core.Models;
 using STS2_Editor.Scripts.Editor.Graph;
 using static STS2_Editor.Scripts.Editor.UI.ModStudioUiFactory;
 
@@ -17,6 +19,7 @@ public sealed partial class ModStudioGraphCanvasView : Control
     private readonly Dictionary<string, Label> _nodePropertySummaryLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Label> _nodeTypeBadgeLabels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, NodeSlotMap> _slotMaps = new(StringComparer.Ordinal);
+    private readonly DynamicPreviewService _dynamicPreviewService = new();
 
     private GraphEdit? _graphEdit;
     private Label? _hintLabel;
@@ -27,6 +30,8 @@ public sealed partial class ModStudioGraphCanvasView : Control
 
     private BehaviorGraphDefinition? _graph;
     private BehaviorGraphRegistry? _registry;
+    private AbstractModel? _sourceModel;
+    private DynamicPreviewContext? _previewContext;
     private string? _selectedNodeId;
     private bool _isReady;
     private bool _rebuildQueued;
@@ -48,10 +53,12 @@ public sealed partial class ModStudioGraphCanvasView : Control
         QueueCanvasRebuild();
     }
 
-    public void BindGraph(BehaviorGraphDefinition graph, BehaviorGraphRegistry registry)
+    public void BindGraph(BehaviorGraphDefinition graph, BehaviorGraphRegistry registry, AbstractModel? sourceModel = null, DynamicPreviewContext? previewContext = null)
     {
         _graph = graph;
         _registry = registry;
+        _sourceModel = sourceModel;
+        _previewContext = previewContext;
         _selectedNodeId = null;
         _pendingNodeGraphPosition = new Vector2(140f, 100f);
         if (_isReady)
@@ -61,10 +68,40 @@ public sealed partial class ModStudioGraphCanvasView : Control
         }
     }
 
+    public void UpdatePreviewContext(AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        _sourceModel = sourceModel;
+        _previewContext = previewContext;
+        if (_graph == null)
+        {
+            RefreshStatus();
+            return;
+        }
+
+        foreach (var node in _graph.Nodes)
+        {
+            UpdateNodePresentation(node);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_selectedNodeId) &&
+            _graph.Nodes.Any(node => string.Equals(node.NodeId, _selectedNodeId, StringComparison.Ordinal)))
+        {
+            SetSelectedNode(_selectedNodeId);
+        }
+        else
+        {
+            ApplySelectionHighlight();
+        }
+
+        RefreshStatus();
+    }
+
     public void ClearBinding()
     {
         _graph = null;
         _registry = null;
+        _sourceModel = null;
+        _previewContext = null;
         _selectedNodeId = null;
         if (_isReady)
         {
@@ -224,12 +261,12 @@ public sealed partial class ModStudioGraphCanvasView : Control
         graphNode.Title = ResolveNodeTitle(node);
         if (_nodeDescriptionLabels.TryGetValue(node.NodeId, out var descriptionLabel))
         {
-            descriptionLabel.Text = BuildDescription(node);
+            descriptionLabel.Text = BuildDynamicDescription(node, _sourceModel, _previewContext);
         }
 
         if (_nodePropertySummaryLabels.TryGetValue(node.NodeId, out var summaryLabel))
         {
-            summaryLabel.Text = BuildPropertySummary(node);
+            summaryLabel.Text = BuildDynamicPropertySummary(node, _sourceModel, _previewContext);
         }
 
         if (_nodeTypeBadgeLabels.TryGetValue(node.NodeId, out var typeBadge))
@@ -243,7 +280,12 @@ public sealed partial class ModStudioGraphCanvasView : Control
 
     public static string GetSuggestedNodeDescription(BehaviorGraphNodeDefinition node)
     {
-        return BuildDescription(node);
+        return BuildDynamicDescription(node, null, null);
+    }
+
+    public static string GetSuggestedNodeDescription(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        return BuildDynamicDescription(node, sourceModel, previewContext);
     }
 
     public void RefreshStatus()
@@ -253,6 +295,10 @@ public sealed partial class ModStudioGraphCanvasView : Control
             return;
         }
 
+        _hintLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        _hintLabel.CustomMinimumSize = new Vector2(0f, 24f);
+        _hintLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        _hintLabel.ClipText = false;
         _hintLabel.Text = _graph == null
             ? Dual("右键空白处添加节点，拖拽空白处平移画布，滚轮缩放。", "Right-click the canvas to add nodes. Drag the background to pan. Use the mouse wheel to zoom.")
             : Dual($"右键空白处添加节点  ·  节点 {_graph.Nodes.Count}  ·  连线 {_graph.Connections.Count}", $"Right-click the canvas to add nodes  ·  Nodes {_graph.Nodes.Count}  ·  Connections {_graph.Connections.Count}");
@@ -540,7 +586,7 @@ public sealed partial class ModStudioGraphCanvasView : Control
 
     private void AddNode(string nodeType, Vector2 position)
     {
-        if (_graph == null)
+        if (_graph == null || !BehaviorGraphPaletteFilter.IsAllowed(_graph.EntityKind ?? ModStudioEntityKind.Card, nodeType))
         {
             return;
         }
@@ -555,6 +601,17 @@ public sealed partial class ModStudioGraphCanvasView : Control
                 ? new Dictionary<string, string>(descriptor.DefaultProperties, StringComparer.Ordinal)
                 : new Dictionary<string, string>(StringComparer.Ordinal)
         };
+
+        if ((string.Equals(nodeType, "orb.channel", StringComparison.Ordinal) ||
+             string.Equals(nodeType, "orb.passive", StringComparison.Ordinal)) &&
+            (!node.Properties.TryGetValue("orb_id", out var orbId) || string.IsNullOrWhiteSpace(orbId)))
+        {
+            var defaultOrbId = FieldChoiceProvider.GetGraphChoices("orb_id").FirstOrDefault().Value;
+            if (!string.IsNullOrWhiteSpace(defaultOrbId))
+            {
+                node.Properties["orb_id"] = defaultOrbId;
+            }
+        }
 
         _graph.Nodes.Add(node);
         _graph.Metadata[$"{LayoutKeyPrefix}{node.NodeId}.x"] = position.X.ToString("R", CultureInfo.InvariantCulture);
@@ -597,7 +654,10 @@ public sealed partial class ModStudioGraphCanvasView : Control
     private IEnumerable<BehaviorGraphNodeDefinitionDescriptor> GetFilteredDefinitions()
     {
         var search = _nodePaletteSearchEdit?.Text?.Trim() ?? string.Empty;
-        return (_registry?.Definitions ?? Array.Empty<BehaviorGraphNodeDefinitionDescriptor>())
+        var entityKind = _graph?.EntityKind ?? ModStudioEntityKind.Card;
+        return BehaviorGraphPaletteFilter.FilterForEntityKind(
+                _registry?.Definitions ?? Array.Empty<BehaviorGraphNodeDefinitionDescriptor>(),
+                entityKind)
             .Where(definition =>
                 string.IsNullOrWhiteSpace(search) ||
                 ResolveNodeTitle(definition).Contains(search, StringComparison.OrdinalIgnoreCase) ||
@@ -711,7 +771,21 @@ public sealed partial class ModStudioGraphCanvasView : Control
 
     private void ClearGraphEdit()
     {
-        if (_graphEdit == null || _nodeViews.Count == 0)
+        if (_graphEdit == null)
+        {
+            return;
+        }
+
+        if (_graphEdit.HasMethod("clear_connections"))
+        {
+            _graphEdit.Call("clear_connections");
+        }
+        else if (_graphEdit.HasMethod("clearConnections"))
+        {
+            _graphEdit.Call("clearConnections");
+        }
+
+        if (_nodeViews.Count == 0)
         {
             return;
         }
@@ -807,14 +881,14 @@ public sealed partial class ModStudioGraphCanvasView : Control
         idBadge.Modulate = new Color(0.72f, 0.76f, 0.83f, 0.92f);
         headerRow.AddChild(idBadge);
 
-        var descriptionLabel = MakeNodeLabel(BuildDescription(node), true);
+        var descriptionLabel = MakeNodeLabel(BuildDynamicDescription(node, _sourceModel, _previewContext), true);
         descriptionLabel.CustomMinimumSize = new Vector2(DefaultNodeWidth - 28f, 0f);
         descriptionLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         descriptionLabel.Modulate = new Color(0.90f, 0.92f, 0.97f, 0.96f);
         _nodeDescriptionLabels[node.NodeId] = descriptionLabel;
         graphNode.AddChild(descriptionLabel);
 
-        var propertySummary = MakeNodeLabel(BuildPropertySummary(node), true);
+        var propertySummary = MakeNodeLabel(BuildDynamicPropertySummary(node, _sourceModel, _previewContext), true);
         propertySummary.CustomMinimumSize = new Vector2(DefaultNodeWidth - 28f, 0f);
         propertySummary.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         propertySummary.Modulate = new Color(0.72f, 0.78f, 0.88f, 0.96f);
@@ -1059,7 +1133,7 @@ public sealed partial class ModStudioGraphCanvasView : Control
         return string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.NodeType : definition.DisplayName;
     }
 
-    private static string BuildDescription(BehaviorGraphNodeDefinition node)
+    private static string BuildDescription(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
     {
         var dynamicDescription = node.NodeType switch
         {
@@ -1073,6 +1147,7 @@ public sealed partial class ModStudioGraphCanvasView : Control
             "player.gain_gold" => Dual($"获得 {GetProperty(node, "amount", "1")} 金币。", $"Gain {GetProperty(node, "amount", "1")} gold."),
             "player.gain_stars" => Dual($"获得 {GetProperty(node, "amount", "1")} 星数。", $"Gain {GetProperty(node, "amount", "1")} stars."),
             "combat.apply_power" => Dual($"施加 {GetProperty(node, "power_id", "power")} x{GetProperty(node, "amount", "1")}，目标 {DescribeTarget(GetProperty(node, "target", "current_target"))}。", $"Apply {GetProperty(node, "power_id", "power")} x{GetProperty(node, "amount", "1")} to {DescribeTarget(GetProperty(node, "target", "current_target"))}."),
+            "orb.channel" => GraphDescriptionSupport.BuildChannelOrbDescription(GetProperty(node, "orb_id", string.Empty)),
             _ => string.Empty
         };
 
@@ -1089,8 +1164,25 @@ public sealed partial class ModStudioGraphCanvasView : Control
         return node.NodeType;
     }
 
-    private static string BuildPropertySummary(BehaviorGraphNodeDefinition node)
+    private static string BuildPropertySummary(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
     {
+        var segments = new List<string>();
+        if (node.DynamicValues.TryGetValue("amount", out var amountDefinition))
+        {
+            var preview = DynamicValueEvaluator.EvaluatePreview(amountDefinition, sourceModel, previewContext);
+            segments.Add($"{ModStudioFieldDisplayNames.Get("amount")}: {preview.PreviewText}");
+            segments.Add($"{ModStudioLocalizationCatalog.T("graph.value_source")}: {amountDefinition.SourceKind}");
+        }
+
+        if (segments.Count > 0)
+        {
+            segments.AddRange(node.Properties
+                .Where(pair => !string.Equals(pair.Key, "amount", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+                .Take(3)
+                .Select(pair => $"{ModStudioFieldDisplayNames.Get(pair.Key)}: {ModStudioFieldDisplayNames.FormatGraphPropertyValue(pair.Key, pair.Value)}"));
+            return string.Join("  鈥? ", segments);
+        }
         if (node.Properties.Count == 0)
         {
             return Dual("无额外属性", "No extra properties");
@@ -1100,6 +1192,107 @@ public sealed partial class ModStudioGraphCanvasView : Control
             .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .Select(pair => $"{ModStudioFieldDisplayNames.Get(pair.Key)}: {ModStudioFieldDisplayNames.FormatGraphPropertyValue(pair.Key, pair.Value)}"));
+    }
+
+    private static string BuildDynamicDescription(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        string AmountText(string defaultValue)
+        {
+            var preview = DynamicValueEvaluator.EvaluatePreview(
+                node,
+                "amount",
+                sourceModel,
+                previewContext,
+                decimal.TryParse(defaultValue, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0m);
+
+            return string.IsNullOrWhiteSpace(preview.PreviewText) ? defaultValue : preview.PreviewText;
+        }
+
+        var description = node.NodeType switch
+        {
+            "flow.entry" => Dual("Graph 入口节点。", "Entry point for this graph."),
+            "flow.exit" => Dual("Graph 结束节点。", "Exit point for this graph."),
+            "combat.damage" => Dual($"造成 {AmountText("0")} 点伤害，目标 {DescribeTarget(GetProperty(node, "target", "current_target"))}。", $"Deal {AmountText("0")} damage to {DescribeTarget(GetProperty(node, "target", "current_target"))}."),
+            "combat.gain_block" => Dual($"获得 {AmountText("0")} 点格挡，目标 {DescribeTarget(GetProperty(node, "target", "self"))}。", $"Gain {AmountText("0")} block for {DescribeTarget(GetProperty(node, "target", "self"))}."),
+            "combat.heal" => Dual($"恢复 {AmountText("0")} 点生命，目标 {DescribeTarget(GetProperty(node, "target", "self"))}。", $"Heal {AmountText("0")} HP for {DescribeTarget(GetProperty(node, "target", "self"))}."),
+            "combat.draw_cards" => Dual($"抽取 {AmountText("1")} 张牌。", $"Draw {AmountText("1")} cards."),
+            "player.gain_energy" => Dual($"获得 {AmountText("1")} 点能量。", $"Gain {AmountText("1")} energy."),
+            "player.gain_gold" => Dual($"获得 {AmountText("1")} 金币。", $"Gain {AmountText("1")} gold."),
+            "player.gain_stars" => Dual($"获得 {AmountText("1")} 星数。", $"Gain {AmountText("1")} stars."),
+            "combat.apply_power" => Dual($"施加 {GetProperty(node, "power_id", "power")} x{AmountText("1")}，目标 {DescribeTarget(GetProperty(node, "target", "current_target"))}。", $"Apply {GetProperty(node, "power_id", "power")} x{AmountText("1")} to {DescribeTarget(GetProperty(node, "target", "current_target"))}."),
+            _ => string.Empty
+        };
+
+        if (!string.IsNullOrWhiteSpace(description))
+        {
+            return description;
+        }
+
+        if (!string.IsNullOrWhiteSpace(node.Description))
+        {
+            return node.Description;
+        }
+
+        return node.NodeType;
+    }
+
+    private static string BuildPropertyEntry(BehaviorGraphNodeDefinition node, string key, string? value, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        if (string.Equals(key, "amount", StringComparison.OrdinalIgnoreCase))
+        {
+            var preview = DynamicValueEvaluator.EvaluatePreview(node, key, sourceModel, previewContext, 0m);
+            return $"{ModStudioFieldDisplayNames.Get(key)}: {GetPreviewText(preview, value)}";
+        }
+
+        return $"{ModStudioFieldDisplayNames.Get(key)}: {ModStudioFieldDisplayNames.FormatGraphPropertyValue(key, value)}";
+    }
+
+    private static string BuildDynamicPropertyEntry(string key, DynamicValueDefinition definition, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        var preview = DynamicValueEvaluator.EvaluatePreview(definition, sourceModel, previewContext, 0m);
+        return $"{ModStudioFieldDisplayNames.Get(key)}: {GetPreviewText(preview, definition.TemplateText)}";
+    }
+
+    private static string GetPreviewText(DynamicValuePreviewResult preview, string? fallback)
+    {
+        if (!string.IsNullOrWhiteSpace(preview.SummaryText))
+        {
+            return preview.SummaryText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(preview.PreviewText))
+        {
+            return preview.PreviewText;
+        }
+
+        return string.IsNullOrWhiteSpace(fallback) ? string.Empty : fallback;
+    }
+
+    private static string BuildDynamicPropertySummary(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        var entries = new List<string>();
+
+        foreach (var pair in node.Properties.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            entries.Add(BuildPropertyEntry(node, pair.Key, pair.Value, sourceModel, previewContext));
+        }
+
+        foreach (var pair in node.DynamicValues.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            if (node.Properties.ContainsKey(pair.Key))
+            {
+                continue;
+            }
+
+            entries.Add(BuildDynamicPropertyEntry(pair.Key, pair.Value, sourceModel, previewContext));
+        }
+
+        if (entries.Count == 0)
+        {
+            return Dual("无额外属性", "No extra properties");
+        }
+
+        return string.Join("  •  ", entries.Take(4));
     }
 
     private static string GetProperty(BehaviorGraphNodeDefinition node, string key, string defaultValue)

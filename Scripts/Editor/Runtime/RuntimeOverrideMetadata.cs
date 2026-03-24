@@ -64,6 +64,11 @@ internal static class RuntimeOverrideMetadata
     public static bool TryGetLocalizedText(string table, string key, out string value)
     {
         value = string.Empty;
+        if (ModStudioAuthoringIsolation.IsProjectModeActive)
+        {
+            return false;
+        }
+
         if (string.IsNullOrWhiteSpace(table) || string.IsNullOrWhiteSpace(key))
         {
             return false;
@@ -268,6 +273,11 @@ internal static class RuntimeOverrideMetadata
     private static bool TryGetMetadataValue(ModStudioEntityKind kind, string entityId, string key, out string value)
     {
         value = string.Empty;
+        if (ModStudioAuthoringIsolation.IsProjectModeActive)
+        {
+            return false;
+        }
+
         if (string.IsNullOrWhiteSpace(entityId) || string.IsNullOrWhiteSpace(key))
         {
             return false;

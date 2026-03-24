@@ -1,4 +1,4 @@
-using Godot;
+﻿using Godot;
 using MegaCrit.Sts2.Core.ValueProps;
 using System.IO;
 using System;
@@ -36,14 +36,36 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
     private LineEdit? _graphNameEdit;
     private Label? _graphDescriptionLabel;
     private TextEdit? _graphDescriptionEdit;
+    private Label? _previewContextLabel;
+    private CheckBox? _previewUpgradedCheck;
+    private Label? _previewTargetLabel;
+    private OptionButton? _previewTargetSelector;
+    private Label? _previewCurrentBlockLabel;
+    private SpinBox? _previewCurrentBlockSpin;
+    private Label? _previewCurrentStarsLabel;
+    private SpinBox? _previewCurrentStarsSpin;
+    private Label? _previewCurrentEnergyLabel;
+    private SpinBox? _previewCurrentEnergySpin;
+    private Label? _previewHandCountLabel;
+    private SpinBox? _previewHandCountSpin;
+    private Label? _previewDrawPileLabel;
+    private SpinBox? _previewDrawPileSpin;
+    private Label? _previewDiscardPileLabel;
+    private SpinBox? _previewDiscardPileSpin;
+    private Label? _previewExhaustPileLabel;
+    private SpinBox? _previewExhaustPileSpin;
+    private Label? _previewMissingHpLabel;
+    private SpinBox? _previewMissingHpSpin;
     private Label? _selectedNodeTypeLabel;
     private Label? _selectedNodeIdLabel;
     private Label? _selectedNodeDisplayNameLabel;
     private LineEdit? _selectedNodeDisplayNameEdit;
     private Label? _selectedNodeDescriptionLabel;
     private TextEdit? _selectedNodeDescriptionEdit;
+    private RichTextLabel? _selectedNodeDynamicSummaryLabel;
     private Label? _selectedNodePropertiesLabel;
     private VBoxContainer? _selectedNodePropertyHost;
+    private bool _suppressPreviewContextChanged;
 
     public LineEdit RuntimeAssetSearchEdit
     {
@@ -156,6 +178,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
     public event Action<string, string>? NodePropertyChanged;
     public event Action<string>? SelectedNodeDisplayNameChanged;
     public event Action<string>? SelectedNodeDescriptionChanged;
+    public event Action<DynamicPreviewContext>? PreviewContextChanged;
 
     public override void _Ready()
     {
@@ -230,6 +253,37 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         if (_graphEnabledCheck != null) _graphEnabledCheck.ButtonPressed = useGraphBehavior;
     }
 
+    public void SetPreviewContext(DynamicPreviewContext? context)
+    {
+        context ??= new DynamicPreviewContext();
+        _suppressPreviewContextChanged = true;
+        try
+        {
+            if (_previewUpgradedCheck != null)
+            {
+                _previewUpgradedCheck.ButtonPressed = context.Upgraded;
+            }
+
+            if (_previewTargetSelector != null)
+            {
+                SelectPreviewTarget(context.TargetSelector);
+            }
+
+            if (_previewCurrentBlockSpin != null) _previewCurrentBlockSpin.Value = (double)context.CurrentBlock;
+            if (_previewCurrentStarsSpin != null) _previewCurrentStarsSpin.Value = (double)context.CurrentStars;
+            if (_previewCurrentEnergySpin != null) _previewCurrentEnergySpin.Value = (double)context.CurrentEnergy;
+            if (_previewHandCountSpin != null) _previewHandCountSpin.Value = context.HandCount;
+            if (_previewDrawPileSpin != null) _previewDrawPileSpin.Value = context.DrawPileCount;
+            if (_previewDiscardPileSpin != null) _previewDiscardPileSpin.Value = context.DiscardPileCount;
+            if (_previewExhaustPileSpin != null) _previewExhaustPileSpin.Value = context.ExhaustPileCount;
+            if (_previewMissingHpSpin != null) _previewMissingHpSpin.Value = (double)context.MissingHp;
+        }
+        finally
+        {
+            _suppressPreviewContextChanged = false;
+        }
+    }
+
     public void SetSelectedNode(BehaviorGraphNodeDefinition? node)
     {
         if (_selectedNodeIdLabel != null)
@@ -257,6 +311,11 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             _selectedNodeDescriptionEdit.Editable = node != null;
             _selectedNodeDescriptionEdit.Text = node?.Description ?? string.Empty;
         }
+
+        if (_selectedNodeDynamicSummaryLabel != null && node == null)
+        {
+            _selectedNodeDynamicSummaryLabel.Text = string.Empty;
+        }
     }
 
     public void SetSelectedNodeProperties(IReadOnlyDictionary<string, string> properties)
@@ -274,7 +333,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
         if (properties.Count == 0)
         {
-            _selectedNodePropertyHost.AddChild(MakeLabel(Dual("当前节点没有额外属性。", "The selected node has no extra properties."), true));
+            _selectedNodePropertyHost.AddChild(MakeLabel(ModStudioLocalizationCatalog.T("placeholder.graph_node_properties_empty"), true));
             return;
         }
 
@@ -285,12 +344,31 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
                 SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
             };
             row.AddThemeConstantOverride("separation", 4);
-            row.AddChild(MakeLabel(ModStudioFieldDisplayNames.Get(pair.Key), true));
+            var label = MakeLabel(ModStudioFieldDisplayNames.Get(pair.Key), true);
+            var helpText = GetGraphPropertyHelpText(pair.Key);
+            if (!string.IsNullOrWhiteSpace(helpText))
+            {
+                row.TooltipText = helpText;
+                label.TooltipText = helpText;
+            }
+            row.AddChild(label);
 
             var editor = BuildPropertyEditor(pair.Key, pair.Value ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(helpText))
+            {
+                editor.TooltipText = helpText;
+            }
             row.AddChild(editor);
             _propertyEditors[pair.Key] = editor;
             _selectedNodePropertyHost.AddChild(row);
+        }
+    }
+
+    public void SetSelectedNodeDynamicSummary(string text)
+    {
+        if (_selectedNodeDynamicSummaryLabel != null)
+        {
+            _selectedNodeDynamicSummaryLabel.Text = text ?? string.Empty;
         }
     }
 
@@ -320,12 +398,12 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
         if (_runtimeAssetsTabButton != null)
         {
-            _runtimeAssetsTabButton.Text = Dual("游戏内素材", "Game Assets");
+            _runtimeAssetsTabButton.Text = ModStudioLocalizationCatalog.T("tab.asset_runtime");
         }
 
         if (_importedAssetsTabButton != null)
         {
-            _importedAssetsTabButton.Text = Dual("导入的外部素材", "Imported Assets");
+            _importedAssetsTabButton.Text = ModStudioLocalizationCatalog.T("tab.asset_project");
         }
 
         if (_graphEnabledCheck != null)
@@ -358,6 +436,61 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             _graphNameEdit.PlaceholderText = Dual("输入 Graph 名称", "Enter graph name");
         }
 
+        if (_previewContextLabel != null)
+        {
+            _previewContextLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context");
+        }
+
+        if (_previewUpgradedCheck != null)
+        {
+            _previewUpgradedCheck.Text = ModStudioLocalizationCatalog.T("graph.preview_context.upgraded");
+        }
+
+        if (_previewTargetLabel != null)
+        {
+            _previewTargetLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.target");
+        }
+
+        if (_previewCurrentBlockLabel != null)
+        {
+            _previewCurrentBlockLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.current_block");
+        }
+
+        if (_previewCurrentStarsLabel != null)
+        {
+            _previewCurrentStarsLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.current_stars");
+        }
+
+        if (_previewCurrentEnergyLabel != null)
+        {
+            _previewCurrentEnergyLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.current_energy");
+        }
+
+        if (_previewHandCountLabel != null)
+        {
+            _previewHandCountLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.hand_count");
+        }
+
+        if (_previewDrawPileLabel != null)
+        {
+            _previewDrawPileLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.draw_pile_count");
+        }
+
+        if (_previewDiscardPileLabel != null)
+        {
+            _previewDiscardPileLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.discard_pile_count");
+        }
+
+        if (_previewExhaustPileLabel != null)
+        {
+            _previewExhaustPileLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.exhaust_pile_count");
+        }
+
+        if (_previewMissingHpLabel != null)
+        {
+            _previewMissingHpLabel.Text = ModStudioLocalizationCatalog.T("graph.preview_context.missing_hp");
+        }
+
         if (_selectedNodeDisplayNameLabel != null)
         {
             _selectedNodeDisplayNameLabel.Text = Dual("节点显示名称", "Node Display Name");
@@ -370,10 +503,9 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
         if (_selectedNodePropertiesLabel != null)
         {
-            _selectedNodePropertiesLabel.Text = Dual("节点属性", "Node Properties");
+            _selectedNodePropertiesLabel.Text = ModStudioLocalizationCatalog.T("label.node_properties");
         }
     }
-
     private void BuildUi()
     {
         if (GetChildCount() > 0)
@@ -459,13 +591,19 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
     private Control BuildGraphPage()
     {
-        var page = new VBoxContainer
+        var pageScroll = new ScrollContainer
         {
             Name = "GraphTab",
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
             SizeFlagsVertical = Control.SizeFlags.ExpandFill
         };
+        var page = new VBoxContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            SizeFlagsVertical = Control.SizeFlags.ShrinkBegin
+        };
         page.AddThemeConstantOverride("separation", 8);
+        pageScroll.AddChild(page);
 
         _graphInfoLabel = MakeDetails(string.Empty, scrollActive: false, fitContent: true, minHeight: 72f);
         page.AddChild(_graphInfoLabel);
@@ -493,6 +631,36 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         page.AddChild(_graphDescriptionLabel);
         page.AddChild(_graphDescriptionEdit);
 
+        var previewContextPanel = new PanelContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        page.AddChild(previewContextPanel);
+
+        var previewContextRoot = new VBoxContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        previewContextRoot.AddThemeConstantOverride("separation", 6);
+        previewContextPanel.AddChild(previewContextRoot);
+
+        _previewContextLabel = MakeLabel(string.Empty, true);
+        previewContextRoot.AddChild(_previewContextLabel);
+
+        _previewUpgradedCheck = new CheckBox();
+        _previewUpgradedCheck.Toggled += _ => EmitPreviewContextChanged();
+        previewContextRoot.AddChild(_previewUpgradedCheck);
+
+        previewContextRoot.AddChild(BuildPreviewTargetRow());
+        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentBlockLabel, out _previewCurrentBlockSpin, 0d, 999d, 1d, 0));
+        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentStarsLabel, out _previewCurrentStarsSpin, 0d, 999d, 1d, 0));
+        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentEnergyLabel, out _previewCurrentEnergySpin, 0d, 20d, 1d, 0));
+        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewHandCountLabel, out _previewHandCountSpin, 0d, 50d, 1d, 0));
+        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewDrawPileLabel, out _previewDrawPileSpin, 0d, 200d, 1d, 0));
+        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewDiscardPileLabel, out _previewDiscardPileSpin, 0d, 200d, 1d, 0));
+        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewExhaustPileLabel, out _previewExhaustPileSpin, 0d, 200d, 1d, 0));
+        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewMissingHpLabel, out _previewMissingHpSpin, 0d, 999d, 1d, 0));
+
         _selectedNodeTypeLabel = MakeLabel(string.Empty, true);
         _selectedNodeIdLabel = MakeLabel(string.Empty, true);
         page.AddChild(_selectedNodeTypeLabel);
@@ -515,24 +683,21 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         page.AddChild(_selectedNodeDescriptionLabel);
         page.AddChild(_selectedNodeDescriptionEdit);
 
+        _selectedNodeDynamicSummaryLabel = MakeDetails(string.Empty, scrollActive: false, fitContent: true, minHeight: 72f);
+        page.AddChild(_selectedNodeDynamicSummaryLabel);
+
         _selectedNodePropertiesLabel = MakeLabel(string.Empty, true);
         page.AddChild(_selectedNodePropertiesLabel);
 
-        var propertyScroll = new ScrollContainer
-        {
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
-        };
         _selectedNodePropertyHost = new VBoxContainer
         {
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            SizeFlagsVertical = Control.SizeFlags.ExpandFill
+            SizeFlagsVertical = Control.SizeFlags.ShrinkBegin
         };
         _selectedNodePropertyHost.AddThemeConstantOverride("separation", 6);
-        propertyScroll.AddChild(_selectedNodePropertyHost);
-        page.AddChild(propertyScroll);
+        page.AddChild(_selectedNodePropertyHost);
 
-        return page;
+        return pageScroll;
     }
 
     private VBoxContainer BuildAssetListPage(out LineEdit searchEdit, out ItemList list)
@@ -624,14 +789,14 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             return choiceEditor;
         }
 
-        if (IsIntegerProperty(propertyKey))
+        if (IsNumericProperty(propertyKey))
         {
             var spinBox = new SpinBox
             {
                 MinValue = -9999,
                 MaxValue = 9999,
                 Step = 1,
-                Rounded = true,
+                Rounded = false,
                 AllowGreater = true,
                 AllowLesser = true,
                 SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
@@ -640,7 +805,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             {
                 spinBox.Value = numericValue;
             }
-            spinBox.ValueChanged += value => NodePropertyChanged?.Invoke(propertyKey, Math.Round(value).ToString());
+            spinBox.ValueChanged += value => NodePropertyChanged?.Invoke(propertyKey, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
             return spinBox;
         }
 
@@ -663,6 +828,43 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         };
         lineEdit.TextChanged += value => NodePropertyChanged?.Invoke(propertyKey, value);
         return lineEdit;
+    }
+
+    private static string GetGraphPropertyHelpText(string propertyKey)
+    {
+        return propertyKey switch
+        {
+            "dynamic_source_kind" => Dual("决定当前节点的数值来自固定值、原版动态变量，还是原版公式。", "Determines whether this node uses a literal value, an original dynamic variable, or an original formula."),
+            "dynamic_var_name" => Dual("选择要引用的原版动态变量，例如 Damage、Block、Cards、Stars。", "Choose the original dynamic variable to reference, such as Damage, Block, Cards, or Stars."),
+            "formula_ref" => Dual("选择要复用的原版公式类型。只有“原版公式”模式会使用该字段。", "Choose the original formula reference. This field is only used in formula mode."),
+            "base_override_mode" => Dual("决定是否覆盖原版基础值。绝对值会直接改成该数，增量会在原值上加减。", "Controls how the original base value is overridden. Absolute replaces it, delta adds on top of it."),
+            "base_override_value" => Dual("基础值覆盖的数值。", "The numeric value used by the base override."),
+            "extra_override_mode" => Dual("决定是否覆盖原版公式里的额外值。只对公式模式生效。", "Controls how the original formula extra value is overridden. Only applies in formula mode."),
+            "extra_override_value" => Dual("额外值覆盖的数值。只对公式模式生效。", "The numeric value used by the extra override. Only applies in formula mode."),
+            "preview_multiplier_key" => Dual("选择公式乘数来自哪个上下文值，例如手牌数、能量、当前星数。真正的预览结果始终由右侧上下文决定。", "Chooses which context value drives the formula multiplier, such as hand count, energy, or stars. The final preview always comes from the preview context on the right."),
+            "amount" => Dual("固定值模式下的直接数值。", "Direct numeric value used in literal mode."),
+            "count" => Dual("要移动或生成的数量。填 0 代表全部。", "How many cards to move or create. Use 0 to mean all matching cards."),
+            "target" => Dual("节点作用的目标。", "The target affected by this node."),
+            "source_pile" => Dual("从哪个牌堆筛选现有卡牌。", "Which pile to search for existing cards."),
+            "target_pile" => Dual("把卡牌移动到哪个牌堆。", "Which pile receives the moved cards."),
+            "exact_energy_cost" => Dual("按精确能量费用筛选。填 -1 代表不限。", "Filter by exact energy cost. Use -1 for no cost filter."),
+            "include_x_cost" => Dual("筛选时是否把 X 费牌也视为可匹配。", "Whether X-cost cards are allowed by this filter."),
+            "card_type_scope" => Dual("按卡牌类型筛选，例如只拿攻击/技能/能力牌。", "Filter by card type, such as attack, skill, or power cards."),
+            "props" => Dual("附加行为标记，例如不可格挡、位移等。", "Additional behavior flags such as unblockable or move."),
+            "page_id" => Dual("事件页面的唯一 ID。其他跳页和选项会引用它。", "Unique id for this event page. Other event nodes can jump to or reference it."),
+            "option_id" => Dual("事件选项的唯一 ID。页面会用它决定选项顺序。", "Unique id for this event option. Pages use it to determine option order."),
+            "next_page_id" => Dual("选项或跳页节点执行后要前往的页面 ID。", "Page id to move to after this option or goto-page node resolves."),
+            "resume_page_id" => Dual("事件战斗结束后返回的页面 ID。", "Page id to return to after event combat completes."),
+            "encounter_id" => Dual("事件触发战斗时要进入的遭遇 ID。", "Encounter id used when this event starts combat."),
+            "reward_kind" => Dual("事件选项实际发放的奖励类型。仅修改标题文字不会改变真正奖励。", "Actual reward type granted by this event choice. Changing title text alone does not change the reward."),
+            "reward_amount" => Dual("事件奖励的数值，例如金币数量、抽牌数、伤害值。", "Numeric amount applied by the event reward, such as gold, draw count, or damage."),
+            "reward_target" => Dual("事件奖励作用的目标。", "Target affected by the event reward."),
+            "reward_props" => Dual("事件伤害或格挡奖励的附加属性。", "Additional flags used by event damage or block rewards."),
+            "reward_power_id" => Dual("当奖励类型为能力时，要施加的能力 ID。", "Power id to apply when the reward kind is power."),
+            "is_proceed" => Dual("该选项执行后是否直接结束当前事件。", "Whether this option should immediately end the current event after resolving."),
+            "save_choice_to_history" => Dual("是否把这个选项写入事件历史。", "Whether this option should be saved into event choice history."),
+            _ => string.Empty
+        };
     }
 
     private bool TryCreateChoiceEditor(string propertyKey, string propertyValue, out Control editor)
@@ -698,6 +900,8 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             selectedIndex = optionButton.ItemCount - 1;
         }
 
+        string? autoSelectedValue = null;
+
         if (selectedIndex >= 0)
         {
             optionButton.Select(selectedIndex);
@@ -705,6 +909,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         else if (optionButton.ItemCount > 0)
         {
             optionButton.Select(0);
+            autoSelectedValue = optionButton.GetItemMetadata(0).AsString();
         }
 
         optionButton.ItemSelected += itemIndex =>
@@ -713,45 +918,205 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             NodePropertyChanged?.Invoke(propertyKey, selectedValue);
         };
 
+        if (selectedIndex < 0 && string.IsNullOrWhiteSpace(propertyValue) && !string.IsNullOrWhiteSpace(autoSelectedValue))
+        {
+            CallDeferred(nameof(EmitDeferredNodePropertyChanged), propertyKey, autoSelectedValue);
+        }
+
         editor = optionButton;
         return true;
     }
 
+    private void EmitDeferredNodePropertyChanged(string propertyKey, string value)
+    {
+        NodePropertyChanged?.Invoke(propertyKey, value);
+    }
+
     private static bool TryGetChoiceOptions(string propertyKey, out IReadOnlyList<PropertyChoice> choices)
     {
-        choices = Array.Empty<PropertyChoice>();
-        switch (propertyKey)
+        var normalizedPropertyKey = propertyKey switch
         {
-            case "target":
-                choices =
-                [
-                    new PropertyChoice("self", Dual("自身", "Self")),
-                    new PropertyChoice("current_target", Dual("当前目标", "Current Target")),
-                    new PropertyChoice("all_enemies", Dual("全体敌人", "All Enemies")),
-                    new PropertyChoice("all_allies", Dual("全体友方", "All Allies")),
-                    new PropertyChoice("all_targets", Dual("所有目标", "All Targets"))
-                ];
-                return true;
-            case "props":
+            "reward_target" => "target",
+            "reward_props" => "props",
+            "reward_power_id" => "power_id",
+            _ => propertyKey
+        };
+
+        var providerChoices = FieldChoiceProvider.GetGraphChoices(normalizedPropertyKey);
+        if (providerChoices.Count == 0)
+        {
+            choices = Array.Empty<PropertyChoice>();
+            return false;
+        }
+
+        if (string.Equals(propertyKey, "preview_multiplier_key", StringComparison.Ordinal))
+        {
+            choices = providerChoices
+                .Select(choice => (Value: NormalizePreviewMultiplierChoice(choice.Value), choice.Display))
+                .GroupBy(choice => choice.Value, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .Select(choice => new PropertyChoice(choice.Value, choice.Display))
+                .ToList();
+            return true;
+        }
+
+        choices = providerChoices
+            .Select(choice => new PropertyChoice(choice.Value, choice.Display))
+            .ToList();
+        return true;
+    }
+
+    private static string NormalizePreviewMultiplierChoice(string rawValue)
+    {
+        return string.Equals(rawValue, "cards", StringComparison.OrdinalIgnoreCase)
+            ? "hand_count"
+            : rawValue;
+    }
+
+    private static bool IsNumericProperty(string propertyKey)
+    {
+        return propertyKey is "amount" or
+            "count" or
+            "exact_energy_cost" or
+            "base_override_value" or
+            "extra_override_value";
+    }
+
+    private Control BuildPreviewTargetRow()
+    {
+        var row = new HBoxContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        row.AddThemeConstantOverride("separation", 6);
+
+        _previewTargetLabel = MakeLabel(string.Empty, true);
+        _previewTargetLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        row.AddChild(_previewTargetLabel);
+
+        _previewTargetSelector = new OptionButton
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        AddPreviewTargetChoice("self");
+        AddPreviewTargetChoice("current_target");
+        AddPreviewTargetChoice("all_enemies");
+        AddPreviewTargetChoice("all_allies");
+        AddPreviewTargetChoice("all_targets");
+        _previewTargetSelector.ItemSelected += _ => EmitPreviewContextChanged();
+        row.AddChild(_previewTargetSelector);
+
+        return row;
+    }
+
+    private Control BuildPreviewNumericRow(out Label label, out SpinBox spinBox, double minValue, double maxValue, double step, int decimalPlaces)
+    {
+        var row = new HBoxContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        row.AddThemeConstantOverride("separation", 6);
+
+        label = MakeLabel(string.Empty, true);
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        row.AddChild(label);
+
+        spinBox = new SpinBox
+        {
+            MinValue = minValue,
+            MaxValue = maxValue,
+            Step = step,
+            AllowGreater = true,
+            AllowLesser = true,
+            Rounded = decimalPlaces == 0,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        spinBox.ValueChanged += _ => EmitPreviewContextChanged();
+        row.AddChild(spinBox);
+
+        return row;
+    }
+
+    private void AddPreviewTargetChoice(string value)
+    {
+        if (_previewTargetSelector == null)
+        {
+            return;
+        }
+
+        _previewTargetSelector.AddItem(ModStudioFieldDisplayNames.FormatGraphPropertyValue("target", value));
+        _previewTargetSelector.SetItemMetadata(_previewTargetSelector.ItemCount - 1, value);
+    }
+
+    private void SelectPreviewTarget(string? targetSelector)
+    {
+        if (_previewTargetSelector == null)
+        {
+            return;
+        }
+
+        var normalized = string.IsNullOrWhiteSpace(targetSelector) ? "current_target" : targetSelector;
+        for (var index = 0; index < _previewTargetSelector.ItemCount; index++)
+        {
+            if (string.Equals(_previewTargetSelector.GetItemMetadata(index).AsString(), normalized, StringComparison.Ordinal))
             {
-                var results = new List<PropertyChoice>
-                {
-                    new("none", Dual("无", "None"))
-                };
-                results.AddRange(Enum.GetNames<ValueProp>()
-                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-                    .Select(name => new PropertyChoice(name, ModStudioFieldDisplayNames.FormatGraphPropertyValue(propertyKey, name))));
-                choices = results;
-                return true;
+                _previewTargetSelector.Select(index);
+                return;
             }
-            default:
-                return false;
+        }
+
+        if (_previewTargetSelector.ItemCount > 0)
+        {
+            _previewTargetSelector.Select(0);
         }
     }
 
-    private static bool IsIntegerProperty(string propertyKey)
+    private void EmitPreviewContextChanged()
     {
-        return propertyKey is "amount";
+        if (_suppressPreviewContextChanged)
+        {
+            return;
+        }
+
+        PreviewContextChanged?.Invoke(ReadPreviewContext());
+    }
+
+    private DynamicPreviewContext ReadPreviewContext()
+    {
+        var context = new DynamicPreviewContext
+        {
+            Upgraded = _previewUpgradedCheck?.ButtonPressed ?? false,
+            TargetSelector = ResolveSelectedPreviewTarget(),
+            CurrentBlock = (decimal)(_previewCurrentBlockSpin?.Value ?? 0d),
+            CurrentStars = (decimal)(_previewCurrentStarsSpin?.Value ?? 0d),
+            CurrentEnergy = (decimal)(_previewCurrentEnergySpin?.Value ?? 0d),
+            HandCount = (int)Math.Round(_previewHandCountSpin?.Value ?? 0d),
+            DrawPileCount = (int)Math.Round(_previewDrawPileSpin?.Value ?? 0d),
+            DiscardPileCount = (int)Math.Round(_previewDiscardPileSpin?.Value ?? 0d),
+            ExhaustPileCount = (int)Math.Round(_previewExhaustPileSpin?.Value ?? 0d),
+            MissingHp = (decimal)(_previewMissingHpSpin?.Value ?? 0d)
+        };
+
+        context.FormulaMultipliers["hand_count"] = context.HandCount;
+        context.FormulaMultipliers["cards"] = context.HandCount;
+        context.FormulaMultipliers["stars"] = context.CurrentStars;
+        context.FormulaMultipliers["energy"] = context.CurrentEnergy;
+        context.FormulaMultipliers["current_block"] = context.CurrentBlock;
+        context.FormulaMultipliers["draw_pile"] = context.DrawPileCount;
+        context.FormulaMultipliers["discard_pile"] = context.DiscardPileCount;
+        context.FormulaMultipliers["exhaust_pile"] = context.ExhaustPileCount;
+        context.FormulaMultipliers["missing_hp"] = context.MissingHp;
+        return context;
+    }
+
+    private string ResolveSelectedPreviewTarget()
+    {
+        if (_previewTargetSelector == null || _previewTargetSelector.ItemCount == 0 || _previewTargetSelector.Selected < 0)
+        {
+            return "current_target";
+        }
+
+        return _previewTargetSelector.GetItemMetadata(_previewTargetSelector.Selected).AsString();
     }
 
     private static string ResolveNodeTypeDisplay(BehaviorGraphNodeDefinition node)
@@ -783,3 +1148,5 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
     private sealed record PropertyChoice(string Value, string DisplayText);
 }
+
+

@@ -1,4 +1,5 @@
 using Godot;
+using MegaCrit.Sts2.Core.Models;
 using STS2_Editor.Scripts.Editor.Graph;
 using static STS2_Editor.Scripts.Editor.UI.ModStudioUiFactory;
 
@@ -31,7 +32,6 @@ internal sealed partial class ModStudioGraphEditor : MarginContainer
 
     public override void _Ready()
     {
-        EnsureBuilt();
     }
 
     public void EnsureBuilt()
@@ -40,10 +40,16 @@ internal sealed partial class ModStudioGraphEditor : MarginContainer
         RefreshTexts();
     }
 
-    public void BindGraph(BehaviorGraphDefinition graph, BehaviorGraphRegistry registry)
+    public void BindGraph(BehaviorGraphDefinition graph, BehaviorGraphRegistry registry, AbstractModel? sourceModel = null, DynamicPreviewContext? previewContext = null)
     {
-        CanvasView.BindGraph(graph, registry);
+        CanvasView.BindGraph(graph, registry, sourceModel, previewContext);
         Callable.From(() => CanvasView.ZoomToFit()).CallDeferred();
+        RefreshStatus();
+    }
+
+    public void UpdatePreviewContext(AbstractModel? sourceModel = null, DynamicPreviewContext? previewContext = null)
+    {
+        CanvasView.UpdatePreviewContext(sourceModel, previewContext);
         RefreshStatus();
     }
 
@@ -139,7 +145,7 @@ internal sealed partial class ModStudioGraphEditor : MarginContainer
 
         var selected = _canvasView?.SelectedNodeId;
         _statusLabel.Text = string.IsNullOrWhiteSpace(selected)
-            ? Dual($"节点 {graph.Nodes.Count}  ·  连线 {graph.Connections.Count}", $"Nodes {graph.Nodes.Count}  ·  Connections {graph.Connections.Count}")
-            : Dual($"已选节点 {selected}  ·  节点 {graph.Nodes.Count}", $"Selected {selected}  ·  Nodes {graph.Nodes.Count}");
+            ? Dual($"节点 {graph.Nodes.Count} · 连线 {graph.Connections.Count}", $"Nodes {graph.Nodes.Count} · Connections {graph.Connections.Count}")
+            : Dual($"已选节点 {selected} · 节点 {graph.Nodes.Count}", $"Selected {selected} · Nodes {graph.Nodes.Count}");
     }
 }

@@ -182,6 +182,12 @@ public sealed class BehaviorGraphExecutionContext
             "all_allies" or "all_friendlies" or "allies" => combatState == null
                 ? Array.Empty<Creature>()
                 : combatState.GetCreaturesOnSide(ownerSide).Where(x => x.IsAlive).ToList(),
+            "other_enemies" or "other_opponents" => combatState == null
+                ? Array.Empty<Creature>()
+                : combatState
+                    .GetCreaturesOnSide(ownerSide == CombatSide.Player ? CombatSide.Enemy : CombatSide.Player)
+                    .Where(x => x.IsAlive && x != Target)
+                    .ToList(),
             "all_enemies" or "all_opponents" or "enemies" or "opponents" => combatState == null
                 ? Array.Empty<Creature>()
                 : combatState.GetCreaturesOnSide(ownerSide == CombatSide.Player ? CombatSide.Enemy : CombatSide.Player).Where(x => x.IsAlive).ToList(),

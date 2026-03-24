@@ -6,8 +6,8 @@
     "description": "Smoke-test project.",
     "editorVersion": "stage03",
     "targetGameVersion": "unknown",
-    "createdAtUtc": "2026-03-23T20:47:30.6808852+00:00",
-    "updatedAtUtc": "2026-03-23T20:47:30.680903+00:00"
+    "createdAtUtc": "2026-03-24T19:02:14.2619648+00:00",
+    "updatedAtUtc": "2026-03-24T19:02:14.2619649+00:00"
   },
   "overrides": [
     {
@@ -22,11 +22,11 @@
       },
       "assets": [
         {
-          "id": "d6120699828244eb91ec911a4e56861b",
+          "id": "e8122d1324ae4dc1b8d175d15bf69f5a",
           "sourceType": "managed-import",
           "logicalRole": "portrait",
           "sourcePath": "external/strike.png",
-          "managedPath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\sts2-editor-asset-398e6cd491b74298a653e6351b760350.txt",
+          "managedPath": "C:\\Users\\Administrator\\AppData\\Local\\Temp\\sts2-editor-asset-ceebab8357b4419cb36dc3a2dd40b89b.txt",
           "packagePath": "",
           "fileName": "strike.txt"
         }
@@ -47,7 +47,8 @@
           "nodeType": "flow.entry",
           "displayName": "Entry",
           "description": "",
-          "properties": {}
+          "properties": {},
+          "dynamicValues": {}
         },
         {
           "nodeId": "graph.card.smoke.log",
@@ -56,14 +57,16 @@
           "description": "",
           "properties": {
             "message": "Smoke graph for graph.card.smoke"
-          }
+          },
+          "dynamicValues": {}
         },
         {
           "nodeId": "graph.card.smoke.exit",
           "nodeType": "flow.exit",
           "displayName": "Exit",
           "description": "",
-          "properties": {}
+          "properties": {},
+          "dynamicValues": {}
         }
       ],
       "connections": [
@@ -88,7 +91,7 @@
   },
   "projectAssets": [
     {
-      "id": "80d1e7a439614e4485df2fa3a6de672b",
+      "id": "ec0c2df9b61e498a9767feb79a3188f3",
       "sourceType": "res",
       "logicalRole": "icon",
       "sourcePath": "res://ui/icon.png",

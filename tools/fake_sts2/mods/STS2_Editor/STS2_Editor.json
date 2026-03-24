@@ -1,0 +1,11 @@
+{
+  "id": "STS2_Editor",           
+  "name": "STS2_Editor",
+  "author": "yunxuan",
+  "description": "Mod Studio for Slay the Spire 2",
+  "version": "1.0",
+  "has_pck": false,        
+  "has_dll": true,        
+  "dependencies": [],     
+  "affects_gameplay": true 
+}

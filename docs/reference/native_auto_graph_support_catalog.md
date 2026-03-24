@@ -21,6 +21,18 @@
 - `combat.heal`
 - `combat.draw_cards`
 - `combat.apply_power`
+- `combat.create_card`
+- `combat.remove_card`
+- `combat.transform_card`
+- `combat.discard_cards`
+- `combat.exhaust_cards`
+- `card.autoplay`
+- `card.apply_keyword`
+- `card.apply_single_turn_sly`
+- `cardpile.auto_play_from_draw_pile`
+- `cardpile.shuffle`
+- `creature.set_current_hp`
+- `orb.passive`
 - `player.gain_energy`
 - `player.gain_gold`
 - `player.gain_stars`
@@ -35,6 +47,8 @@
   - `Backflip` -> `combat.gain_block -> combat.draw_cards`
   - `ShrugItOff` -> `combat.gain_block -> combat.draw_cards`
   - `Adrenaline` -> `player.gain_energy -> combat.draw_cards`
+  - `Havoc` -> `cardpile.auto_play_from_draw_pile`
+  - `Turbo` -> `combat.create_card` / `card.apply_single_turn_sly` style chains when the source IL exposes concrete card identity
   - `Afterimage` -> `combat.apply_power`
   - `Venerate` -> `player.gain_stars`
   - `BlockPotion` -> `combat.gain_block`
@@ -49,15 +63,18 @@
 - The translator catalog already marks these as partial categories:
   - `event.reward`
   - `event.choice`
+- `combat.create_card` is partial when the importer cannot recover a concrete `card_id`, `count`, or `target_pile` from the source call and has to fall back to the node defaults.
+- `cardpile.shuffle` also covers `ShuffleIfNecessary`; the conditional guard itself is collapsed during import.
+- `cardpile.auto_play_from_draw_pile` is imported with best-effort defaults when the source call arguments are not statically recoverable.
 
 ## Known Unsupported Patterns
 - Event scene / layout logic
 - Monster AI
-- Card creation, reward drafting, choose-one flows
+- Reward drafting / choose-one flows that are not already backed by a graph node
 - Random targeting and repeated loops
-- Deck mutation, transform, upgrade, forge, orb, summon
 - Branch-heavy or condition-heavy native logic where the IL importer can only see called methods but not preserve the original condition semantics reliably
 - X-cost or battle-state-calculated effects that depend on runtime expressions instead of direct canonical dynamic vars
+- Any command path that still depends on runtime card collections or reflection-only generic resolution for exact identity recovery
 
 ## Relic Scope Notes
 - The current runtime dispatcher does not yet execute arbitrary relic triggers; it only covers the relic hooks already patched by `RuntimeGraphDispatcher`.

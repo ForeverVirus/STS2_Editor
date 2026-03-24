@@ -90,6 +90,7 @@ public sealed class NativeBehaviorAutoGraphService
             ModStudioEntityKind.Card => TryCreateCardGraphFallback(entityId, out result),
             ModStudioEntityKind.Potion => TryCreatePotionGraphFallback(entityId, out result),
             ModStudioEntityKind.Relic => TryCreateRelicGraphFallback(entityId, out result),
+            ModStudioEntityKind.Event => TryCreateEventGraphFallback(entityId, out result),
             _ => false
         };
     }
@@ -238,6 +239,123 @@ public sealed class NativeBehaviorAutoGraphService
         translation.Graph.GraphId = source.GraphId;
         translation.Graph.Name = source.Name;
         result = BuildFallbackResult(translation, triggerId, notes);
+        return true;
+    }
+
+    private bool TryCreateEventGraphFallback(string entityId, out NativeBehaviorAutoGraphResult? result)
+    {
+        result = null;
+        var eventModel = ModelDb.AllEvents.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, entityId, StringComparison.Ordinal));
+        if (eventModel == null)
+        {
+            return false;
+        }
+
+        var graph = BehaviorGraphTemplateFactory.CreateDefaultScaffold(
+            $"auto_event_{entityId}",
+            ModStudioEntityKind.Event,
+            $"{TryGetLocText(eventModel.Title)} Native Import",
+            NormalizeDescription(TryGetLocText(eventModel.InitialDescription)),
+            "event.on_begin");
+
+        var exitNodeId = graph.Nodes.First(node => string.Equals(node.NodeType, "flow.exit", StringComparison.Ordinal)).NodeId;
+        graph.Connections.Clear();
+
+        var pageNodeId = "event_page_initial";
+        var optionIds = new List<string>();
+        var pageNode = new BehaviorGraphNodeDefinition
+        {
+            NodeId = pageNodeId,
+            NodeType = "event.page",
+            DisplayName = "Initial Page",
+            Properties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["page_id"] = "INITIAL",
+                ["title"] = TryGetLocText(eventModel.Title),
+                ["description"] = NormalizeDescription(TryGetLocText(eventModel.InitialDescription)),
+                ["is_start"] = bool.TrueString
+            }
+        };
+        graph.Nodes.Add(pageNode);
+        graph.Connections.Add(new BehaviorGraphConnectionDefinition
+        {
+            FromNodeId = graph.EntryNodeId,
+            FromPortId = "next",
+            ToNodeId = pageNodeId,
+            ToPortId = "in"
+        });
+
+        var optionIndex = 0;
+        foreach (var optionTitle in eventModel.GameInfoOptions.Select(TryGetLocText).Where(text => !string.IsNullOrWhiteSpace(text)))
+        {
+            var optionId = $"OPTION_{optionIndex + 1}";
+            optionIds.Add(optionId);
+            var optionNodeId = $"event_option_{optionIndex + 1}";
+            var proceedNodeId = $"event_proceed_{optionIndex + 1}";
+            graph.Nodes.Add(new BehaviorGraphNodeDefinition
+            {
+                NodeId = optionNodeId,
+                NodeType = "event.option",
+                DisplayName = $"Option {optionIndex + 1}",
+                Properties = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["page_id"] = "INITIAL",
+                    ["option_id"] = optionId,
+                    ["title"] = optionTitle,
+                    ["description"] = string.Empty,
+                    ["is_proceed"] = bool.TrueString
+                }
+            });
+            graph.Nodes.Add(new BehaviorGraphNodeDefinition
+            {
+                NodeId = proceedNodeId,
+                NodeType = "event.proceed",
+                DisplayName = "Proceed"
+            });
+            graph.Connections.Add(new BehaviorGraphConnectionDefinition
+            {
+                FromNodeId = pageNodeId,
+                FromPortId = "out",
+                ToNodeId = optionNodeId,
+                ToPortId = "in"
+            });
+            graph.Connections.Add(new BehaviorGraphConnectionDefinition
+            {
+                FromNodeId = optionNodeId,
+                FromPortId = "out",
+                ToNodeId = proceedNodeId,
+                ToPortId = "in"
+            });
+            graph.Connections.Add(new BehaviorGraphConnectionDefinition
+            {
+                FromNodeId = proceedNodeId,
+                FromPortId = "out",
+                ToNodeId = exitNodeId,
+                ToPortId = "in"
+            });
+            optionIndex++;
+        }
+
+        pageNode.Properties["option_order"] = string.Join(",", optionIds);
+        graph.Metadata["event_start_page_id"] = "INITIAL";
+
+        result = new NativeBehaviorAutoGraphResult
+        {
+            Graph = graph,
+            IsPartial = true,
+            Notes = new[]
+            {
+                "Event auto-graph scaffolded from the initial page and option localization only.",
+                "Option outcomes still require manual review or later event reflection support."
+            },
+            SupportedStepKinds = graph.Nodes
+                .Select(node => node.NodeType)
+                .Where(nodeType => !string.IsNullOrWhiteSpace(nodeType) && nodeType is not "flow.entry" and not "flow.exit")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            Strategy = NativeBehaviorAutoGraphStrategy.DescriptionFallback,
+            Summary = "Strategy: event-scaffold-fallback"
+        };
         return true;
     }
 

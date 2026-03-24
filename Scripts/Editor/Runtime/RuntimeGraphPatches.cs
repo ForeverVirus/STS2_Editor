@@ -4,6 +4,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Hooks;
+using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Runs;
@@ -33,6 +34,37 @@ internal static class RuntimeGraphPatches
             () => RuntimeGraphDispatcher.ExecuteCardPlayWrapperAsync(__instance, choiceContext, target, isAutoPlay, resources, skipCardPileVisuals),
             $"card graph override '{__instance.Id.Entry}'");
         return false;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(CardModel), nameof(CardModel.GetDescriptionForPile), new[] { typeof(PileType), typeof(Creature) })]
+    private static void CardModel_GetDescriptionForPile_Postfix(CardModel __instance, Creature? target, ref string __result)
+    {
+        if (RuntimeGraphDescriptionService.TryGetCardDescription(__instance, target, upgradedPreview: false, out var graphDescription))
+        {
+            __result = graphDescription;
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(CardModel), nameof(CardModel.GetDescriptionForUpgradePreview))]
+    private static void CardModel_GetDescriptionForUpgradePreview_Postfix(CardModel __instance, ref string __result)
+    {
+        if (RuntimeGraphDescriptionService.TryGetCardDescription(__instance, null, upgradedPreview: true, out var graphDescription))
+        {
+            __result = graphDescription;
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(CardModel), nameof(CardModel.UpdateDynamicVarPreview))]
+    private static void CardModel_UpdateDynamicVarPreview_Postfix(
+        CardModel __instance,
+        CardPreviewMode previewMode,
+        Creature? target,
+        DynamicVarSet dynamicVarSet)
+    {
+        RuntimeGraphPreviewService.ApplyCardPreview(__instance, previewMode, target, dynamicVarSet);
     }
 
     [HarmonyPrefix]

@@ -37,7 +37,6 @@ internal sealed partial class ModStudioAssetEditor : MarginContainer
 
     public override void _Ready()
     {
-        EnsureBuilt();
     }
 
     public void EnsureBuilt()
