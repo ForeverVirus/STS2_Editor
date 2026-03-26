@@ -14,6 +14,7 @@ namespace STS2_Editor.Scripts.Editor.UI;
 
 public sealed partial class NModStudioProjectWindow : NSubmenu
 {
+    private const bool AiEntryEnabled = false;
     private const string BackButtonScenePath = "res://scenes/ui/back_button.tscn";
     private const string AutoDescriptionCacheKeyPrefix = "__modstudio_auto_description__";
     private const string GraphAutoDescriptionCacheKey = "__modstudio_graph_auto_description__";
@@ -180,6 +181,12 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _menuBar.ExportPackageRequested += ExportProject;
         _menuBar.RevertRequested += RevertBasic;
         _menuBar.SwitchModeRequested += RequestSwitchMode;
+        _menuBar.PresetStateKeysGuideRequested += OpenPresetStateKeysGuide;
+        if (AiEntryEnabled)
+        {
+            _menuBar.AiAssistantRequested += OpenAiAssistant;
+            _menuBar.AiSettingsRequested += ShowAiSettingsDialog;
+        }
         _menuBar.ExitRequested += RequestExit;
         _menuBar.LanguageChanged += code => ModStudioLocalization.SetLanguage(code);
         _rootContainer.AddChild(_menuBar);
@@ -259,6 +266,18 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         AddChild(_exportDialog);
         AddChild(_assetImportDialog);
         AddChild(_graphImportDialog);
+        if (AiEntryEnabled)
+        {
+            _aiConfigDialog = new ModStudioAiConfigDialog();
+            _aiConfigDialog.SaveRequested += HandleAiSettingsSaved;
+            _aiChatPanel = new ModStudioAiChatPanel();
+            _aiChatPanel.SendRequested += HandleAiChatSendRequested;
+            _aiChatPanel.Closed += HandleAiChatClosed;
+            _aiChatPanel.ApplyPreviewRequested += HandleApplyAiPreviewRequested;
+            _aiChatPanel.DiscardPreviewRequested += HandleDiscardAiPreviewRequested;
+            AddChild(_aiConfigDialog);
+            AddChild(_aiChatPanel);
+        }
 
         _projectGateOverlay = BuildProjectGateOverlay();
         AddChild(_projectGateOverlay);
@@ -298,6 +317,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         ApplyFullRectToChild(_background, targetSize);
         ApplyFullRectToChild(_rootContainer, targetSize);
         ApplyFullRectToChild(_projectGateOverlay, targetSize);
+        RefreshAiLayout();
     }
 
     private static void ApplyFullRectToChild(Control? control, Vector2 targetSize)
@@ -402,6 +422,11 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _browserPanel?.RefreshTexts();
         _centerEditor?.RefreshTexts();
         _detailPanel?.RefreshTexts();
+        if (AiEntryEnabled)
+        {
+            _aiConfigDialog?.RefreshTexts();
+            _aiChatPanel?.RefreshTexts();
+        }
         RefreshProjectGateTexts();
         RefreshProjectState();
     }

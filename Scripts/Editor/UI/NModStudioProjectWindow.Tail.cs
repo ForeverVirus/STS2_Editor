@@ -38,6 +38,31 @@ public sealed partial class NModStudioProjectWindow
         RefreshCurrentTabView(forceLoad: true);
     }
 
+    private void OpenPresetStateKeysGuide()
+    {
+        var guidePath = ResolvePresetStateKeysGuidePath();
+        if (string.IsNullOrWhiteSpace(guidePath) || !File.Exists(guidePath))
+        {
+            OS.Alert(
+                Dual("未找到“预制键说明”文件。请先重新编译并同步当前模组目录。", "The preset key guide file was not found. Rebuild and sync the current mod directory first."),
+                Dual("说明文件缺失", "Guide Missing"));
+            return;
+        }
+
+        OS.ShellOpen(guidePath);
+    }
+
+    private static string ResolvePresetStateKeysGuidePath()
+    {
+        var candidates = new[]
+        {
+            ModStudioPaths.PresetStateKeysGuidePath,
+            Path.Combine(AppContext.BaseDirectory, "docs", "preset_state_keys_guide.txt")
+        };
+
+        return candidates.FirstOrDefault(File.Exists) ?? candidates[0];
+    }
+
     private void RefreshDerivedGraphText(BehaviorGraphDefinition graph, bool updateBasicPreview)
     {
         var sourceModel = _currentItem == null ? null : ResolveSourceModel(_currentKind, _currentItem.EntityId);

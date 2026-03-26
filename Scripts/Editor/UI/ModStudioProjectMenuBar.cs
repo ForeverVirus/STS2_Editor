@@ -6,10 +6,32 @@ namespace STS2_Editor.Scripts.Editor.UI;
 
 internal sealed partial class ModStudioProjectMenuBar : PanelContainer
 {
+    private const bool AiEntryEnabled = false;
+    private const int FileNewProjectId = 1;
+    private const int FileOpenProjectId = 2;
+    private const int FileSaveProjectId = 3;
+    private const int FileExportPackageId = 4;
+    private const int FileCloseId = 5;
+
+    private const int EditSaveCurrentId = 10;
+    private const int EditRevertCurrentId = 11;
+
+    private const int ModeSwitchId = 20;
+
+    private const int LanguageChineseId = 30;
+    private const int LanguageEnglishId = 31;
+
+    private const int HelpPresetKeyGuideId = 40;
+
+    private const int AiAssistantId = 50;
+    private const int AiSettingsId = 51;
+
     private MenuButton? _fileButton;
     private MenuButton? _editButton;
     private MenuButton? _modeButton;
     private MenuButton? _languageButton;
+    private MenuButton? _helpButton;
+    private MenuButton? _aiButton;
     private Button? _exitButton;
     private Label? _projectStateLabel;
 
@@ -19,6 +41,9 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
     public event Action? ExportPackageRequested;
     public event Action? RevertRequested;
     public event Action? SwitchModeRequested;
+    public event Action? PresetStateKeysGuideRequested;
+    public event Action? AiAssistantRequested;
+    public event Action? AiSettingsRequested;
     public event Action? ExitRequested;
     public event Action<string>? LanguageChanged;
 
@@ -44,39 +69,61 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
         if (_fileButton != null)
         {
             _fileButton.Text = Dual("文件", "File");
-            SetMenuItems(_fileButton, new (int, string)[]
+            SetMenuItems(_fileButton, new[]
             {
-                (1, Dual("新建项目", "New Project")),
-                (2, Dual("打开项目", "Open Project")),
-                (3, Dual("保存项目", "Save Project")),
-                (4, Dual("导出包", "Export Package")),
-                (5, Dual("关闭", "Close"))
+                (FileNewProjectId, Dual("新建项目", "New Project")),
+                (FileOpenProjectId, Dual("打开项目", "Open Project")),
+                (FileSaveProjectId, Dual("保存项目", "Save Project")),
+                (FileExportPackageId, Dual("导出包", "Export Package")),
+                (FileCloseId, Dual("关闭", "Close"))
             });
         }
 
         if (_editButton != null)
         {
             _editButton.Text = Dual("编辑", "Edit");
-            SetMenuItems(_editButton, new (int, string)[]
+            SetMenuItems(_editButton, new[]
             {
-                (10, Dual("保存当前", "Save Current")),
-                (11, Dual("还原当前", "Revert Current"))
+                (EditSaveCurrentId, Dual("保存当前", "Save Current")),
+                (EditRevertCurrentId, Dual("还原当前", "Revert Current"))
             });
         }
 
         if (_modeButton != null)
         {
             _modeButton.Text = Dual("模式", "Mode");
-            SetMenuItems(_modeButton, new (int, string)[] { (20, Dual("切换模式", "Switch Mode")) });
+            SetMenuItems(_modeButton, new[]
+            {
+                (ModeSwitchId, Dual("切换模式", "Switch Mode"))
+            });
         }
 
         if (_languageButton != null)
         {
             _languageButton.Text = Dual("语言", "Language");
-            SetMenuItems(_languageButton, new (int, string)[]
+            SetMenuItems(_languageButton, new[]
             {
-                (30, Dual("中文", "Chinese")),
-                (31, Dual("English", "English"))
+                (LanguageChineseId, Dual("中文", "Chinese")),
+                (LanguageEnglishId, Dual("English", "English"))
+            });
+        }
+
+        if (_helpButton != null)
+        {
+            _helpButton.Text = Dual("说明", "Help");
+            SetMenuItems(_helpButton, new[]
+            {
+                (HelpPresetKeyGuideId, Dual("预制键说明", "Preset Key Guide"))
+            });
+        }
+
+        if (AiEntryEnabled && _aiButton != null)
+        {
+            _aiButton.Text = "AI";
+            SetMenuItems(_aiButton, new[]
+            {
+                (AiAssistantId, Dual("AI 助手", "AI Assistant")),
+                (AiSettingsId, Dual("AI 设置", "AI Settings"))
             });
         }
 
@@ -108,6 +155,11 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
         _editButton = MakeMenuButton(Dual("编辑", "Edit"));
         _modeButton = MakeMenuButton(Dual("模式", "Mode"));
         _languageButton = MakeMenuButton(Dual("语言", "Language"));
+        _helpButton = MakeMenuButton(Dual("说明", "Help"));
+        if (AiEntryEnabled)
+        {
+            _aiButton = MakeMenuButton("AI");
+        }
         _projectStateLabel = MakeLabel(string.Empty, true);
         _projectStateLabel.HorizontalAlignment = HorizontalAlignment.Center;
         _exitButton = MakeButton(Dual("退出", "Exit"), () => ExitRequested?.Invoke());
@@ -117,6 +169,11 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
         row.AddChild(_editButton);
         row.AddChild(_modeButton);
         row.AddChild(_languageButton);
+        row.AddChild(_helpButton);
+        if (_aiButton != null)
+        {
+            row.AddChild(_aiButton);
+        }
         row.AddChild(_projectStateLabel);
         row.AddChild(_exitButton);
 
@@ -131,11 +188,21 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
             {
                 switch (id)
                 {
-                    case 1: NewProjectRequested?.Invoke(); break;
-                    case 2: OpenProjectRequested?.Invoke(); break;
-                    case 3: SaveProjectRequested?.Invoke(); break;
-                    case 4: ExportPackageRequested?.Invoke(); break;
-                    case 5: ExitRequested?.Invoke(); break;
+                    case FileNewProjectId:
+                        NewProjectRequested?.Invoke();
+                        break;
+                    case FileOpenProjectId:
+                        OpenProjectRequested?.Invoke();
+                        break;
+                    case FileSaveProjectId:
+                        SaveProjectRequested?.Invoke();
+                        break;
+                    case FileExportPackageId:
+                        ExportPackageRequested?.Invoke();
+                        break;
+                    case FileCloseId:
+                        ExitRequested?.Invoke();
+                        break;
                 }
             };
         }
@@ -146,8 +213,12 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
             {
                 switch (id)
                 {
-                    case 10: SaveProjectRequested?.Invoke(); break;
-                    case 11: RevertRequested?.Invoke(); break;
+                    case EditSaveCurrentId:
+                        SaveProjectRequested?.Invoke();
+                        break;
+                    case EditRevertCurrentId:
+                        RevertRequested?.Invoke();
+                        break;
                 }
             };
         }
@@ -156,7 +227,7 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
         {
             modePopup.IdPressed += id =>
             {
-                if (id == 20)
+                if (id == ModeSwitchId)
                 {
                     SwitchModeRequested?.Invoke();
                 }
@@ -167,13 +238,40 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
         {
             languagePopup.IdPressed += id =>
             {
-                if (id == 30)
+                if (id == LanguageChineseId)
                 {
                     LanguageChanged?.Invoke(ModStudioLocalization.ChineseLanguageCode);
                 }
-                else if (id == 31)
+                else if (id == LanguageEnglishId)
                 {
                     LanguageChanged?.Invoke(ModStudioLocalization.EnglishLanguageCode);
+                }
+            };
+        }
+
+        if (_helpButton?.GetPopup() is PopupMenu helpPopup)
+        {
+            helpPopup.IdPressed += id =>
+            {
+                if (id == HelpPresetKeyGuideId)
+                {
+                    PresetStateKeysGuideRequested?.Invoke();
+                }
+            };
+        }
+
+        if (AiEntryEnabled && _aiButton?.GetPopup() is PopupMenu aiPopup)
+        {
+            aiPopup.IdPressed += id =>
+            {
+                switch (id)
+                {
+                    case AiAssistantId:
+                        AiAssistantRequested?.Invoke();
+                        break;
+                    case AiSettingsId:
+                        AiSettingsRequested?.Invoke();
+                        break;
                 }
             };
         }

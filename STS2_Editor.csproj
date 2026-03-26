@@ -35,10 +35,22 @@
     <Compile Remove="references\**\*.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="docs\reference\preset_state_keys_guide.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>docs\preset_state_keys_guide.txt</TargetPath>
+    </None>
+  </ItemGroup>
+
   <Target Name="Copy Mod" AfterTargets="PostBuildEvent">
     <Message Text="Copying mod to Slay the Spire 2 mods folder..." Importance="high" />
     <MakeDir Directories="$(Sts2Dir)\mods\" />
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(Sts2Dir)\mods\$(MSBuildProjectName)\" />
     <Copy SourceFiles="$(MSBuildProjectName).json" DestinationFolder="$(Sts2Dir)/mods/$(MSBuildProjectName)/" />
+    <MakeDir Directories="$(Sts2Dir)\mods\$(MSBuildProjectName)\docs\" />
+    <Copy
+      SourceFiles="$(TargetDir)docs\preset_state_keys_guide.txt"
+      DestinationFolder="$(Sts2Dir)\mods\$(MSBuildProjectName)\docs\"
+      Condition="Exists('$(TargetDir)docs\preset_state_keys_guide.txt')" />
   </Target>
 </Project>

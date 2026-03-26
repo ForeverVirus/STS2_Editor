@@ -3,3 +3,9 @@
 /android/
 sts2
 STS2_Proj
+
+tools/**/bin/
+tools/**/obj/
+error_log.txt
+coverage/ai-runtime-proof/
+bug_ui.png

@@ -70,6 +70,7 @@ public static class ModStudioBootstrap
         _runtimeInitialized = true;
         RuntimeRegistry.Initialize();
         RuntimeSessionProofHarness.ApplyNegotiationIfRequested(RuntimeRegistry);
+        RuntimeAiProofHarness.ApplyIfRequested(ModelMetadataService, ProjectAssetBindingService, GraphRegistry);
         Log.Info("Mod Studio runtime registry initialized after core model startup.");
     }
 }

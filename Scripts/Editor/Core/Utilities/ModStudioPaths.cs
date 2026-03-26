@@ -4,6 +4,8 @@ namespace STS2_Editor.Scripts.Editor.Core.Utilities;
 
 public static class ModStudioPaths
 {
+    private const string EditorModFolderName = "STS2_Editor";
+
     public static string RootPath => ProjectSettings.GlobalizePath("user://sts2_editor");
 
     public static string SettingsFilePath => Path.Combine(RootPath, "settings.json");
@@ -43,7 +45,13 @@ public static class ModStudioPaths
         }
     }
 
-    public static string PublishedPackagesRootPath => Path.Combine(GameExecutableDirectory, "mods", "STS2_Editor", "mods");
+    public static string InstalledModRootPath => Path.Combine(GameExecutableDirectory, "mods", EditorModFolderName);
+
+    public static string InstalledModDocsPath => Path.Combine(InstalledModRootPath, "docs");
+
+    public static string PresetStateKeysGuidePath => Path.Combine(InstalledModDocsPath, "preset_state_keys_guide.txt");
+
+    public static string PublishedPackagesRootPath => Path.Combine(InstalledModRootPath, "mods");
 
     public static string GetLegacyProjectDirectory(string projectId)
     {

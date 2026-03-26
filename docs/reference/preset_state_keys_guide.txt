@@ -1,0 +1,291 @@
+Mod Studio 预制键说明
+======================
+
+一、先看最重要的规则
+--------------------
+
+1. $state.xxx 表示“读取当前这次 graph 执行上下文里的状态值”。
+2. 在写键名的字段里，不要写 $state. 前缀，只写裸键名。
+3. 在读表达式/读值的字段里，如果你想读取状态，才写 $state.xxx。
+
+常见写法：
+
+- value.compare
+  left = $state.CombatRound
+  operator = gt
+  right = 1
+  result_key = round_above_one
+
+- flow.branch
+  condition_key = round_above_one
+
+- value.set
+  key = hook_result
+  value = true
+
+记忆方式：
+
+- result_key / condition_key / key / state_key / card_state_key
+  这些字段是在“命名一个状态槽位”
+
+- left / right / condition / value
+  这些字段是在“读取一个值或表达式”
+
+
+二、哪些键是用户可以自定义的
+----------------------------
+
+大多数状态键都可以自定义。
+
+推荐：
+
+- 用英文
+- 不要有空格
+- 推荐 snake_case
+- 尽量小写，例如：
+  round_above_one
+  should_double_damage
+  owner_hand_empty
+
+注意：
+
+- 大小写敏感，foo 和 Foo 是两个不同键
+- 自定义键只在当前这次 graph 执行里存在，不会自动永久保存
+
+
+三、哪些键属于系统约定或常见保留键
+--------------------------------
+
+下面这些键不要随便拿来做普通临时变量，除非你明确知道自己在覆写什么。
+
+1. hook_result
+   用途：很多原版 hook graph 会把最终布尔/数值返回值写到这里。
+   常见场景：遗物 should_xxx、modify_xxx、是否允许某行为等。
+
+2. Status
+   用途：原版对象的状态字段快照。
+   常见场景：一些 native import graph 会直接读写它。
+   备注：新建附魔图时，更推荐用 enchantment.set_status，而不是手写 value.set(Status)。
+
+3. last_compare
+   用途：value.compare 的默认 result_key。
+   备注：你可以改成自己的键名，但如果不改，默认就是它。
+
+4. selected_cards
+   用途：很多卡牌选择类节点默认把结果放在这里。
+   常见节点：card.select_cards，以及后续消费 selected_cards 的节点。
+
+5. event.*
+   用途：事件节点运行时会写入的一组内部状态，例如：
+   event.page_id
+   event.option_id
+   event.title
+   event.description
+   event.next_page_id
+   event.reward_kind
+   event.reward_amount
+   event.reward_target
+   event.reward_props
+   event.reward_power_id
+   备注：不要拿 event.* 当普通自定义键，容易和事件系统内部状态混淆。
+
+
+四、系统内置的 $ 引用
+---------------------
+
+除了 $state.xxx，还可以直接读取这些内置引用：
+
+- $trigger
+  当前触发器 ID
+
+- $source_model
+  当前 graph 所属模型
+
+- $card
+- $card_play
+- $potion
+- $relic
+- $event
+- $enchantment
+  当前上下文对应的对象
+
+- $owner / $owner_player
+  拥有者玩家
+
+- $self / $owner_creature / $source_creature
+  拥有者生物
+
+- $target / $current_target
+  当前目标
+
+- $combat_state
+- $run_state
+- $choice_context
+
+如果你在 left / right / condition / value 里写这些引用，节点会在运行时解析它们。
+
+
+五、按触发器预先塞进来的常见预制键
+--------------------------------
+
+这部分最容易误解：不是所有 graph 都有同一批键。
+运行时会根据“当前对象类型 + 当前 trigger”预先塞一批状态值进去。
+
+下面是常见例子：
+
+- CombatRound
+  当前战斗回合数
+
+- HandCount
+  当前手牌数
+
+- CurrentBlock
+  当前格挡
+
+- HookPlayerIsOwner
+  这次 hook 相关的玩家是否正好是该对象拥有者
+
+- IsUsedUp
+  当前遗物是否已用尽
+
+- DisplayAmount
+  当前对象显示数字
+
+- RoomType / CurrentRoomType
+  当前房间类型
+
+- CurrentActIndex / ActIndex
+  当前章节序号
+
+- modifier_base
+- modifier_props
+  某些数值修正类 trigger 会预置的原始值和属性
+
+- reward_list
+  奖励列表
+
+- unknown_room_types
+  地图未知房间类型集合
+
+- damage_result
+- damage_props
+  某些伤害相关 hook 的上下文
+
+这些键是否存在，取决于具体 trigger。
+如果你读取一个当前 trigger 没有提供的键，得到的通常就是空/null，后续布尔或数值解析会按默认值走。
+
+
+六、字段里到底该怎么写
+---------------------
+
+1. result_key / condition_key / key / state_key / card_state_key
+
+这里写裸键名：
+
+- round_above_one
+- hook_result
+- selected_cards
+- my_temp_flag
+
+不要写：
+
+- $state.round_above_one
+- $state.hook_result
+
+2. left / right / condition / value
+
+这里写字面量或引用表达式：
+
+- 1
+- true
+- false
+- Normal
+- $state.CombatRound
+- $state.round_above_one
+- $target
+- $owner
+
+
+七、推荐命名习惯
+---------------
+
+推荐把状态键分成三类：
+
+1. 比较结果
+- is_owner
+- round_above_one
+- should_double_damage
+
+2. 临时数据
+- chosen_room_type
+- cached_damage
+- reward_count_temp
+
+3. 约定返回值
+- hook_result
+
+不推荐：
+
+- test
+- aaa
+- data1
+- status
+- temp
+
+因为后期根本看不出用途。
+
+
+八、典型模式示例
+---------------
+
+模式 A：Compare -> Branch
+
+- Compare
+  left = $state.CombatRound
+  operator = gt
+  right = 1
+  result_key = round_above_one
+
+- Branch
+  condition_key = round_above_one
+
+含义：
+如果当前回合数大于 1，走 True，否则走 False。
+
+
+模式 B：写 hook 返回值
+
+- value.set
+  key = hook_result
+  value = true
+
+含义：
+把当前 hook 的返回值设为 true。
+
+
+模式 C：修改附魔状态
+
+推荐：
+
+- enchantment.set_status
+  status = Disabled / Normal
+
+旧图里可能会看到：
+
+- value.set
+  key = Status
+  value = Normal
+
+两者都能表达“改状态”，但专用节点更清楚。
+
+
+九、如果你不确定一个键是不是系统预置
+----------------------------------
+
+优先遵守这条原则：
+
+- 只把 hook_result、Status、selected_cards、event.* 当作系统保留键
+- 自己新增的中间变量统一用 snake_case 小写名
+- 如果某个 graph 是 native import 来的，尽量沿用它已有的键名，不要随意改
+
+这样最稳，不容易和运行时上下文撞车。

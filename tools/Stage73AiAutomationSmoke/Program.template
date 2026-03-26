@@ -1,0 +1,198 @@
+#nullable enable
+using STS2_Editor.Scripts.Editor.AI;
+using STS2_Editor.Scripts.Editor.Core.Models;
+using STS2_Editor.Scripts.Editor.Core.Services;
+using STS2_Editor.Scripts.Editor.Graph;
+var report = new List<string>();
+var failures = new List<string>();
+
+Run("protocol parser", TestProtocolParser);
+Run("preview executor", TestPreviewExecutor);
+
+Console.WriteLine("Stage 73 AI automation smoke");
+foreach (var line in report)
+{
+    Console.WriteLine(line);
+}
+
+if (failures.Count > 0)
+{
+    Console.WriteLine("Failures:");
+    foreach (var failure in failures)
+    {
+        Console.WriteLine(failure);
+    }
+
+    return 1;
+}
+
+Console.WriteLine("Result: PASS");
+return 0;
+
+void Run(string label, Action action)
+{
+    try
+    {
+        action();
+        report.Add($"[PASS] {label}");
+    }
+    catch (Exception ex)
+    {
+        var message = $"[FAIL] {label}: {ex}";
+        report.Add(message);
+        failures.Add(message);
+    }
+}
+
+static void TestProtocolParser()
+{
+    const string raw = """
+```json
+{
+  "type": "reply",
+  "assistantMessage": "Need one more detail.",
+  "needsClarification": true
+}
+```
+""";
+
+    if (!AiProtocolParser.TryParseEnvelope(raw, out var envelope, out var error))
+    {
+        throw new InvalidOperationException(error);
+    }
+
+    if (!string.Equals(envelope.Type, "reply", StringComparison.Ordinal) || !envelope.NeedsClarification)
+    {
+        throw new InvalidOperationException("Protocol parser did not preserve reply fields.");
+    }
+}
+
+static void TestPreviewExecutor()
+{
+    var registry = new BehaviorGraphRegistry();
+    registry.RegisterBuiltIns();
+    var metadataService = new ModelMetadataService();
+    var assetBindingService = new ProjectAssetBindingService();
+    var executor = new AiEditExecutor(metadataService, assetBindingService, registry);
+
+    var project = new EditorProject
+    {
+        Manifest = new EditorProjectManifest
+        {
+            ProjectId = "ai_smoke_project",
+            Name = "AI Smoke"
+        }
+    };
+    const string sampleCardId = "ai_test_card_001";
+    project.Overrides.Add(new EntityOverrideEnvelope
+    {
+        EntityKind = ModStudioEntityKind.Card,
+        EntityId = sampleCardId,
+        BehaviorSource = BehaviorSource.Graph,
+        GraphId = "ai_smoke_graph",
+        Metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["title"] = "Preview Card",
+            ["description"] = "Initial description",
+            ["type"] = "Attack",
+            ["rarity"] = "Common",
+            ["target_type"] = "AnyEnemy",
+            ["energy_cost"] = "1"
+        }
+    });
+    project.Graphs["ai_smoke_graph"] = BehaviorGraphTemplateFactory.CreateDefaultScaffold("ai_smoke_graph", ModStudioEntityKind.Card, "Preview Card", "Initial description");
+
+    var plan = new AiEditPlan
+    {
+        AssistantMessage = "Create a simple card graph.",
+        Operations =
+        [
+            new AiEditOperation
+            {
+                Type = "set_basic_fields",
+                EntityKind = "Card",
+                EntityId = sampleCardId,
+                Fields = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["title"] = "AI Test Card",
+                    ["description"] = "Deal 9 damage.",
+                    ["type"] = "Attack",
+                    ["rarity"] = "Common"
+                }
+            },
+            new AiEditOperation
+            {
+                Type = "disconnect_graph_nodes",
+                EntityKind = "Card",
+                EntityId = sampleCardId,
+                FromNodeId = "entry_card",
+                FromPortId = "next",
+                ToNodeId = "exit_card",
+                ToPortId = "in"
+            },
+            new AiEditOperation
+            {
+                Type = "add_graph_node",
+                OpRef = "damage_node",
+                EntityKind = "Card",
+                EntityId = sampleCardId,
+                NodeType = "combat.damage",
+                DisplayName = "Damage",
+                Properties = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["amount"] = "9",
+                    ["target"] = "current_target",
+                    ["props"] = "none"
+                }
+            },
+            new AiEditOperation
+            {
+                Type = "connect_graph_nodes",
+                EntityKind = "Card",
+                EntityId = sampleCardId,
+                FromNodeId = "entry_card",
+                FromPortId = "next",
+                ToNodeRef = "damage_node",
+                ToPortId = "in"
+            },
+            new AiEditOperation
+            {
+                Type = "connect_graph_nodes",
+                EntityKind = "Card",
+                EntityId = sampleCardId,
+                FromNodeRef = "damage_node",
+                FromPortId = "out",
+                ToNodeId = "exit_card",
+                ToPortId = "in"
+            }
+        ]
+    };
+
+    var preview = executor.Preview(project, plan, new AiExecutionContext
+    {
+        CurrentKind = ModStudioEntityKind.Card,
+        CurrentEntityId = string.Empty
+    });
+
+    if (!preview.IsValid)
+    {
+        throw new InvalidOperationException(string.Join(" | ", preview.ErrorLines));
+    }
+
+    if (preview.ProjectSnapshot.Overrides.Count != 1)
+    {
+        throw new InvalidOperationException("Expected one created override envelope.");
+    }
+
+    var createdEnvelope = preview.ProjectSnapshot.Overrides[0];
+    if (string.IsNullOrWhiteSpace(createdEnvelope.GraphId) ||
+        !preview.ProjectSnapshot.Graphs.TryGetValue(createdEnvelope.GraphId, out var graph))
+    {
+        throw new InvalidOperationException("Expected created graph to be attached to the new entity.");
+    }
+
+    if (!graph.Nodes.Any(node => string.Equals(node.NodeType, "combat.damage", StringComparison.Ordinal)))
+    {
+        throw new InvalidOperationException("Expected damage node to be added to the graph.");
+    }
+}
