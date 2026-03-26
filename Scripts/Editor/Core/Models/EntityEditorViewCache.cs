@@ -13,4 +13,6 @@ public sealed class EntityEditorViewCache
     public List<string> RuntimeAssetCandidates { get; set; } = new();
 
     public List<AssetRef> ImportedAssets { get; set; } = new();
+
+    public bool AssetsLoaded { get; set; }
 }

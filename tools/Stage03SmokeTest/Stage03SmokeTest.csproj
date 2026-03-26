@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <Reference Include="STS2_Editor">
-      <HintPath>F:\sts2_mod\mod_projects\STS2_editor\.godot\mono\temp\bin\Debug\STS2_Editor.dll</HintPath>
+      <HintPath>F:\sts2_mod\mod_projects\STS2_editor\.godot\mono\temp\obj\Debug\STS2_Editor.dll</HintPath>
       <Private>true</Private>
     </Reference>
     <Reference Include="sts2">

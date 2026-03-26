@@ -1,0 +1,10 @@
+{
+  "BatchId": "passive_only",
+  "EntityKind": "PassiveOnly",
+  "Title": "Stage 13 session proof",
+  "Scenario": 3,
+  "TimeoutSeconds": 30,
+  "ExpectedMarkers": [
+    "[ModStudio.SessionProof] Package stage13_session_c@1.0.0 enabled=True sessionEnabled=False"
+  ]
+}

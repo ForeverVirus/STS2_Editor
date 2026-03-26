@@ -1,18 +1,25 @@
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Models;
 using Godot;
+using STS2_Editor.Scripts.Editor.Core.Models;
+using STS2_Editor.Scripts.Editor.Core.Utilities;
 using static STS2_Editor.Scripts.Editor.UI.ModStudioUiFactory;
 
 namespace STS2_Editor.Scripts.Editor.UI;
 
 internal sealed partial class ModStudioBasicEditor : MarginContainer
 {
+    private static readonly Dictionary<string, IReadOnlyList<FieldOption>> ListOptionCache = new(StringComparer.OrdinalIgnoreCase);
+    private static bool? _cachedLanguageIsChinese;
+
     private readonly Dictionary<string, Control> _fieldControls = new(StringComparer.OrdinalIgnoreCase);
     private VBoxContainer? _fieldHost;
     private Label? _titleLabel;
     private Button? _saveButton;
     private Button? _revertButton;
     private bool _suppressFieldChanged;
+    private ModStudioEntityKind _boundKind;
+    private string _fieldLayoutSignature = string.Empty;
 
     public event Action? SaveRequested;
     public event Action? RevertRequested;
@@ -29,19 +36,28 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         RefreshTexts();
     }
 
-    public void BindMetadata(string title, IReadOnlyDictionary<string, string> metadata)
+    public void BindMetadata(string title, ModStudioEntityKind kind, IReadOnlyDictionary<string, string> metadata)
     {
+        _boundKind = kind;
         if (_titleLabel != null)
         {
             _titleLabel.Text = title;
         }
 
-        _fieldControls.Clear();
         if (_fieldHost == null)
         {
             return;
         }
 
+        var signature = string.Join("|", metadata.Keys.OrderBy(key => key, StringComparer.OrdinalIgnoreCase));
+        if (string.Equals(_fieldLayoutSignature, signature, StringComparison.Ordinal))
+        {
+            ApplyFieldValues(metadata);
+            return;
+        }
+
+        _fieldLayoutSignature = signature;
+        _fieldControls.Clear();
         foreach (var child in _fieldHost.GetChildren())
         {
             child.QueueFree();
@@ -264,7 +280,7 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         return lineEdit;
     }
 
-    private static bool TryCreateListFieldEditor(string key, string value, out ListFieldEditor editor)
+    private bool TryCreateListFieldEditor(string key, string value, out ListFieldEditor editor)
     {
         editor = null!;
         if (!TryGetListOptions(key, out var options))
@@ -276,21 +292,27 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         return true;
     }
 
-    private static bool TryCreateChoiceFieldEditor(string key, string value, out ChoiceFieldEditor editor)
+    private bool TryCreateChoiceFieldEditor(string key, string value, out ChoiceFieldEditor editor)
     {
         editor = null!;
-        var options = FieldChoiceProvider.GetBasicChoices(key);
+        var options = FieldChoiceProvider.GetBasicChoices(_boundKind, key);
         if (options.Count == 0)
         {
             return false;
         }
 
-        editor = new ChoiceFieldEditor(key, options, value);
+        editor = new ChoiceFieldEditor(_boundKind, key, options, value);
         return true;
     }
 
     private static bool TryGetListOptions(string key, out IReadOnlyList<FieldOption> options)
     {
+        EnsureListOptionCacheLanguage();
+        if (ListOptionCache.TryGetValue(key, out options!))
+        {
+            return true;
+        }
+
         options = Array.Empty<FieldOption>();
         switch (key)
         {
@@ -300,24 +322,27 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
                     .ThenBy(card => card.Id.Entry, StringComparer.OrdinalIgnoreCase)
                     .Select(card => new FieldOption(card.Id.Entry, BuildOptionDisplay(card.Title, card.Id.Entry)))
                     .ToList();
-                return true;
+                break;
             case "starting_relic_ids":
                 options = ModelDb.AllRelics
                     .OrderBy(relic => SafeLocText(relic.Title), StringComparer.OrdinalIgnoreCase)
                     .ThenBy(relic => relic.Id.Entry, StringComparer.OrdinalIgnoreCase)
                     .Select(relic => new FieldOption(relic.Id.Entry, BuildOptionDisplay(SafeLocText(relic.Title), relic.Id.Entry)))
                     .ToList();
-                return true;
+                break;
             case "starting_potion_ids":
                 options = ModelDb.AllPotions
                     .OrderBy(potion => SafeLocText(potion.Title), StringComparer.OrdinalIgnoreCase)
                     .ThenBy(potion => potion.Id.Entry, StringComparer.OrdinalIgnoreCase)
                     .Select(potion => new FieldOption(potion.Id.Entry, BuildOptionDisplay(SafeLocText(potion.Title), potion.Id.Entry)))
                     .ToList();
-                return true;
+                break;
             default:
                 return false;
         }
+
+        ListOptionCache[key] = options;
+        return true;
     }
 
     private static IReadOnlyList<string> ParseListValue(string value)
@@ -383,6 +408,39 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         }
     }
 
+    private void ApplyFieldValues(IReadOnlyDictionary<string, string> metadata)
+    {
+        WithSuppressedFieldChanged(() =>
+        {
+            foreach (var pair in metadata)
+            {
+                if (!_fieldControls.TryGetValue(pair.Key, out var control))
+                {
+                    continue;
+                }
+
+                switch (control)
+                {
+                    case LineEdit lineEdit:
+                        lineEdit.Text = pair.Value ?? string.Empty;
+                        break;
+                    case TextEdit textEdit:
+                        textEdit.Text = pair.Value ?? string.Empty;
+                        break;
+                    case CheckBox checkBox when bool.TryParse(pair.Value, out var boolValue):
+                        checkBox.ButtonPressed = boolValue;
+                        break;
+                    case ChoiceFieldEditor choiceFieldEditor:
+                        choiceFieldEditor.SetValue(pair.Value ?? string.Empty);
+                        break;
+                    case ListFieldEditor listFieldEditor:
+                        listFieldEditor.SetValues(ParseListValue(pair.Value));
+                        break;
+                }
+            }
+        });
+    }
+
     private void WithSuppressedFieldChanged(Action action)
     {
         var previous = _suppressFieldChanged;
@@ -395,6 +453,17 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         {
             _suppressFieldChanged = previous;
         }
+    }
+
+    private static void EnsureListOptionCacheLanguage()
+    {
+        if (_cachedLanguageIsChinese == ModStudioLocalization.IsChinese)
+        {
+            return;
+        }
+
+        _cachedLanguageIsChinese = ModStudioLocalization.IsChinese;
+        ListOptionCache.Clear();
     }
 
     private sealed partial class ListFieldEditor : VBoxContainer
@@ -453,6 +522,30 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             }
         }
 
+        public void SetValues(IReadOnlyList<string> selectedIds)
+        {
+            var normalized = selectedIds.Count == 0 ? new[] { string.Empty } : selectedIds.ToArray();
+
+            while (_rows.Count < normalized.Length)
+            {
+                AddRow(null);
+            }
+
+            while (_rows.Count > normalized.Length && _rows.Count > 1)
+            {
+                var last = _rows[^1];
+                _rows.RemoveAt(_rows.Count - 1);
+                _rowsHost.RemoveChild(last);
+                last.QueueFree();
+            }
+
+            for (var index = 0; index < _rows.Count; index++)
+            {
+                var value = index < normalized.Length ? normalized[index] : string.Empty;
+                _rows[index].SetSelectedId(value);
+            }
+        }
+
         private void AddRow(string? selectedId)
         {
             var row = new ListRow(_options, selectedId);
@@ -482,12 +575,14 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
 
     private sealed partial class ChoiceFieldEditor : VBoxContainer
     {
+        private readonly ModStudioEntityKind _kind;
         private readonly string _key;
         private readonly OptionButton _picker;
         private string _currentValue;
 
-        public ChoiceFieldEditor(string key, IReadOnlyList<(string Value, string Display)> options, string value)
+        public ChoiceFieldEditor(ModStudioEntityKind kind, string key, IReadOnlyList<(string Value, string Display)> options, string value)
         {
+            _kind = kind;
             _key = key;
             _currentValue = value ?? string.Empty;
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -541,7 +636,7 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
 
         public void RefreshTexts()
         {
-            RefreshTexts(FieldChoiceProvider.GetBasicChoices(_key));
+            RefreshTexts(FieldChoiceProvider.GetBasicChoices(_kind, _key));
         }
 
         private void RefreshTexts(IReadOnlyList<(string Value, string Display)> options)
@@ -580,7 +675,7 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
 
         private static string BuildDisplayText(string value, string fallback)
         {
-            var display = ModStudioFieldDisplayNames.FormatValue(value);
+            var display = ModStudioFieldDisplayNames.FormatPropertyValue(string.Empty, value);
             if (string.IsNullOrWhiteSpace(display))
             {
                 display = fallback;
@@ -662,6 +757,29 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
 
         public void ClearSelection()
         {
+            _picker.Select(0);
+        }
+
+        public void SetSelectedId(string? selectedId)
+        {
+            var normalized = selectedId ?? string.Empty;
+            for (var index = 0; index < _picker.ItemCount; index++)
+            {
+                if (string.Equals(_picker.GetItemMetadata(index).AsString(), normalized, StringComparison.Ordinal))
+                {
+                    _picker.Select(index);
+                    return;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(normalized))
+            {
+                _picker.AddItem(normalized);
+                _picker.SetItemMetadata(_picker.ItemCount - 1, normalized);
+                _picker.Select(_picker.ItemCount - 1);
+                return;
+            }
+
             _picker.Select(0);
         }
 

@@ -1125,12 +1125,34 @@ public sealed partial class ModStudioGraphCanvasView : Control
 
     private static string ResolveNodeTitle(BehaviorGraphNodeDefinition node)
     {
-        return string.IsNullOrWhiteSpace(node.DisplayName) ? node.NodeType : node.DisplayName;
+        var baseTitle = string.IsNullOrWhiteSpace(node.DisplayName) ? node.NodeType : node.DisplayName;
+        var suffix = ResolveInternalNodeTitleSuffix(node);
+        return string.IsNullOrWhiteSpace(suffix) ? baseTitle : $"{baseTitle} [{suffix}]";
     }
 
     private static string ResolveNodeTitle(BehaviorGraphNodeDefinitionDescriptor definition)
     {
         return string.IsNullOrWhiteSpace(definition.DisplayName) ? definition.NodeType : definition.DisplayName;
+    }
+
+    private static string ResolveInternalNodeTitleSuffix(BehaviorGraphNodeDefinition node)
+    {
+        var nodeType = (node.NodeType ?? string.Empty).Trim().ToLowerInvariant();
+        var rawSuffix = nodeType switch
+        {
+            "value.compare" => GetProperty(node, "result_key", string.Empty),
+            "flow.branch" => GetProperty(node, "condition_key", string.Empty),
+            "value.set" or "value.add" or "value.multiply" => GetProperty(node, "key", string.Empty),
+            "enchantment.set_status" => GetProperty(node, "status", string.Empty),
+            _ => string.Empty
+        };
+
+        if (string.IsNullOrWhiteSpace(rawSuffix))
+        {
+            return string.Empty;
+        }
+
+        return rawSuffix.Length <= 24 ? rawSuffix : $"{rawSuffix[..21]}...";
     }
 
     private static string BuildDescription(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
@@ -1171,7 +1193,7 @@ public sealed partial class ModStudioGraphCanvasView : Control
         {
             var preview = DynamicValueEvaluator.EvaluatePreview(amountDefinition, sourceModel, previewContext);
             segments.Add($"{ModStudioFieldDisplayNames.Get("amount")}: {preview.PreviewText}");
-            segments.Add($"{ModStudioLocalizationCatalog.T("graph.value_source")}: {amountDefinition.SourceKind}");
+            segments.Add($"{ModStudioLocalizationCatalog.T("graph.value_source")}: {ModStudioFieldDisplayNames.FormatPropertyValue("dynamic_source_kind", amountDefinition.SourceKind.ToString())}");
         }
 
         if (segments.Count > 0)
@@ -1181,14 +1203,14 @@ public sealed partial class ModStudioGraphCanvasView : Control
                 .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
                 .Take(3)
                 .Select(pair => $"{ModStudioFieldDisplayNames.Get(pair.Key)}: {ModStudioFieldDisplayNames.FormatGraphPropertyValue(pair.Key, pair.Value)}"));
-            return string.Join("  鈥? ", segments);
+            return string.Join("  |  ", segments);
         }
         if (node.Properties.Count == 0)
         {
             return Dual("无额外属性", "No extra properties");
         }
 
-        return string.Join("  •  ", node.Properties
+        return string.Join("  |  ", node.Properties
             .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .Select(pair => $"{ModStudioFieldDisplayNames.Get(pair.Key)}: {ModStudioFieldDisplayNames.FormatGraphPropertyValue(pair.Key, pair.Value)}"));
@@ -1228,6 +1250,12 @@ public sealed partial class ModStudioGraphCanvasView : Control
             return description;
         }
 
+        var internalDescription = BuildInternalStateNodeDescription(node);
+        if (!string.IsNullOrWhiteSpace(internalDescription))
+        {
+            return internalDescription;
+        }
+
         if (!string.IsNullOrWhiteSpace(node.Description))
         {
             return node.Description;
@@ -1245,6 +1273,81 @@ public sealed partial class ModStudioGraphCanvasView : Control
         }
 
         return $"{ModStudioFieldDisplayNames.Get(key)}: {ModStudioFieldDisplayNames.FormatGraphPropertyValue(key, value)}";
+    }
+
+    private static string BuildInternalStateNodeDescription(BehaviorGraphNodeDefinition node)
+    {
+        return (node.NodeType ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "value.compare" => Dual(
+                $"比较 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("left", GetProperty(node, "left", string.Empty))} {ModStudioFieldDisplayNames.FormatGraphPropertyValue("operator", GetProperty(node, "operator", "eq"))} {ModStudioFieldDisplayNames.FormatGraphPropertyValue("right", GetProperty(node, "right", string.Empty))}，并把结果写入 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("result_key", GetProperty(node, "result_key", "last_compare"))}。",
+                $"Compare {ModStudioFieldDisplayNames.FormatGraphPropertyValue("left", GetProperty(node, "left", string.Empty))} {ModStudioFieldDisplayNames.FormatGraphPropertyValue("operator", GetProperty(node, "operator", "eq"))} {ModStudioFieldDisplayNames.FormatGraphPropertyValue("right", GetProperty(node, "right", string.Empty))}, then store the result in {ModStudioFieldDisplayNames.FormatGraphPropertyValue("result_key", GetProperty(node, "result_key", "last_compare"))}."),
+            "flow.branch" when TryGetNonEmptyProperty(node, "condition", out var condition) => Dual(
+                $"判断 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("condition", condition)}，为真走 True，为假走 False。",
+                $"Evaluate {ModStudioFieldDisplayNames.FormatGraphPropertyValue("condition", condition)}. Use the True port when it passes, otherwise use False."),
+            "flow.branch" when TryGetNonEmptyProperty(node, "condition_key", out var conditionKey) => Dual(
+                $"读取 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("condition_key", conditionKey)} 的布尔结果，为真走 True，为假走 False。",
+                $"Read the boolean stored in {ModStudioFieldDisplayNames.FormatGraphPropertyValue("condition_key", conditionKey)}. Use the True port when it passes, otherwise use False."),
+            "flow.branch" => Dual("根据条件进入 True 或 False 分支。", "Branch into the True or False flow path based on a condition."),
+            "value.set" => Dual(
+                $"把 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", GetProperty(node, "key", string.Empty))} 设为 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", GetProperty(node, "value", string.Empty))}。",
+                $"Set {ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", GetProperty(node, "key", string.Empty))} to {ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", GetProperty(node, "value", string.Empty))}."),
+            "value.add" => Dual(
+                $"给 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", GetProperty(node, "key", string.Empty))} 增加 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", GetProperty(node, "delta", "0"))}。",
+                $"Add {ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", GetProperty(node, "delta", "0"))} to {ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", GetProperty(node, "key", string.Empty))}."),
+            "value.multiply" => Dual(
+                $"把 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", GetProperty(node, "key", string.Empty))} 乘以 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", GetProperty(node, "factor", "1"))}。",
+                $"Multiply {ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", GetProperty(node, "key", string.Empty))} by {ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", GetProperty(node, "factor", "1"))}."),
+            "enchantment.set_status" => Dual(
+                $"把当前附魔状态设为 {ModStudioFieldDisplayNames.FormatGraphPropertyValue("status", GetProperty(node, "status", "Disabled"))}。",
+                $"Set the current enchantment status to {ModStudioFieldDisplayNames.FormatGraphPropertyValue("status", GetProperty(node, "status", "Disabled"))}."),
+            _ => string.Empty
+        };
+    }
+
+    private static string BuildInternalStateNodeSummary(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        IEnumerable<string> entries = (node.NodeType ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "value.compare" => BuildEntries("left", "operator", "right", "result_key"),
+            "flow.branch" when TryGetNonEmptyProperty(node, "condition", out _) => BuildEntries("condition"),
+            "flow.branch" => BuildEntries("condition_key"),
+            "value.set" => BuildEntries("key", "value"),
+            "value.add" => BuildEntries("key", "delta"),
+            "value.multiply" => BuildEntries("key", "factor"),
+            "enchantment.set_status" => BuildEntries("status"),
+            _ => Array.Empty<string>()
+        };
+
+        var visibleEntries = entries.Where(entry => !string.IsNullOrWhiteSpace(entry)).ToList();
+        return visibleEntries.Count == 0
+            ? string.Empty
+            : string.Join("  |  ", visibleEntries);
+
+        IEnumerable<string> BuildEntries(params string[] keys)
+        {
+            foreach (var key in keys)
+            {
+                if (!node.Properties.TryGetValue(key, out var value))
+                {
+                    continue;
+                }
+
+                yield return BuildPropertyEntry(node, key, value, sourceModel, previewContext);
+            }
+        }
+    }
+
+    private static bool TryGetNonEmptyProperty(BehaviorGraphNodeDefinition node, string key, out string value)
+    {
+        if (node.Properties.TryGetValue(key, out var rawValue) && !string.IsNullOrWhiteSpace(rawValue))
+        {
+            value = rawValue;
+            return true;
+        }
+
+        value = string.Empty;
+        return false;
     }
 
     private static string BuildDynamicPropertyEntry(string key, DynamicValueDefinition definition, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
@@ -1270,6 +1373,12 @@ public sealed partial class ModStudioGraphCanvasView : Control
 
     private static string BuildDynamicPropertySummary(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
     {
+        var internalSummary = BuildInternalStateNodeSummary(node, sourceModel, previewContext);
+        if (!string.IsNullOrWhiteSpace(internalSummary))
+        {
+            return internalSummary;
+        }
+
         var entries = new List<string>();
 
         foreach (var pair in node.Properties.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
@@ -1292,7 +1401,7 @@ public sealed partial class ModStudioGraphCanvasView : Control
             return Dual("无额外属性", "No extra properties");
         }
 
-        return string.Join("  •  ", entries.Take(4));
+        return string.Join("  |  ", entries.Take(4));
     }
 
     private static string GetProperty(BehaviorGraphNodeDefinition node, string key, string defaultValue)

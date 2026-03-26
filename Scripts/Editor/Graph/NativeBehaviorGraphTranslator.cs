@@ -1,5 +1,6 @@
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Rooms;
 using STS2_Editor.Scripts.Editor.Core.Models;
 
 namespace STS2_Editor.Scripts.Editor.Graph;
@@ -96,17 +97,47 @@ public sealed class NativeBehaviorGraphTranslator
             "Adds energy to the owner player.",
             new[] { "amount" }),
         new NativeBehaviorTranslationCapability(
+            "player.lose_energy",
+            "Lose Energy",
+            NativeBehaviorTranslationStatus.Supported,
+            "Removes energy from the owner player.",
+            new[] { "amount" }),
+        new NativeBehaviorTranslationCapability(
             "player.gain_gold",
             "Gain Gold",
             NativeBehaviorTranslationStatus.Supported,
             "Adds gold to the owner player.",
             new[] { "amount" }),
         new NativeBehaviorTranslationCapability(
+            "player.lose_gold",
+            "Lose Gold",
+            NativeBehaviorTranslationStatus.Supported,
+            "Removes gold from the owner player.",
+            new[] { "amount", "gold_loss_type" }),
+        new NativeBehaviorTranslationCapability(
             "player.gain_stars",
             "Gain Stars",
             NativeBehaviorTranslationStatus.Supported,
             "Adds stars to the owner player.",
             new[] { "amount" }),
+        new NativeBehaviorTranslationCapability(
+            "player.gain_max_potion_count",
+            "Gain Max Potion Count",
+            NativeBehaviorTranslationStatus.Supported,
+            "Increases the owner's potion capacity.",
+            new[] { "amount" }),
+        new NativeBehaviorTranslationCapability(
+            "power.remove",
+            "Remove Power",
+            NativeBehaviorTranslationStatus.Partial,
+            "Removes a power from the selected target.",
+            new[] { "power_id", "target" }),
+        new NativeBehaviorTranslationCapability(
+            "power.modify_amount",
+            "Modify Power Amount",
+            NativeBehaviorTranslationStatus.Partial,
+            "Adjusts the amount of an existing power on the selected target.",
+            new[] { "power_id", "amount", "target", "silent" }),
         new NativeBehaviorTranslationCapability(
             "combat.apply_power",
             "Apply Power",
@@ -167,6 +198,96 @@ public sealed class NativeBehaviorGraphTranslator
             NativeBehaviorTranslationStatus.Partial,
             "Adds a keyword to the selected cards.",
             new[] { "card_state_key", "keyword" }),
+        new NativeBehaviorTranslationCapability(
+            "card.remove_keyword",
+            "Remove Card Keyword",
+            NativeBehaviorTranslationStatus.Partial,
+            "Removes a keyword from the selected cards.",
+            new[] { "card_state_key", "keyword" }),
+        new NativeBehaviorTranslationCapability(
+            "card.set_cost_delta",
+            "Set Cost Delta",
+            NativeBehaviorTranslationStatus.Partial,
+            "Adjusts a card energy cost by a relative amount.",
+            new[] { "amount", "card_state_key" }),
+        new NativeBehaviorTranslationCapability(
+            "card.set_cost_absolute",
+            "Set Cost Absolute",
+            NativeBehaviorTranslationStatus.Partial,
+            "Sets a card energy cost to an absolute amount.",
+            new[] { "amount", "card_state_key" }),
+        new NativeBehaviorTranslationCapability(
+            "card.set_cost_this_combat",
+            "Set Cost This Combat",
+            NativeBehaviorTranslationStatus.Partial,
+            "Sets a card energy cost for the rest of combat.",
+            new[] { "amount", "card_state_key" }),
+        new NativeBehaviorTranslationCapability(
+            "card.add_cost_until_played",
+            "Add Cost Until Played",
+            NativeBehaviorTranslationStatus.Partial,
+            "Adds a relative energy cost modifier until played.",
+            new[] { "amount", "card_state_key" }),
+        new NativeBehaviorTranslationCapability(
+            "enchantment.set_status",
+            "Set Enchantment Status",
+            NativeBehaviorTranslationStatus.Partial,
+            "Changes the current enchantment status.",
+            new[] { "status" }),
+        new NativeBehaviorTranslationCapability(
+            "modifier.damage_additive",
+            "Damage Additive Modifier",
+            NativeBehaviorTranslationStatus.Partial,
+            "Provides an additive damage modifier.",
+            new[] { "amount" }),
+        new NativeBehaviorTranslationCapability(
+            "modifier.damage_multiplicative",
+            "Damage Multiplicative Modifier",
+            NativeBehaviorTranslationStatus.Partial,
+            "Provides a multiplicative damage modifier.",
+            new[] { "amount" }),
+        new NativeBehaviorTranslationCapability(
+            "modifier.block_additive",
+            "Block Additive Modifier",
+            NativeBehaviorTranslationStatus.Partial,
+            "Provides an additive block modifier.",
+            new[] { "amount" }),
+        new NativeBehaviorTranslationCapability(
+            "modifier.block_multiplicative",
+            "Block Multiplicative Modifier",
+            NativeBehaviorTranslationStatus.Partial,
+            "Provides a multiplicative block modifier.",
+            new[] { "amount" }),
+        new NativeBehaviorTranslationCapability(
+            "modifier.play_count",
+            "Play Count Modifier",
+            NativeBehaviorTranslationStatus.Partial,
+            "Provides an additive or absolute play count modification.",
+            new[] { "amount", "mode" }),
+        new NativeBehaviorTranslationCapability(
+            "modifier.hand_draw",
+            "Hand Draw Modifier",
+            NativeBehaviorTranslationStatus.Partial,
+            "Provides an additive or absolute hand draw modification.",
+            new[] { "amount", "mode" }),
+        new NativeBehaviorTranslationCapability(
+            "modifier.x_value",
+            "X Value Modifier",
+            NativeBehaviorTranslationStatus.Partial,
+            "Provides an additive or absolute X-value modification.",
+            new[] { "amount", "mode" }),
+        new NativeBehaviorTranslationCapability(
+            "modifier.max_energy",
+            "Max Energy Modifier",
+            NativeBehaviorTranslationStatus.Partial,
+            "Provides an additive or absolute max-energy modification.",
+            new[] { "amount", "mode" }),
+        new NativeBehaviorTranslationCapability(
+            "player.lose_max_hp",
+            "Lose Max HP",
+            NativeBehaviorTranslationStatus.Supported,
+            "Removes max HP from the selected target.",
+            new[] { "amount", "target" }),
         new NativeBehaviorTranslationCapability(
             "card.upgrade",
             "Upgrade Card",
@@ -324,11 +445,47 @@ public sealed class NativeBehaviorGraphTranslator
             "Sets the current HP of the selected creature.",
             new[] { "amount", "target" }),
         new NativeBehaviorTranslationCapability(
+            "creature.kill",
+            "Kill Creature",
+            NativeBehaviorTranslationStatus.Partial,
+            "Kills the selected creature immediately.",
+            new[] { "target" }),
+        new NativeBehaviorTranslationCapability(
+            "creature.stun",
+            "Stun Creature",
+            NativeBehaviorTranslationStatus.Partial,
+            "Stuns the selected creature.",
+            new[] { "target" }),
+        new NativeBehaviorTranslationCapability(
             "flow.branch",
             "Branch",
             NativeBehaviorTranslationStatus.Supported,
             "Splits execution into true and false branches.",
             new[] { "condition", "condition_key" }),
+        new NativeBehaviorTranslationCapability(
+            "value.set",
+            "Set Value",
+            NativeBehaviorTranslationStatus.Supported,
+            "Stores a literal or referenced value in graph state.",
+            new[] { "key", "value" }),
+        new NativeBehaviorTranslationCapability(
+            "value.add",
+            "Add Value",
+            NativeBehaviorTranslationStatus.Supported,
+            "Adds a numeric delta to a stored value in graph state.",
+            new[] { "key", "delta" }),
+        new NativeBehaviorTranslationCapability(
+            "value.multiply",
+            "Multiply Value",
+            NativeBehaviorTranslationStatus.Supported,
+            "Multiplies a stored numeric value by a factor.",
+            new[] { "key", "factor" }),
+        new NativeBehaviorTranslationCapability(
+            "value.compare",
+            "Compare Values",
+            NativeBehaviorTranslationStatus.Supported,
+            "Compares two values and writes the boolean result into graph state.",
+            new[] { "left", "right", "operator", "result_key" }),
         new NativeBehaviorTranslationCapability(
             "event.reward",
             "Event Reward",
@@ -340,7 +497,37 @@ public sealed class NativeBehaviorGraphTranslator
             "Offer Custom Reward",
             NativeBehaviorTranslationStatus.Partial,
             "Offers a reward screen entry. Auto-import may still require manual reward-kind cleanup.",
-            new[] { "reward_kind", "amount", "reward_count", "card_id", "relic_id", "potion_id" }),
+            new[] { "reward_kind", "amount", "reward_count", "card_count", "reward_room_type", "card_id", "relic_id", "potion_id" }),
+        new NativeBehaviorTranslationCapability(
+            "reward.mark_card_rewards_rerollable",
+            "Mark Card Rewards Rerollable",
+            NativeBehaviorTranslationStatus.Partial,
+            "Marks existing card rewards as rerollable in the current reward list.",
+            Array.Empty<string>()),
+        new NativeBehaviorTranslationCapability(
+            "reward.card_options_upgrade",
+            "Upgrade Card Reward Options",
+            NativeBehaviorTranslationStatus.Partial,
+            "Upgrades matching cards in the current card reward option list.",
+            new[] { "card_type_scope", "require_hook_upgrades_enabled" }),
+        new NativeBehaviorTranslationCapability(
+            "reward.card_options_enchant",
+            "Enchant Card Reward Options",
+            NativeBehaviorTranslationStatus.Partial,
+            "Applies an enchantment to matching cards in the current card reward option list.",
+            new[] { "enchantment_id", "amount", "selection" }),
+        new NativeBehaviorTranslationCapability(
+            "map.replace_generated",
+            "Replace Generated Map",
+            NativeBehaviorTranslationStatus.Partial,
+            "Replaces the generated act map with a known built-in map variant.",
+            new[] { "map_kind" }),
+        new NativeBehaviorTranslationCapability(
+            "map.remove_unknown_room_type",
+            "Remove Unknown Room Type",
+            NativeBehaviorTranslationStatus.Partial,
+            "Removes a room type from the current unknown-map-point room type set.",
+            new[] { "room_type" }),
         new NativeBehaviorTranslationCapability(
             "event.choice",
             "Event Choice",
@@ -473,6 +660,28 @@ public sealed class NativeBehaviorGraphTranslator
 
         return normalizedKind switch
         {
+            "value.set" => BuildNode(nodeId, "value.set", "Set Value", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["key"] = GetParameter(step, "key", string.Empty),
+                ["value"] = GetParameter(step, "value", string.Empty)
+            }),
+            "value.add" => BuildNode(nodeId, "value.add", "Add Value", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["key"] = GetParameter(step, "key", string.Empty),
+                ["delta"] = GetParameter(step, "delta", "0")
+            }),
+            "value.multiply" => BuildNode(nodeId, "value.multiply", "Multiply Value", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["key"] = GetParameter(step, "key", string.Empty),
+                ["factor"] = GetParameter(step, "factor", "1")
+            }),
+            "value.compare" => BuildNode(nodeId, "value.compare", "Compare Values", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["left"] = GetParameter(step, "left", string.Empty),
+                ["right"] = GetParameter(step, "right", string.Empty),
+                ["operator"] = GetParameter(step, "operator", "eq"),
+                ["result_key"] = GetParameter(step, "result_key", "last_compare")
+            }),
             "combat.damage" => BuildNode(nodeId, "combat.damage", "Damage", step, new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["amount"] = GetParameter(step, "amount", "0"),
@@ -498,13 +707,38 @@ public sealed class NativeBehaviorGraphTranslator
             {
                 ["amount"] = GetParameter(step, "amount", "1")
             }),
+            "player.lose_energy" => BuildNode(nodeId, "player.lose_energy", "Lose Energy", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "1")
+            }),
             "player.gain_gold" or "gold" => BuildNode(nodeId, "player.gain_gold", "Gain Gold", step, new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["amount"] = GetParameter(step, "amount", "1")
             }),
+            "player.lose_gold" => BuildNode(nodeId, "player.lose_gold", "Lose Gold", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "1"),
+                ["gold_loss_type"] = GetParameter(step, "gold_loss_type", "Lost")
+            }),
             "player.gain_stars" or "stars" => BuildNode(nodeId, "player.gain_stars", "Gain Stars", step, new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["amount"] = GetParameter(step, "amount", "1")
+            }),
+            "player.gain_max_potion_count" => BuildNode(nodeId, "player.gain_max_potion_count", "Gain Max Potion Count", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "1")
+            }),
+            "power.remove" => BuildNode(nodeId, "power.remove", "Remove Power", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["power_id"] = GetParameter(step, "power_id", string.Empty),
+                ["target"] = GetParameter(step, "target", "current_target")
+            }),
+            "power.modify_amount" => BuildNode(nodeId, "power.modify_amount", "Modify Power Amount", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["power_id"] = GetParameter(step, "power_id", string.Empty),
+                ["amount"] = GetParameter(step, "amount", "0"),
+                ["target"] = GetParameter(step, "target", "current_target"),
+                ["silent"] = GetParameter(step, "silent", bool.FalseString)
             }),
             "combat.apply_power" or "power" => BuildNode(nodeId, "combat.apply_power", "Apply Power", step, new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -570,6 +804,71 @@ public sealed class NativeBehaviorGraphTranslator
             {
                 ["card_state_key"] = GetParameter(step, "card_state_key", "selected_cards"),
                 ["keyword"] = GetParameter(step, "keyword", string.Empty)
+            }),
+            "card.remove_keyword" => BuildNode(nodeId, "card.remove_keyword", "Remove Card Keyword", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_state_key"] = GetParameter(step, "card_state_key", "selected_cards"),
+                ["keyword"] = GetParameter(step, "keyword", string.Empty)
+            }),
+            "card.set_cost_delta" => BuildNode(nodeId, "card.set_cost_delta", "Set Cost Delta", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_state_key"] = GetParameter(step, "card_state_key", "selected_cards"),
+                ["amount"] = GetParameter(step, "amount", "-1")
+            }),
+            "card.set_cost_absolute" => BuildNode(nodeId, "card.set_cost_absolute", "Set Cost Absolute", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_state_key"] = GetParameter(step, "card_state_key", "selected_cards"),
+                ["amount"] = GetParameter(step, "amount", "0")
+            }),
+            "card.set_cost_this_combat" => BuildNode(nodeId, "card.set_cost_this_combat", "Set Cost This Combat", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_state_key"] = GetParameter(step, "card_state_key", "selected_cards"),
+                ["amount"] = GetParameter(step, "amount", "0")
+            }),
+            "card.add_cost_until_played" => BuildNode(nodeId, "card.add_cost_until_played", "Add Cost Until Played", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_state_key"] = GetParameter(step, "card_state_key", "selected_cards"),
+                ["amount"] = GetParameter(step, "amount", "-1")
+            }),
+            "enchantment.set_status" => BuildNode(nodeId, "enchantment.set_status", "Set Enchantment Status", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["status"] = GetParameter(step, "status", "Disabled")
+            }),
+            "modifier.damage_additive" => BuildNode(nodeId, "modifier.damage_additive", "Damage Additive Modifier", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "0")
+            }),
+            "modifier.damage_multiplicative" => BuildNode(nodeId, "modifier.damage_multiplicative", "Damage Multiplier", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "1")
+            }),
+            "modifier.block_additive" => BuildNode(nodeId, "modifier.block_additive", "Block Additive Modifier", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "0")
+            }),
+            "modifier.block_multiplicative" => BuildNode(nodeId, "modifier.block_multiplicative", "Block Multiplier", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "1")
+            }),
+            "modifier.play_count" => BuildNode(nodeId, "modifier.play_count", "Play Count Modifier", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "0"),
+                ["mode"] = GetParameter(step, "mode", "delta")
+            }),
+            "modifier.hand_draw" => BuildNode(nodeId, "modifier.hand_draw", "Hand Draw Modifier", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "0"),
+                ["mode"] = GetParameter(step, "mode", "delta")
+            }),
+            "modifier.x_value" => BuildNode(nodeId, "modifier.x_value", "X Value Modifier", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "0"),
+                ["mode"] = GetParameter(step, "mode", "delta")
+            }),
+            "modifier.max_energy" => BuildNode(nodeId, "modifier.max_energy", "Max Energy Modifier", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "0"),
+                ["mode"] = GetParameter(step, "mode", "delta")
             }),
             "card.upgrade" => BuildNode(nodeId, "card.upgrade", "Upgrade Card", step, new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -673,6 +972,12 @@ public sealed class NativeBehaviorGraphTranslator
             {
                 ["count"] = GetParameter(step, "count", "1")
             }),
+            "combat.lose_block" => BuildNode(nodeId, "combat.lose_block", "Lose Block", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "0"),
+                ["target"] = GetParameter(step, "target", "self"),
+                ["props"] = GetParameter(step, "props", "none")
+            }),
             "player.lose_hp" or "lose_hp" => BuildNode(nodeId, "player.lose_hp", "Lose HP", step, new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["amount"] = GetParameter(step, "amount", "0"),
@@ -684,10 +989,23 @@ public sealed class NativeBehaviorGraphTranslator
                 ["amount"] = GetParameter(step, "amount", "0"),
                 ["target"] = GetParameter(step, "target", "self")
             }),
+            "player.lose_max_hp" => BuildNode(nodeId, "player.lose_max_hp", "Lose Max HP", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = GetParameter(step, "amount", "0"),
+                ["target"] = GetParameter(step, "target", "self")
+            }),
             "creature.set_current_hp" => BuildNode(nodeId, "creature.set_current_hp", "Set Current HP", step, new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["amount"] = GetParameter(step, "amount", "0"),
                 ["target"] = GetParameter(step, "target", "self")
+            }),
+            "creature.kill" => BuildNode(nodeId, "creature.kill", "Kill Creature", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["target"] = GetParameter(step, "target", "current_target")
+            }),
+            "creature.stun" => BuildNode(nodeId, "creature.stun", "Stun Creature", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["target"] = GetParameter(step, "target", "current_target")
             }),
             "event.reward" => TranslateRewardStep(step, nodeId, result),
             "reward.offer_custom" => BuildNode(nodeId, "reward.offer_custom", "Offer Custom Reward", step, new Dictionary<string, string>(StringComparer.Ordinal)
@@ -695,9 +1013,35 @@ public sealed class NativeBehaviorGraphTranslator
                 ["reward_kind"] = GetParameter(step, "reward_kind", "custom"),
                 ["amount"] = GetParameter(step, "amount", "0"),
                 ["reward_count"] = GetParameter(step, "reward_count", "1"),
+                ["card_count"] = GetParameter(step, "card_count", "3"),
+                ["reward_room_type"] = GetParameter(step, "reward_room_type", string.Empty),
                 ["card_id"] = GetParameter(step, "card_id", string.Empty),
                 ["relic_id"] = GetParameter(step, "relic_id", string.Empty),
                 ["potion_id"] = GetParameter(step, "potion_id", string.Empty)
+            }),
+            "reward.mark_card_rewards_rerollable" => BuildNode(nodeId, "reward.mark_card_rewards_rerollable", "Mark Card Rewards Rerollable", step, new Dictionary<string, string>(StringComparer.Ordinal)),
+            "reward.card_options_upgrade" => BuildNode(nodeId, "reward.card_options_upgrade", "Upgrade Card Reward Options", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_type_scope"] = GetParameter(step, "card_type_scope", "any"),
+                ["require_hook_upgrades_enabled"] = GetParameter(step, "require_hook_upgrades_enabled", bool.FalseString)
+            }),
+            "reward.card_options_enchant" => BuildNode(nodeId, "reward.card_options_enchant", "Enchant Card Reward Options", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["enchantment_id"] = GetParameter(step, "enchantment_id", string.Empty),
+                ["amount"] = GetParameter(step, "amount", "1"),
+                ["selection"] = GetParameter(step, "selection", "all")
+            }),
+            "cardpile.shuffle" => BuildNode(nodeId, "cardpile.shuffle", "Shuffle Card Pile", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["source_pile"] = GetParameter(step, "source_pile", PileType.Discard.ToString())
+            }),
+            "map.replace_generated" => BuildNode(nodeId, "map.replace_generated", "Replace Generated Map", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["map_kind"] = GetParameter(step, "map_kind", string.Empty)
+            }),
+            "map.remove_unknown_room_type" => BuildNode(nodeId, "map.remove_unknown_room_type", "Remove Unknown Room Type", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["room_type"] = GetParameter(step, "room_type", RoomType.Monster.ToString())
             }),
             "event.page" or "event.option" or "event.goto_page" or "event.proceed" or "event.start_combat" => BuildNode(nodeId, normalizedKind, GetDisplayName(step, normalizedKind), step, new Dictionary<string, string>(StringComparer.Ordinal)
             {

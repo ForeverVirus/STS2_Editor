@@ -1,0 +1,16 @@
+Stage 09 Custom Content Gameplay Proof Package Generator
+Workspace: F:\sts2_mod\mod_projects\STS2_editor\coverage\release-proof\workspace\enchantments_modifiers\workspace
+Game user root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2
+Editor root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor
+Saved editor project: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage09_custom_content_proof\project.json
+Exported package: F:\sts2_mod\mod_projects\STS2_editor\coverage\release-proof\workspace\enchantments_modifiers\workspace\stage09-custom-content-proof.sts2pack
+Copied package to editor exports: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\exports\stage09-custom-content-proof.sts2pack
+Installed package: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage09_custom_content_proof@1.0.0
+Session file: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\session.json
+Package key: stage09_custom_content_proof@1.0.0
+Checksum: 21a8be16901450f3775a824394266097c4020af84c756117755309978c27bb3e
+Expected autoslay evidence:
+  - Godot log contains '[INFO] [ModStudio.Graph] STAGE09_CARD_OK'
+  - Godot log contains '[INFO] [ModStudio.Graph] STAGE09_POTION_OK'
+  - Godot log contains '[INFO] [ModStudio.Graph] STAGE09_RELIC_OK'
+  - AutoSlay log should mention custom ids ed_stage09__card_001 and ed_stage09__potion_001

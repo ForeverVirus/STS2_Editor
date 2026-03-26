@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Context;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.HoverTips;
@@ -45,6 +46,10 @@ internal static class RuntimeEventTemplateSupport
     private const string RewardTargetKey = "reward_target";
     private const string RewardPropsKey = "reward_props";
     private const string RewardPowerIdKey = "reward_power_id";
+    private const string RewardCardIdKey = "card_id";
+    private const string RewardRelicIdKey = "relic_id";
+    private const string RewardPotionIdKey = "potion_id";
+    private const string RewardCountKey = "reward_count";
 
     public static bool HasTemplate(EventModel eventModel)
     {
@@ -306,13 +311,62 @@ internal static class RuntimeEventTemplateSupport
                     }
                 }
                 return;
+            case "relic":
+                if (!string.IsNullOrWhiteSpace(option.RewardRelicId))
+                {
+                    var canonicalRelic = ModelDb.AllRelics.FirstOrDefault(item =>
+                        string.Equals(item.Id.Entry, option.RewardRelicId, StringComparison.OrdinalIgnoreCase));
+                    if (canonicalRelic != null)
+                    {
+                        var rewardCount = Math.Max(1, ParseInt(option.RewardCount, 1));
+                        for (var i = 0; i < rewardCount; i++)
+                        {
+                            await RelicCmd.Obtain(canonicalRelic.ToMutable(), eventModel.Owner);
+                        }
+                        return;
+                    }
+                }
+                Log.Warn($"[ModStudio.Event] Reward kind 'relic' on event '{eventModel.Id.Entry}' is missing a concrete relic id.");
+                return;
+            case "potion":
+                if (!string.IsNullOrWhiteSpace(option.RewardPotionId))
+                {
+                    var canonicalPotion = ModelDb.AllPotions.FirstOrDefault(item =>
+                        string.Equals(item.Id.Entry, option.RewardPotionId, StringComparison.OrdinalIgnoreCase));
+                    if (canonicalPotion != null)
+                    {
+                        var rewardCount = Math.Max(1, ParseInt(option.RewardCount, 1));
+                        for (var i = 0; i < rewardCount; i++)
+                        {
+                            await PotionCmd.TryToProcure(canonicalPotion.ToMutable(), eventModel.Owner);
+                        }
+                        return;
+                    }
+                }
+                Log.Warn($"[ModStudio.Event] Reward kind 'potion' on event '{eventModel.Id.Entry}' is missing a concrete potion id.");
+                return;
+            case "card":
+            case "special_card":
+                if (!string.IsNullOrWhiteSpace(option.RewardCardId))
+                {
+                    var canonicalCard = ModelDb.AllCards.FirstOrDefault(item =>
+                        string.Equals(item.Id.Entry, option.RewardCardId, StringComparison.OrdinalIgnoreCase));
+                    if (canonicalCard != null)
+                    {
+                        var rewardCount = ParseInt(option.RewardCount, 1);
+                        for (var i = 0; i < Math.Max(1, rewardCount); i++)
+                        {
+                            var created = eventModel.Owner.RunState.CreateCard(canonicalCard, eventModel.Owner);
+                            await CardPileCmd.Add(created, PileType.Deck);
+                        }
+                        return;
+                    }
+                }
+                Log.Warn($"[ModStudio.Event] Reward kind '{rewardKind}' on event '{eventModel.Id.Entry}' is missing a concrete card id.");
+                return;
             case "damage":
             case "draw":
-            case "card":
-            case "relic":
-            case "potion":
             case "remove_card":
-            case "special_card":
                 Log.Warn($"[ModStudio.Event] Reward kind '{rewardKind}' on event '{eventModel.Id.Entry}' is not supported for immediate runtime application.");
                 return;
             default:
@@ -505,12 +559,29 @@ internal static class RuntimeEventTemplateSupport
             case RewardPowerIdKey:
                 option.RewardPowerId = value.Trim();
                 break;
+            case RewardCardIdKey:
+                option.RewardCardId = value.Trim();
+                break;
+            case RewardRelicIdKey:
+                option.RewardRelicId = value.Trim();
+                break;
+            case RewardPotionIdKey:
+                option.RewardPotionId = value.Trim();
+                break;
+            case RewardCountKey:
+                option.RewardCount = value.Trim();
+                break;
         }
     }
 
     private static decimal ParseDecimal(string? value, decimal fallback)
     {
         return decimal.TryParse(value, out var parsed) ? parsed : fallback;
+    }
+
+    private static int ParseInt(string? value, int fallback)
+    {
+        return int.TryParse(value, out var parsed) ? parsed : fallback;
     }
 
     private static ValueProp ParseValueProps(string? rawValue)
@@ -747,5 +818,13 @@ internal static class RuntimeEventTemplateSupport
         public string? RewardProps { get; set; }
 
         public string? RewardPowerId { get; set; }
+
+        public string? RewardCardId { get; set; }
+
+        public string? RewardRelicId { get; set; }
+
+        public string? RewardPotionId { get; set; }
+
+        public string? RewardCount { get; set; }
     }
 }

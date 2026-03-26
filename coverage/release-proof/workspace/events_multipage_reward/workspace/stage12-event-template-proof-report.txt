@@ -1,0 +1,19 @@
+Stage 12 Event Template Proof Package Generator
+Workspace: F:\sts2_mod\mod_projects\STS2_editor\coverage\release-proof\workspace\events_multipage_reward\workspace
+Game user root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2
+Editor root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor
+Saved editor project: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage12_event_template_proof\project.json
+Exported package: F:\sts2_mod\mod_projects\STS2_editor\coverage\release-proof\workspace\events_multipage_reward\workspace\stage12-event-template-proof.sts2pack
+Copied package to editor exports: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\exports\stage12-event-template-proof.sts2pack
+Installed package: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage12_event_template_proof@1.0.0
+Session file: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\session.json
+Package key: stage12_event_template_proof@1.0.0
+Checksum: f1fac3a5d44677ddb57c51220544a3f2fdf1425f7ab72971bad039c3cb6368a6
+Recommended proof launch:
+  - SlayTheSpire2.exe --autoslay --seed stage12-event-proof --modstudio-proof-event=ED_STAGE12_EVENT001
+Expected godot.log evidence:
+  - [ModStudio.Proof] Entering proof event 'ED_STAGE12_EVENT001'
+  - [ModStudio.Event] Initializing template event ED_STAGE12_EVENT001 -> page INITIAL
+  - [ModStudio.Event] Starting template combat ED_STAGE12_EVENT001 encounter=LOUSE_PROGENITOR_NORMAL resume=AFTER_COMBAT
+  - [ModStudio.Event] Resuming template event ED_STAGE12_EVENT001 -> page AFTER_COMBAT
+  - [ModStudio.Event] Proceeding out of template event ED_STAGE12_EVENT001 via option PROCEED

@@ -10,7 +10,7 @@
         "dependencies": {
           "0Harmony": "2.4.2.0",
           "sts2": "0.1.0.0",
-          "STS2_Editor": "0.0.0.0"
+          "STS2_Editor": "1.0.0.0"
         },
         "runtime": {
           "Stage09CustomContentProof.dll": {}
@@ -32,11 +32,11 @@
           }
         }
       },
-      "STS2_Editor/0.0.0.0": {
+      "STS2_Editor/1.0.0.0": {
         "runtime": {
           "STS2_Editor.dll": {
-            "assemblyVersion": "0.0.0.0",
-            "fileVersion": "0.0.0.0"
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
           }
         }
       },
@@ -146,7 +146,7 @@
       "serviceable": false,
       "sha512": ""
     },
-    "STS2_Editor/0.0.0.0": {
+    "STS2_Editor/1.0.0.0": {
       "type": "reference",
       "serviceable": false,
       "sha512": ""

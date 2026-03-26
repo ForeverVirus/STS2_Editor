@@ -170,7 +170,11 @@ public sealed class EventGraphCompiler
             RewardAmount = NormalizeOptional(GetProperty(node, "reward_amount", string.Empty)),
             RewardTarget = NormalizeOptional(GetProperty(node, "reward_target", string.Empty)),
             RewardProps = NormalizeOptional(GetProperty(node, "reward_props", string.Empty)),
-            RewardPowerId = NormalizeOptional(GetProperty(node, "reward_power_id", string.Empty))
+            RewardPowerId = NormalizeOptional(GetProperty(node, "reward_power_id", string.Empty)),
+            RewardCardId = NormalizeOptional(GetProperty(node, "card_id", string.Empty)),
+            RewardRelicId = NormalizeOptional(GetProperty(node, "relic_id", string.Empty)),
+            RewardPotionId = NormalizeOptional(GetProperty(node, "potion_id", string.Empty)),
+            RewardCount = NormalizeOptional(GetProperty(node, "reward_count", string.Empty))
         };
 
         foreach (var actionNode in TraverseActionChain(graph, node.NodeId))
@@ -201,6 +205,14 @@ public sealed class EventGraphCompiler
                 binding.RewardTarget = NormalizeOptional(GetProperty(node, "reward_target", binding.RewardTarget ?? string.Empty)) ?? binding.RewardTarget;
                 binding.RewardProps = NormalizeOptional(GetProperty(node, "reward_props", binding.RewardProps ?? string.Empty)) ?? binding.RewardProps;
                 binding.RewardPowerId = NormalizeOptional(GetProperty(node, "reward_power_id", binding.RewardPowerId ?? string.Empty)) ?? binding.RewardPowerId;
+                break;
+            case "reward.offer_custom":
+                binding.RewardKind = NormalizeOptional(GetProperty(node, "reward_kind", binding.RewardKind ?? string.Empty)) ?? binding.RewardKind;
+                binding.RewardAmount = NormalizeOptional(GetProperty(node, "amount", binding.RewardAmount ?? string.Empty)) ?? binding.RewardAmount;
+                binding.RewardCount = NormalizeOptional(GetProperty(node, "reward_count", binding.RewardCount ?? string.Empty)) ?? binding.RewardCount;
+                binding.RewardCardId = NormalizeOptional(GetProperty(node, "card_id", binding.RewardCardId ?? string.Empty)) ?? binding.RewardCardId;
+                binding.RewardRelicId = NormalizeOptional(GetProperty(node, "relic_id", binding.RewardRelicId ?? string.Empty)) ?? binding.RewardRelicId;
+                binding.RewardPotionId = NormalizeOptional(GetProperty(node, "potion_id", binding.RewardPotionId ?? string.Empty)) ?? binding.RewardPotionId;
                 break;
             case "event.option":
             case "event.page":
@@ -244,7 +256,7 @@ public sealed class EventGraphCompiler
             }
 
             var nodeType = Normalize(node.NodeType);
-            if (nodeType is not ("event.goto_page" or "event.start_combat" or "event.proceed" or "event.reward"))
+            if (nodeType is not ("event.goto_page" or "event.start_combat" or "event.proceed" or "event.reward" or "reward.offer_custom"))
             {
                 continue;
             }
@@ -381,6 +393,26 @@ public sealed class EventGraphCompiler
             if (!string.IsNullOrWhiteSpace(choice.RewardPowerId))
             {
                 metadata[$"{prefix}.reward_power_id"] = choice.RewardPowerId!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(choice.RewardCardId))
+            {
+                metadata[$"{prefix}.card_id"] = choice.RewardCardId!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(choice.RewardRelicId))
+            {
+                metadata[$"{prefix}.relic_id"] = choice.RewardRelicId!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(choice.RewardPotionId))
+            {
+                metadata[$"{prefix}.potion_id"] = choice.RewardPotionId!;
+            }
+
+            if (!string.IsNullOrWhiteSpace(choice.RewardCount))
+            {
+                metadata[$"{prefix}.reward_count"] = choice.RewardCount!;
             }
         }
     }

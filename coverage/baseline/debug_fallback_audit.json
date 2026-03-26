@@ -1,0 +1,385 @@
+[
+  {
+    "EntityKind": "Card",
+    "EntityId": "ASCENDERS_BANE",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/AscendersBane.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_ASCENDERS_BANE",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "CLUMSY",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/Clumsy.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_CLUMSY",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "CURSE_OF_THE_BELL",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/CurseOfTheBell.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_CURSE_OF_THE_BELL",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "DAZED",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/Dazed.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_DAZED",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "DEPRECATED_CARD",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/DeprecatedCard.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_DEPRECATED_CARD",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "FOLLY",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/Folly.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_FOLLY",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "GREED",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/Greed.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_GREED",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "INJURY",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/Injury.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_INJURY",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "POOR_SLEEP",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/PoorSleep.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_POOR_SLEEP",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "SOOT",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/Soot.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_SOOT",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "WOUND",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/Wound.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_WOUND",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Card",
+    "EntityId": "WRITHE",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Cards/Writhe.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_card_WRITHE",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Card fallback threw in the console harness; generated an explicit debug fallback graph."
+    ]
+  },
+  {
+    "EntityKind": "Potion",
+    "EntityId": "DEPRECATED_POTION",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Potions/DeprecatedPotion.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_potion_DEPRECATED_POTION",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": [
+      "Potion did not expose a parseable on-use effect in the current fallback importer."
+    ]
+  },
+  {
+    "EntityKind": "Relic",
+    "EntityId": "CIRCLET",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Relics/Circlet.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_relic_CIRCLET",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": []
+  },
+  {
+    "EntityKind": "Relic",
+    "EntityId": "DEPRECATED_RELIC",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Relics/DeprecatedRelic.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_relic_DEPRECATED_RELIC",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": []
+  },
+  {
+    "EntityKind": "Relic",
+    "EntityId": "FAKE_MERCHANTS_RUG",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Relics/FakeMerchantsRug.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_relic_FAKE_MERCHANTS_RUG",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": []
+  },
+  {
+    "EntityKind": "Relic",
+    "EntityId": "WONGO_CUSTOMER_APPRECIATION_BADGE",
+    "SourcePath": "sts2/MegaCrit.Sts2.Core.Models.Relics/WongoCustomerAppreciationBadge.cs",
+    "HasExistingGraph": true,
+    "AutoGraphStatus": "supported",
+    "GraphId": "auto_relic_WONGO_CUSTOMER_APPRECIATION_BADGE",
+    "GraphNodeTypes": [
+      "debug.log",
+      "flow.entry",
+      "flow.exit"
+    ],
+    "CommandCalls": [],
+    "RecognizedCalls": [],
+    "UnrecognizedCalls": [],
+    "FailureReasons": [],
+    "DescriptionSemantics": [
+      "plain_text"
+    ],
+    "Notes": []
+  }
+]

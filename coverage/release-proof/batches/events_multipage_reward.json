@@ -1,0 +1,11 @@
+{
+  "BatchId": "events_multipage_reward",
+  "EntityKind": "Event",
+  "Title": "Stage 12 event proof",
+  "Scenario": 2,
+  "TimeoutSeconds": 60,
+  "ExpectedMarkers": [
+    "[ModStudio.Proof] Entering proof event \u0027ED_STAGE12_EVENT001\u0027",
+    "[ModStudio.Event] Initializing template event ED_STAGE12_EVENT001 -\u003E page INITIAL"
+  ]
+}

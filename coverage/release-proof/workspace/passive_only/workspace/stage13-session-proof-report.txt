@@ -1,0 +1,23 @@
+Stage 13 Session Proof Package Generator
+Workspace: F:\sts2_mod\mod_projects\STS2_editor\coverage\release-proof\workspace\passive_only\workspace
+Game user root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2
+Editor root: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor
+Saved project: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage13_session_a\project.json
+Installed package: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage13_session_a@1.0.0
+Saved project: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage13_session_b\project.json
+Installed package: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage13_session_b@1.0.0
+Saved project: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\projects\stage13_session_c\project.json
+Installed package: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage13_session_c@1.0.0
+Normalized session file: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\session.json
+Proof request JSON: F:\sts2_mod\mod_projects\STS2_editor\coverage\release-proof\workspace\passive_only\workspace\stage13-session-proof-peers.json
+Focus card: COOLHEADED
+Expected live-game log evidence:
+  - [ModStudio.SessionProof] Package stage13_session_a@1.0.0 enabled=True sessionEnabled=True
+  - [ModStudio.SessionProof] Package stage13_session_c@1.0.0 enabled=True sessionEnabled=False ... missing on peer
+  - [ModStudio.SessionProof] Package stage13_session_b@1.0.0 enabled=True sessionEnabled=True
+  - [ModStudio.SessionProof] Applied package order: ... stage13_session_a@1.0.0 -> stage13_session_b@1.0.0
+  - [ModStudio.SessionProof] Conflict Card:COOLHEADED winner=stage13_session_b@1.0.0
+Recommended proof launch:
+  - SlayTheSpire2.exe --modstudio-proof-peers="F:\sts2_mod\mod_projects\STS2_editor\coverage\release-proof\workspace\passive_only\workspace\stage13-session-proof-peers.json"
+Automation note:
+  - Start the game with the above argument, wait until main menu appears and SessionProof logs are written, then close the game.

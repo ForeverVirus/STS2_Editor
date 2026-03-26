@@ -29,4 +29,12 @@ public sealed class EventGraphChoiceBinding
     public string? RewardProps { get; set; }
 
     public string? RewardPowerId { get; set; }
+
+    public string? RewardCardId { get; set; }
+
+    public string? RewardRelicId { get; set; }
+
+    public string? RewardPotionId { get; set; }
+
+    public string? RewardCount { get; set; }
 }

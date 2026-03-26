@@ -1,3 +1,10 @@
+using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Enchantments;
+using MegaCrit.Sts2.Core.Entities.Potions;
+using MegaCrit.Sts2.Core.Entities.Relics;
+using MegaCrit.Sts2.Core.Events;
+using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Rooms;
 using STS2_Editor.Scripts.Editor.Core.Utilities;
 
 namespace STS2_Editor.Scripts.Editor.UI;
@@ -13,6 +20,14 @@ internal static class ModStudioFieldDisplayNames
 
         return key switch
         {
+            "left" => Dual("左值", "Left"),
+            "right" => Dual("右值", "Right"),
+            "key" => Dual("状态键", "State Key"),
+            "value" => Dual("状态值", "State Value"),
+            "delta" => Dual("增量", "Delta"),
+            "factor" => Dual("倍率", "Factor"),
+            "result_key" => Dual("结果键", "Result Key"),
+            "status" => Dual("状态", "Status"),
             "title" => Dual("名称", "Title"),
             "description" => Dual("描述", "Description"),
             "initial_description" => Dual("初始描述", "Initial Description"),
@@ -106,7 +121,7 @@ internal static class ModStudioFieldDisplayNames
         return value;
     }
 
-    public static string FormatGraphPropertyValue(string? key, string? value)
+    public static string FormatPropertyValue(string? key, string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -120,6 +135,131 @@ internal static class ModStudioFieldDisplayNames
 
         return (key ?? string.Empty).ToLowerInvariant() switch
         {
+            "type" => value switch
+            {
+                nameof(CardType.None) => Dual("无", "None"),
+                nameof(CardType.Attack) => Dual("攻击", "Attack"),
+                nameof(CardType.Skill) => Dual("技能", "Skill"),
+                nameof(CardType.Power) => Dual("能力", "Power"),
+                nameof(CardType.Status) => Dual("状态", "Status"),
+                nameof(CardType.Curse) => Dual("诅咒", "Curse"),
+                nameof(CardType.Quest) => Dual("任务", "Quest"),
+                _ => value
+            },
+            "target_type" => value switch
+            {
+                nameof(TargetType.None) => Dual("无", "None"),
+                nameof(TargetType.Self) => Dual("自身", "Self"),
+                nameof(TargetType.AnyEnemy) => Dual("任意敌人", "Any Enemy"),
+                nameof(TargetType.AllEnemies) => Dual("所有敌人", "All Enemies"),
+                nameof(TargetType.RandomEnemy) => Dual("随机敌人", "Random Enemy"),
+                nameof(TargetType.AnyPlayer) => Dual("任意玩家", "Any Player"),
+                nameof(TargetType.AnyAlly) => Dual("任意友方", "Any Ally"),
+                nameof(TargetType.AllAllies) => Dual("所有友方", "All Allies"),
+                nameof(TargetType.TargetedNoCreature) => Dual("非生物目标", "Targeted Non-Creature"),
+                nameof(TargetType.Osty) => "Osty",
+                _ => value
+            },
+            "rarity" => value switch
+            {
+                nameof(CardRarity.None) => Dual("无", "None"),
+                nameof(CardRarity.Basic) => Dual("基础", "Basic"),
+                nameof(CardRarity.Common) => Dual("普通", "Common"),
+                nameof(CardRarity.Uncommon) => Dual("非凡", "Uncommon"),
+                nameof(CardRarity.Rare) => Dual("稀有", "Rare"),
+                nameof(CardRarity.Ancient) => Dual("远古", "Ancient"),
+                nameof(CardRarity.Event) => Dual("事件", "Event"),
+                nameof(CardRarity.Token) => Dual("衍生", "Token"),
+                nameof(CardRarity.Status) => Dual("状态", "Status"),
+                nameof(CardRarity.Curse) => Dual("诅咒", "Curse"),
+                nameof(CardRarity.Quest) => Dual("任务", "Quest"),
+                nameof(RelicRarity.Starter) => Dual("起始", "Starter"),
+                nameof(RelicRarity.Shop) => Dual("商店", "Shop"),
+                _ => value
+            },
+            "usage" => value switch
+            {
+                nameof(PotionUsage.None) => Dual("无", "None"),
+                nameof(PotionUsage.CombatOnly) => Dual("仅战斗", "Combat Only"),
+                nameof(PotionUsage.AnyTime) => Dual("任意时机", "Any Time"),
+                nameof(PotionUsage.Automatic) => Dual("自动触发", "Automatic"),
+                _ => value
+            },
+            "layout_type" => value switch
+            {
+                nameof(EventLayoutType.Default) => Dual("默认", "Default"),
+                nameof(EventLayoutType.Combat) => Dual("战斗", "Combat"),
+                nameof(EventLayoutType.Ancient) => Dual("远古", "Ancient"),
+                nameof(EventLayoutType.Custom) => Dual("自定义", "Custom"),
+                _ => value
+            },
+            "pool_id" => FormatPoolValue(value),
+            "behavior_source" => value switch
+            {
+                "Native" => Dual("原版", "Native"),
+                "Graph" => "Graph",
+                _ => value
+            },
+            "room_type" or "reward_room_type" => value switch
+            {
+                nameof(RoomType.Unassigned) => Dual("未分配", "Unassigned"),
+                nameof(RoomType.Monster) => Dual("怪物", "Monster"),
+                nameof(RoomType.Elite) => Dual("精英", "Elite"),
+                nameof(RoomType.Boss) => Dual("Boss", "Boss"),
+                nameof(RoomType.Treasure) => Dual("宝箱", "Treasure"),
+                nameof(RoomType.Shop) => Dual("商店", "Shop"),
+                nameof(RoomType.Event) => Dual("事件", "Event"),
+                nameof(RoomType.RestSite) => Dual("休息点", "Rest Site"),
+                nameof(RoomType.Map) => Dual("地图", "Map"),
+                _ => value
+            },
+            "map_kind" => value switch
+            {
+                "golden_path" => Dual("黄金路线", "Golden Path"),
+                _ => value
+            },
+            "selection_mode" => value switch
+            {
+                "simple_grid" => Dual("网格选择", "Simple Grid"),
+                "simple_grid_rewards" => Dual("奖励网格选择", "Rewards Grid"),
+                "hand" => Dual("手牌选择", "Hand"),
+                "hand_for_discard" => Dual("手牌弃牌选择", "Hand For Discard"),
+                "hand_for_upgrade" => Dual("手牌升级选择", "Hand For Upgrade"),
+                "choose_a_card_screen" => Dual("三选一卡", "Choose A Card"),
+                "choose_bundle" => Dual("卡包选择", "Choose Bundle"),
+                "deck_for_upgrade" => Dual("牌库升级选择", "Deck For Upgrade"),
+                "deck_for_enchantment" => Dual("牌库附魔选择", "Deck For Enchantment"),
+                "deck_for_transformation" => Dual("牌库变形选择", "Deck For Transformation"),
+                "deck_for_removal" => Dual("牌库移除选择", "Deck For Removal"),
+                _ => value
+            },
+            "prompt_kind" => value switch
+            {
+                "generic" => Dual("通用", "Generic"),
+                "discard" => Dual("弃牌", "Discard"),
+                "exhaust" => Dual("消耗", "Exhaust"),
+                "transform" => Dual("变形", "Transform"),
+                "upgrade" => Dual("升级", "Upgrade"),
+                "remove" => Dual("移除", "Remove"),
+                "enchant" => Dual("附魔", "Enchant"),
+                _ => value
+            },
+            _ => FormatGraphPropertyValue(key, value)
+        };
+    }
+
+    public static string FormatGraphPropertyValue(string? key, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return (key ?? string.Empty).ToLowerInvariant() switch
+        {
+            "left" or "right" or "condition" or "value" => FormatGraphExpression(value),
+            "key" or "result_key" or "condition_key" => FormatStateKey(value),
+            "status" => FormatEnchantmentStatus(value),
             "target" => value switch
             {
                 "self" => Dual("自身", "Self"),
@@ -208,6 +348,7 @@ internal static class ModStudioFieldDisplayNames
                 "missing_hp" => Dual("已损生命", "Missing HP"),
                 _ => value
             },
+            "target_type" or "type" or "rarity" or "usage" or "layout_type" or "pool_id" or "behavior_source" or "room_type" or "reward_room_type" or "map_kind" or "selection_mode" or "prompt_kind" => FormatPropertyValue(key, value),
             "card_type_scope" => value switch
             {
                 "any" => Dual("任意类型", "Any Type"),
@@ -247,6 +388,116 @@ internal static class ModStudioFieldDisplayNames
             },
             _ => FormatValue(value)
         };
+    }
+
+    internal static string FormatGraphExpression(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("$", StringComparison.Ordinal))
+        {
+            return FormatReference(trimmed[1..]);
+        }
+
+        if (bool.TryParse(trimmed, out var booleanValue))
+        {
+            return FormatValue(booleanValue.ToString());
+        }
+
+        return trimmed;
+    }
+
+    internal static string FormatStateKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("$state.", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed["$state.".Length..];
+        }
+        else if (trimmed.StartsWith("state.", StringComparison.OrdinalIgnoreCase))
+        {
+            trimmed = trimmed["state.".Length..];
+        }
+
+        return trimmed switch
+        {
+            "hook_result" => $"{Dual("状态", "State")}.hook_result [{Dual("Hook 返回值", "Hook Return")}]",
+            "Status" => $"{Dual("状态", "State")}.Status [{Dual("原版状态字段", "Native Status Field")}]",
+            _ => $"{Dual("状态", "State")}.{trimmed}"
+        };
+    }
+
+    private static string FormatReference(string reference)
+    {
+        if (reference.StartsWith("state.", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{Dual("状态", "State")}.{reference["state.".Length..]}";
+        }
+
+        return reference.ToLowerInvariant() switch
+        {
+            "trigger" => Dual("触发器", "Trigger"),
+            "source_model" => Dual("源模型", "Source Model"),
+            "card" => Dual("卡牌", "Card"),
+            "card_play" => Dual("出牌动作", "Card Play"),
+            "potion" => Dual("药水", "Potion"),
+            "relic" => Dual("遗物", "Relic"),
+            "event" => Dual("事件", "Event"),
+            "enchantment" => Dual("附魔", "Enchantment"),
+            "owner" or "owner_player" => Dual("拥有者", "Owner"),
+            "owner_creature" or "source_creature" or "self" => Dual("拥有者生物", "Owner Creature"),
+            "target" or "current_target" => Dual("当前目标", "Current Target"),
+            "combat_state" => Dual("战斗状态", "Combat State"),
+            "run_state" => Dual("运行状态", "Run State"),
+            "choice_context" => Dual("选择上下文", "Choice Context"),
+            _ => reference
+        };
+    }
+
+    private static string FormatEnchantmentStatus(string value)
+    {
+        return value switch
+        {
+            nameof(EnchantmentStatus.Disabled) => Dual("未启用", "Disabled"),
+            nameof(EnchantmentStatus.Normal) => Dual("正常", "Normal"),
+            "Enabled" => Dual("已启用", "Enabled"),
+            _ => value
+        };
+    }
+
+    private static string FormatPoolValue(string value)
+    {
+        var cardPool = ModelDb.AllCardPools.FirstOrDefault(pool => string.Equals(pool.Id.Entry, value, StringComparison.OrdinalIgnoreCase));
+        if (cardPool != null)
+        {
+            var title = cardPool.Title;
+            return string.IsNullOrWhiteSpace(title) || string.Equals(title, value, StringComparison.OrdinalIgnoreCase)
+                ? value
+                : $"{title} [{value}]";
+        }
+
+        var relicPool = ModelDb.AllRelicPools.FirstOrDefault(pool => string.Equals(pool.Id.Entry, value, StringComparison.OrdinalIgnoreCase));
+        if (relicPool != null)
+        {
+            return $"{value} [{Dual("遗物池", "Relic Pool")}]";
+        }
+
+        var potionPool = ModelDb.AllPotionPools.FirstOrDefault(pool => string.Equals(pool.Id.Entry, value, StringComparison.OrdinalIgnoreCase));
+        if (potionPool != null)
+        {
+            return $"{value} [{Dual("药水池", "Potion Pool")}]";
+        }
+
+        return value;
     }
 
     private static string Dual(string zh, string en)

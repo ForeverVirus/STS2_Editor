@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /f/sts2_mod/mod_projects/STS2_editor/Scripts/Editor -type f -name \"*.cs\" -exec wc -l {} +)",
+      "Bash(xargs wc:*)"
+    ]
+  }
+}

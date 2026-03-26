@@ -1,0 +1,11 @@
+{
+  "BatchId": "potions_combat",
+  "EntityKind": "Potion",
+  "Title": "Stage 06 gameplay proof",
+  "Scenario": 0,
+  "TimeoutSeconds": 45,
+  "ExpectedMarkers": [
+    "[ModStudio.Graph] STAGE06_POTION_OK",
+    "[AutoSlay] Using potion: BLOCK_POTION"
+  ]
+}

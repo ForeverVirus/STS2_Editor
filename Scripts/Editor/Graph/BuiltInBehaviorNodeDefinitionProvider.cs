@@ -1,6 +1,7 @@
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Gold;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Rooms;
 
 namespace STS2_Editor.Scripts.Editor.Graph;
 
@@ -14,6 +15,7 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
         yield return Branch();
         yield return SetValue();
         yield return AddValue();
+        yield return MultiplyValue();
         yield return Compare();
         yield return RandomChoice();
         yield return LogMessage();
@@ -37,6 +39,7 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
         yield return TransformCard();
         yield return DiscardAndDraw();
         yield return ApplyCardKeyword();
+        yield return RemoveCardKeyword();
         yield return UpgradeCard();
         yield return DowngradeCard();
         yield return EnchantCard();
@@ -70,6 +73,19 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
         yield return RemovePower();
         yield return ModifyPowerAmount();
         yield return ShuffleCardPile();
+        yield return ModifierDamageAdditive();
+        yield return ModifierDamageMultiplicative();
+        yield return ModifierBlockAdditive();
+        yield return ModifierBlockMultiplicative();
+        yield return ModifierPlayCount();
+        yield return ModifierHandDraw();
+        yield return ModifierXValue();
+        yield return ModifierMaxEnergy();
+        yield return EnchantmentSetStatus();
+        yield return CardSetCostDelta();
+        yield return CardSetCostAbsolute();
+        yield return CardSetCostThisCombat();
+        yield return CardAddCostUntilPlayed();
         yield return EventPage();
         yield return EventOption();
         yield return EventGotoPage();
@@ -77,6 +93,11 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
         yield return EventStartCombat();
         yield return EventReward();
         yield return OfferCustomReward();
+        yield return MarkCardRewardsRerollable();
+        yield return CardRewardOptionsUpgrade();
+        yield return CardRewardOptionsEnchant();
+        yield return ReplaceGeneratedMap();
+        yield return RemoveUnknownRoomType();
     }
 
     private static BehaviorGraphNodeDefinitionDescriptor FlowEntry()
@@ -271,6 +292,50 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
                 {
                     PortId = "delta",
                     DisplayName = "Delta",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "number"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MultiplyValue()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "value.multiply",
+            DisplayName = "Multiply Value",
+            Description = "Multiplies a stored numeric value by a factor.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                },
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "key",
+                    DisplayName = "Key",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "string"
+                },
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "factor",
+                    DisplayName = "Factor",
                     Direction = BehaviorGraphPortDirection.Input,
                     ValueType = "number"
                 }
@@ -1087,6 +1152,41 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
             NodeType = "card.apply_keyword",
             DisplayName = "Apply Card Keyword",
             Description = "Adds a keyword to the selected cards.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_state_key"] = "selected_cards",
+                ["keyword"] = string.Empty
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor RemoveCardKeyword()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "card.remove_keyword",
+            DisplayName = "Remove Card Keyword",
+            Description = "Removes a keyword from the selected cards.",
             Inputs = new[]
             {
                 new BehaviorGraphPortDefinition
@@ -2243,6 +2343,379 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
         };
     }
 
+    private static BehaviorGraphNodeDefinitionDescriptor ModifierDamageAdditive()
+    {
+        return CreateModifierNode("modifier.damage_additive", "Damage Additive", "Provides an additive damage modifier.", "amount", "0");
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ModifierDamageMultiplicative()
+    {
+        return CreateModifierNode("modifier.damage_multiplicative", "Damage Multiplier", "Provides a multiplicative damage modifier.", "amount", "1");
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ModifierBlockAdditive()
+    {
+        return CreateModifierNode("modifier.block_additive", "Block Additive", "Provides an additive block modifier.", "amount", "0");
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ModifierBlockMultiplicative()
+    {
+        return CreateModifierNode("modifier.block_multiplicative", "Block Multiplier", "Provides a multiplicative block modifier.", "amount", "1");
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ModifierPlayCount()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "modifier.play_count",
+            DisplayName = "Play Count Modifier",
+            Description = "Provides an additional or absolute card play count.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["mode"] = "delta"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ModifierHandDraw()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "modifier.hand_draw",
+            DisplayName = "Hand Draw Modifier",
+            Description = "Provides an additive or absolute hand draw modification.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["mode"] = "delta"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ModifierXValue()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "modifier.x_value",
+            DisplayName = "X Value Modifier",
+            Description = "Provides an additive or absolute X-value modification.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["mode"] = "delta"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ModifierMaxEnergy()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "modifier.max_energy",
+            DisplayName = "Max Energy Modifier",
+            Description = "Provides an additive or absolute max-energy modification.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["mode"] = "delta"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor EnchantmentSetStatus()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "enchantment.set_status",
+            DisplayName = "Set Enchantment Status",
+            Description = "Sets the active status of the current enchantment.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["status"] = "Disabled"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor CardSetCostDelta()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "card.set_cost_delta",
+            DisplayName = "Set Cost Delta",
+            Description = "Adjusts the selected card energy cost by a relative amount.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "-1",
+                ["card_state_key"] = "selected_cards"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor CardSetCostAbsolute()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "card.set_cost_absolute",
+            DisplayName = "Set Cost Absolute",
+            Description = "Sets the selected card energy cost to an absolute value.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["card_state_key"] = "selected_cards"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor CardSetCostThisCombat()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "card.set_cost_this_combat",
+            DisplayName = "Set Cost This Combat",
+            Description = "Sets the selected card energy cost for the rest of the combat.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["card_state_key"] = "selected_cards"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor CardAddCostUntilPlayed()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "card.add_cost_until_played",
+            DisplayName = "Add Cost Until Played",
+            Description = "Adds a relative energy cost modifier until the selected card is played.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "-1",
+                ["card_state_key"] = "selected_cards"
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor CreateModifierNode(
+        string nodeType,
+        string displayName,
+        string description,
+        string propertyKey,
+        string defaultValue)
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = nodeType,
+            DisplayName = displayName,
+            Description = description,
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [propertyKey] = defaultValue
+            }
+        };
+    }
+
     private static BehaviorGraphNodeDefinitionDescriptor EventPage()
     {
         return new BehaviorGraphNodeDefinitionDescriptor
@@ -2497,9 +2970,180 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
                 ["reward_kind"] = "custom",
                 ["amount"] = "0",
                 ["reward_count"] = "1",
+                ["card_count"] = "3",
+                ["reward_room_type"] = string.Empty,
                 ["card_id"] = string.Empty,
                 ["relic_id"] = string.Empty,
                 ["potion_id"] = string.Empty
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MarkCardRewardsRerollable()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "reward.mark_card_rewards_rerollable",
+            DisplayName = "Mark Card Rewards Rerollable",
+            Description = "Marks all card rewards in the current reward list as rerollable.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor ReplaceGeneratedMap()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "map.replace_generated",
+            DisplayName = "Replace Generated Map",
+            Description = "Replaces the current generated map with a built-in variant.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["map_kind"] = string.Empty
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor RemoveUnknownRoomType()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "map.remove_unknown_room_type",
+            DisplayName = "Remove Unknown Room Type",
+            Description = "Removes a room type from the current unknown-map-point room type set.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["room_type"] = RoomType.Monster.ToString()
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor CardRewardOptionsUpgrade()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "reward.card_options_upgrade",
+            DisplayName = "Upgrade Card Reward Options",
+            Description = "Upgrades matching cards in the current card reward option list.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_type_scope"] = "any",
+                ["require_hook_upgrades_enabled"] = bool.FalseString
+            }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor CardRewardOptionsEnchant()
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = "reward.card_options_enchant",
+            DisplayName = "Enchant Card Reward Options",
+            Description = "Applies an enchantment to matching cards in the current card reward option list.",
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["enchantment_id"] = string.Empty,
+                ["amount"] = "1",
+                ["selection"] = "all"
             }
         };
     }

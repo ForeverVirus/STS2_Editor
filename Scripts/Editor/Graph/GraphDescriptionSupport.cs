@@ -225,8 +225,32 @@ internal static class GraphDescriptionSupport
     {
         try
         {
-            return ModelDb.AllPowers.FirstOrDefault(power =>
+            var resolved = ModelDb.AllPowers.FirstOrDefault(power =>
                 string.Equals(power.Id.Entry, powerId, StringComparison.OrdinalIgnoreCase));
+            if (resolved != null)
+            {
+                return resolved;
+            }
+        }
+        catch
+        {
+        }
+
+        var powerType = typeof(PowerModel).Assembly.GetTypes()
+            .FirstOrDefault(type =>
+                typeof(PowerModel).IsAssignableFrom(type) &&
+                !type.IsAbstract &&
+                TryBuildModelIdFromType(type, out var candidateId) &&
+                string.Equals(candidateId, powerId, StringComparison.OrdinalIgnoreCase));
+        if (powerType == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var modelId = ModelDb.GetId(powerType);
+            return ModelDb.GetByIdOrNull<PowerModel>(modelId);
         }
         catch
         {
@@ -283,31 +307,39 @@ internal static class GraphDescriptionSupport
             return string.Empty;
         }
 
-        try
+        return NativeLocalizationTableFallback.TryGetText(locString);
+    }
+
+    private static bool TryBuildModelIdFromType(Type targetType, out string id)
+    {
+        id = string.Empty;
+        if (!typeof(AbstractModel).IsAssignableFrom(targetType))
         {
-            var formatted = locString.GetFormattedText();
-            if (!string.IsNullOrWhiteSpace(formatted))
-            {
-                return formatted.Trim();
-            }
-        }
-        catch
-        {
+            return false;
         }
 
-        try
+        var typeName = targetType.Name;
+        if (string.IsNullOrWhiteSpace(typeName))
         {
-            var raw = locString.GetRawText();
-            if (!string.IsNullOrWhiteSpace(raw))
-            {
-                return raw.Trim();
-            }
-        }
-        catch
-        {
+            return false;
         }
 
-        return string.Empty;
+        var builder = new System.Text.StringBuilder(typeName.Length + 8);
+        for (var index = 0; index < typeName.Length; index++)
+        {
+            var current = typeName[index];
+            if (index > 0 && char.IsUpper(current) &&
+                (char.IsLower(typeName[index - 1]) ||
+                 (index + 1 < typeName.Length && char.IsLower(typeName[index + 1]))))
+            {
+                builder.Append('_');
+            }
+
+            builder.Append(char.ToUpperInvariant(current));
+        }
+
+        id = builder.ToString();
+        return !string.IsNullOrWhiteSpace(id);
     }
 
     private static string ReplaceAmountTemplate(string rawTemplate, DynamicValueDefinition amountDefinition)

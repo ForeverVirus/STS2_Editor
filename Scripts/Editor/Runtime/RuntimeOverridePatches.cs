@@ -66,11 +66,46 @@ internal static class RuntimeOverridePatches
     {
         try
         {
+            var hasCharacterOverride = false;
+            try
+            {
+                hasCharacterOverride = ModStudioBootstrap.RuntimeRegistry.TryGetOverride(ModStudioEntityKind.Character, character.Id.Entry, out _);
+            }
+            catch
+            {
+            }
+
+            Log.Info($"[ModStudio.Override] Player.CreateForNewRun {character.Id.Entry} overridePresent={hasCharacterOverride}");
             ApplyCharacterOverrides(character, __result);
         }
         catch (Exception ex)
         {
             Log.Warn($"Failed to apply character overrides for '{character.Id.Entry}': {ex.Message}");
+        }
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(Player), "PopulateStartingInventory")]
+    private static void Player_PopulateStartingInventory_Postfix(Player __instance)
+    {
+        try
+        {
+            var character = __instance.Character;
+            var hasCharacterOverride = false;
+            try
+            {
+                hasCharacterOverride = ModStudioBootstrap.RuntimeRegistry.TryGetOverride(ModStudioEntityKind.Character, character.Id.Entry, out _);
+            }
+            catch
+            {
+            }
+
+            Log.Info($"[ModStudio.Override] Player.PopulateStartingInventory {character.Id.Entry} overridePresent={hasCharacterOverride}");
+            ApplyCharacterOverrides(character, __instance);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"Failed to apply PopulateStartingInventory overrides for '{__instance.Character.Id.Entry}': {ex.Message}");
         }
     }
 
@@ -432,6 +467,14 @@ internal static class RuntimeOverridePatches
     private static void ApplyCharacterOverrides(CharacterModel character, Player player)
     {
         var characterId = character.Id.Entry;
+        var hasDeckOverride = RuntimeOverrideMetadata.HasMetadata(ModStudioEntityKind.Character, characterId, "starting_deck_ids");
+        var hasRelicOverride = RuntimeOverrideMetadata.HasMetadata(ModStudioEntityKind.Character, characterId, "starting_relic_ids");
+        var hasPotionOverride = RuntimeOverrideMetadata.HasMetadata(ModStudioEntityKind.Character, characterId, "starting_potion_ids");
+        if (hasDeckOverride || hasRelicOverride || hasPotionOverride)
+        {
+            Log.Info($"[ModStudio.Override] Applying character overrides for {characterId}: deck={hasDeckOverride} relics={hasRelicOverride} potions={hasPotionOverride}");
+        }
+
         if (RuntimeOverrideMetadata.TryGetInt(ModStudioEntityKind.Character, characterId, "starting_hp", out var startingHp) && startingHp > 0)
         {
             player.Creature.SetMaxHpInternal(startingHp);
@@ -453,7 +496,7 @@ internal static class RuntimeOverridePatches
             player.BaseOrbSlotCount = baseOrbSlotCount;
         }
 
-        if (RuntimeOverrideMetadata.HasMetadata(ModStudioEntityKind.Character, characterId, "starting_deck_ids"))
+        if (hasDeckOverride)
         {
             player.Deck.Clear(silent: true);
             foreach (var cardId in RuntimeOverrideMetadata.GetIdList(ModStudioEntityKind.Character, characterId, "starting_deck_ids"))
@@ -470,7 +513,7 @@ internal static class RuntimeOverridePatches
             }
         }
 
-        if (RuntimeOverrideMetadata.HasMetadata(ModStudioEntityKind.Character, characterId, "starting_relic_ids"))
+        if (hasRelicOverride)
         {
             foreach (var relic in player.Relics.ToList())
             {
@@ -492,7 +535,7 @@ internal static class RuntimeOverridePatches
             }
         }
 
-        if (RuntimeOverrideMetadata.HasMetadata(ModStudioEntityKind.Character, characterId, "starting_potion_ids"))
+        if (hasPotionOverride)
         {
             foreach (var potion in player.PotionSlots.ToList())
             {
@@ -519,6 +562,21 @@ internal static class RuntimeOverridePatches
 
                 player.AddPotionInternal(potion, -1, silent: true);
             }
+        }
+
+        if (hasDeckOverride)
+        {
+            Log.Info($"[ModStudio.Override] StartingDeck {characterId}: {string.Join(", ", player.Deck.Cards.Select(card => card.Id.Entry))}");
+        }
+
+        if (hasRelicOverride)
+        {
+            Log.Info($"[ModStudio.Override] StartingRelics {characterId}: {string.Join(", ", player.Relics.Select(relic => relic.Id.Entry))}");
+        }
+
+        if (hasPotionOverride)
+        {
+            Log.Info($"[ModStudio.Override] StartingPotions {characterId}: {string.Join(", ", player.PotionSlots.Where(potion => potion != null).Select(potion => potion!.Id.Entry))}");
         }
     }
 

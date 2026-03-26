@@ -7,11 +7,15 @@ using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.Models;
 using STS2_Editor.Scripts.Editor.Core.Models;
 using STS2_Editor.Scripts.Editor.Core.Utilities;
+using STS2_Editor.Scripts.Editor.UI;
 
 namespace STS2_Editor.Scripts.Editor.Core.Services;
 
 public sealed partial class ModelMetadataService
 {
+    private static readonly Dictionary<string, IReadOnlyDictionary<string, string>> RuntimeMetadataCache = new(StringComparer.OrdinalIgnoreCase);
+    private static bool? _cachedLanguageIsChinese;
+
     private static readonly IReadOnlyDictionary<ModStudioEntityKind, ModStudioAssetBinding> AssetBindings =
         new Dictionary<ModStudioEntityKind, ModStudioAssetBinding>
         {
@@ -46,7 +50,14 @@ public sealed partial class ModelMetadataService
             return new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
-        return kind switch
+        EnsureRuntimeMetadataCacheLanguage();
+        var cacheKey = $"{kind}:{entityId}";
+        if (RuntimeMetadataCache.TryGetValue(cacheKey, out var cached))
+        {
+            return new Dictionary<string, string>(cached, StringComparer.Ordinal);
+        }
+
+        var result = kind switch
         {
             ModStudioEntityKind.Character => BuildCharacterMetadata(ModelDb.AllCharacters.FirstOrDefault(character => character.Id.Entry == entityId)),
             ModStudioEntityKind.Card => BuildCardMetadata(ModelDb.AllCards.FirstOrDefault(card => card.Id.Entry == entityId)),
@@ -56,6 +67,9 @@ public sealed partial class ModelMetadataService
             ModStudioEntityKind.Enchantment => BuildEnchantmentMetadata(ModelDb.DebugEnchantments.FirstOrDefault(enchantment => enchantment.Id.Entry == entityId)),
             _ => new Dictionary<string, string>(StringComparer.Ordinal)
         };
+
+        RuntimeMetadataCache[cacheKey] = new Dictionary<string, string>(result, StringComparer.Ordinal);
+        return result;
     }
 
     public bool HasRuntimeEntity(ModStudioEntityKind kind, string entityId)
@@ -159,15 +173,15 @@ public sealed partial class ModelMetadataService
         Kind = ModStudioEntityKind.Card,
         EntityId = card.Id.Entry,
         Title = card.Title,
-        Summary = $"{card.Type} | {card.Rarity} | Pool {card.Pool.Id.Entry}",
+        Summary = $"{ModStudioFieldDisplayNames.FormatPropertyValue("type", card.Type.ToString())} | {ModStudioFieldDisplayNames.FormatPropertyValue("rarity", card.Rarity.ToString())} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", card.Pool.Id.Entry)}",
         DetailText = string.Join(Environment.NewLine,
             SourceOfTruth("CardModel"),
             Detail("detail.id", card.Id),
             Detail("detail.title", card.Title),
-            Detail("detail.type", card.Type),
-            Detail("detail.rarity", card.Rarity),
-            Detail("detail.pool", card.Pool.Id.Entry),
-            Detail("detail.target_type", card.TargetType),
+            Detail("detail.type", ModStudioFieldDisplayNames.FormatPropertyValue("type", card.Type.ToString())),
+            Detail("detail.rarity", ModStudioFieldDisplayNames.FormatPropertyValue("rarity", card.Rarity.ToString())),
+            Detail("detail.pool", ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", card.Pool.Id.Entry)),
+            Detail("detail.target_type", ModStudioFieldDisplayNames.FormatPropertyValue("target_type", card.TargetType.ToString())),
             Detail("detail.energy_cost", SafeCardEnergyCostText(card)),
             Detail("detail.portrait_path", SafeAssetPath(() => card.PortraitPath)),
             Detail("detail.description_text", SafeLocText(card.Description)))
@@ -196,13 +210,13 @@ public sealed partial class ModelMetadataService
         Kind = ModStudioEntityKind.Relic,
         EntityId = relic.Id.Entry,
         Title = SafeLocText(relic.Title),
-        Summary = $"{relic.Rarity} | Pool {relic.Pool.Id.Entry}",
+        Summary = $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", relic.Rarity.ToString())} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", relic.Pool.Id.Entry)}",
         DetailText = string.Join(Environment.NewLine,
             SourceOfTruth("RelicModel"),
             Detail("detail.id", relic.Id),
             Detail("detail.title", SafeLocText(relic.Title)),
-            Detail("detail.rarity", relic.Rarity),
-            Detail("detail.pool", relic.Pool.Id.Entry),
+            Detail("detail.rarity", ModStudioFieldDisplayNames.FormatPropertyValue("rarity", relic.Rarity.ToString())),
+            Detail("detail.pool", ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", relic.Pool.Id.Entry)),
             Detail("detail.icon_path", SafeAssetPath(() => relic.IconPath)),
             Detail("detail.description_text", SafeLocText(relic.Description)))
     };
@@ -223,15 +237,15 @@ public sealed partial class ModelMetadataService
         Kind = ModStudioEntityKind.Potion,
         EntityId = potion.Id.Entry,
         Title = SafeLocText(potion.Title),
-        Summary = $"{potion.Rarity} | {potion.Usage} | {potion.TargetType}",
+        Summary = $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", potion.Rarity.ToString())} | {ModStudioFieldDisplayNames.FormatPropertyValue("usage", potion.Usage.ToString())} | {ModStudioFieldDisplayNames.FormatPropertyValue("target_type", potion.TargetType.ToString())}",
         DetailText = string.Join(Environment.NewLine,
             SourceOfTruth("PotionModel"),
             Detail("detail.id", potion.Id),
             Detail("detail.title", SafeLocText(potion.Title)),
-            Detail("detail.rarity", potion.Rarity),
-            Detail("detail.usage", potion.Usage),
-            Detail("detail.target_type", potion.TargetType),
-            Detail("detail.pool", potion.Pool.Id.Entry),
+            Detail("detail.rarity", ModStudioFieldDisplayNames.FormatPropertyValue("rarity", potion.Rarity.ToString())),
+            Detail("detail.usage", ModStudioFieldDisplayNames.FormatPropertyValue("usage", potion.Usage.ToString())),
+            Detail("detail.target_type", ModStudioFieldDisplayNames.FormatPropertyValue("target_type", potion.TargetType.ToString())),
+            Detail("detail.pool", ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", potion.Pool.Id.Entry)),
             Detail("detail.image_path", SafeAssetPath(() => potion.ImagePath)),
             Detail("detail.description_text", SafeLocText(potion.Description)))
     };
@@ -255,12 +269,12 @@ public sealed partial class ModelMetadataService
         Kind = ModStudioEntityKind.Event,
         EntityId = evt.Id.Entry,
         Title = SafeLocText(evt.Title),
-        Summary = $"{evt.LayoutType} | Shared {evt.IsShared}",
+        Summary = $"{ModStudioFieldDisplayNames.FormatPropertyValue("layout_type", evt.LayoutType.ToString())} | {Dual("共享", "Shared")} {ModStudioFieldDisplayNames.FormatPropertyValue("is_shared", evt.IsShared.ToString())}",
         DetailText = string.Join(Environment.NewLine,
             SourceOfTruth("EventModel"),
             Detail("detail.id", evt.Id),
             Detail("detail.title", SafeLocText(evt.Title)),
-            Detail("detail.layout", evt.LayoutType),
+            Detail("detail.layout", ModStudioFieldDisplayNames.FormatPropertyValue("layout_type", evt.LayoutType.ToString())),
             Detail("detail.is_shared", BoolText(evt.IsShared)),
             Detail("detail.portrait_path", SafeEventPortraitPath(evt)),
             Detail("detail.initial_description", SafeLocText(evt.InitialDescription)))
@@ -282,7 +296,7 @@ public sealed partial class ModelMetadataService
         Kind = ModStudioEntityKind.Enchantment,
         EntityId = enchantment.Id.Entry,
         Title = SafeLocText(enchantment.Title),
-        Summary = $"Show Amount {enchantment.ShowAmount} | Icon {enchantment.IconPath}",
+        Summary = $"{Dual("显示数值", "Show Amount")} {ModStudioFieldDisplayNames.FormatPropertyValue("show_amount", enchantment.ShowAmount.ToString())} | {Dual("图标", "Icon")} {enchantment.IconPath}",
         DetailText = string.Join(Environment.NewLine,
             SourceOfTruth("EnchantmentModel"),
             Detail("detail.id", enchantment.Id),
@@ -392,12 +406,12 @@ public sealed partial class ModelMetadataService
                 EntityId = envelope.EntityId,
                 IsProjectOnly = true,
                 Title = MetadataOrFallback(metadata, "title", envelope.EntityId),
-                Summary = $"{MetadataOrFallback(metadata, "type", CardType.Attack.ToString())} | {MetadataOrFallback(metadata, "rarity", CardRarity.Common.ToString())} | Pool {MetadataOrFallback(metadata, "pool_id", "-")}",
+                Summary = $"{ModStudioFieldDisplayNames.FormatPropertyValue("type", MetadataOrFallback(metadata, "type", CardType.Attack.ToString()))} | {ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", CardRarity.Common.ToString()))} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))}",
                 DetailText = BuildProjectOnlyDetail(project.Manifest.Name, envelope,
-                    Detail("detail.type", MetadataOrFallback(metadata, "type", CardType.Attack.ToString())),
-                    Detail("detail.rarity", MetadataOrFallback(metadata, "rarity", CardRarity.Common.ToString())),
-                    Detail("detail.pool", MetadataOrFallback(metadata, "pool_id", "-")),
-                    Detail("detail.target_type", MetadataOrFallback(metadata, "target_type", TargetType.AnyEnemy.ToString())),
+                    Detail("detail.type", ModStudioFieldDisplayNames.FormatPropertyValue("type", MetadataOrFallback(metadata, "type", CardType.Attack.ToString()))),
+                    Detail("detail.rarity", ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", CardRarity.Common.ToString()))),
+                    Detail("detail.pool", ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))),
+                    Detail("detail.target_type", ModStudioFieldDisplayNames.FormatPropertyValue("target_type", MetadataOrFallback(metadata, "target_type", TargetType.AnyEnemy.ToString()))),
                     Detail("detail.energy_cost", MetadataOrFallback(metadata, "energy_cost", "1")),
                     Detail("detail.description_text", MetadataOrFallback(metadata, "description", string.Empty)))
             },
@@ -407,10 +421,10 @@ public sealed partial class ModelMetadataService
                 EntityId = envelope.EntityId,
                 IsProjectOnly = true,
                 Title = MetadataOrFallback(metadata, "title", envelope.EntityId),
-                Summary = $"{MetadataOrFallback(metadata, "rarity", RelicRarity.Common.ToString())} | Pool {MetadataOrFallback(metadata, "pool_id", "-")}",
+                Summary = $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", RelicRarity.Common.ToString()))} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))}",
                 DetailText = BuildProjectOnlyDetail(project.Manifest.Name, envelope,
-                    Detail("detail.rarity", MetadataOrFallback(metadata, "rarity", RelicRarity.Common.ToString())),
-                    Detail("detail.pool", MetadataOrFallback(metadata, "pool_id", "-")),
+                    Detail("detail.rarity", ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", RelicRarity.Common.ToString()))),
+                    Detail("detail.pool", ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))),
                     Detail("detail.icon_path", MetadataOrFallback(metadata, "icon_path", "-")),
                     Detail("detail.description_text", MetadataOrFallback(metadata, "description", string.Empty)))
             },
@@ -420,12 +434,12 @@ public sealed partial class ModelMetadataService
                 EntityId = envelope.EntityId,
                 IsProjectOnly = true,
                 Title = MetadataOrFallback(metadata, "title", envelope.EntityId),
-                Summary = $"{MetadataOrFallback(metadata, "rarity", PotionRarity.Common.ToString())} | {MetadataOrFallback(metadata, "usage", PotionUsage.CombatOnly.ToString())} | {MetadataOrFallback(metadata, "target_type", TargetType.Self.ToString())}",
+                Summary = $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", PotionRarity.Common.ToString()))} | {ModStudioFieldDisplayNames.FormatPropertyValue("usage", MetadataOrFallback(metadata, "usage", PotionUsage.CombatOnly.ToString()))} | {ModStudioFieldDisplayNames.FormatPropertyValue("target_type", MetadataOrFallback(metadata, "target_type", TargetType.Self.ToString()))}",
                 DetailText = BuildProjectOnlyDetail(project.Manifest.Name, envelope,
-                    Detail("detail.rarity", MetadataOrFallback(metadata, "rarity", PotionRarity.Common.ToString())),
-                    Detail("detail.usage", MetadataOrFallback(metadata, "usage", PotionUsage.CombatOnly.ToString())),
-                    Detail("detail.target_type", MetadataOrFallback(metadata, "target_type", TargetType.Self.ToString())),
-                    Detail("detail.pool", MetadataOrFallback(metadata, "pool_id", "-")),
+                    Detail("detail.rarity", ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", PotionRarity.Common.ToString()))),
+                    Detail("detail.usage", ModStudioFieldDisplayNames.FormatPropertyValue("usage", MetadataOrFallback(metadata, "usage", PotionUsage.CombatOnly.ToString()))),
+                    Detail("detail.target_type", ModStudioFieldDisplayNames.FormatPropertyValue("target_type", MetadataOrFallback(metadata, "target_type", TargetType.Self.ToString()))),
+                    Detail("detail.pool", ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))),
                     Detail("detail.image_path", MetadataOrFallback(metadata, "image_path", "-")),
                     Detail("detail.description_text", MetadataOrFallback(metadata, "description", string.Empty)))
             },
@@ -435,10 +449,10 @@ public sealed partial class ModelMetadataService
                 EntityId = envelope.EntityId,
                 IsProjectOnly = true,
                 Title = MetadataOrFallback(metadata, "title", envelope.EntityId),
-                Summary = $"{MetadataOrFallback(metadata, "layout_type", EventLayoutType.Default.ToString())} | Shared {MetadataOrFallback(metadata, "is_shared", true.ToString())}",
+                Summary = $"{ModStudioFieldDisplayNames.FormatPropertyValue("layout_type", MetadataOrFallback(metadata, "layout_type", EventLayoutType.Default.ToString()))} | {Dual("共享", "Shared")} {ModStudioFieldDisplayNames.FormatPropertyValue("is_shared", MetadataOrFallback(metadata, "is_shared", true.ToString()))}",
                 DetailText = BuildProjectOnlyDetail(project.Manifest.Name, envelope,
-                    Detail("detail.layout", MetadataOrFallback(metadata, "layout_type", EventLayoutType.Default.ToString())),
-                    Detail("detail.is_shared", MetadataOrFallback(metadata, "is_shared", true.ToString())),
+                    Detail("detail.layout", ModStudioFieldDisplayNames.FormatPropertyValue("layout_type", MetadataOrFallback(metadata, "layout_type", EventLayoutType.Default.ToString()))),
+                    Detail("detail.is_shared", ModStudioFieldDisplayNames.FormatPropertyValue("is_shared", MetadataOrFallback(metadata, "is_shared", true.ToString()))),
                     Detail("detail.portrait_path", MetadataOrFallback(metadata, "portrait_path", "-")),
                     Detail("detail.initial_description", MetadataOrFallback(metadata, "initial_description", string.Empty)))
             },
@@ -448,7 +462,7 @@ public sealed partial class ModelMetadataService
                 EntityId = envelope.EntityId,
                 IsProjectOnly = true,
                 Title = MetadataOrFallback(metadata, "title", envelope.EntityId),
-                Summary = $"Show Amount {MetadataOrFallback(metadata, "show_amount", false.ToString())} | Icon {MetadataOrFallback(metadata, "icon_path", "-")}",
+                Summary = $"{Dual("显示数值", "Show Amount")} {ModStudioFieldDisplayNames.FormatPropertyValue("show_amount", MetadataOrFallback(metadata, "show_amount", false.ToString()))} | {Dual("图标", "Icon")} {MetadataOrFallback(metadata, "icon_path", "-")}",
                 DetailText = BuildProjectOnlyDetail(project.Manifest.Name, envelope,
                     Detail("detail.icon_path", MetadataOrFallback(metadata, "icon_path", "-")),
                     Detail("detail.description_text", MetadataOrFallback(metadata, "description", string.Empty)))
@@ -563,6 +577,19 @@ public sealed partial class ModelMetadataService
     private static string Detail(string key, object? value) => ModStudioLocalization.F(key, value ?? string.Empty);
 
     private static string BoolText(bool value) => ModStudioLocalization.T(value ? "bool.true" : "bool.false");
+
+    private static string Dual(string zh, string en) => ModStudioLocalization.IsChinese ? zh : en;
+
+    private static void EnsureRuntimeMetadataCacheLanguage()
+    {
+        if (_cachedLanguageIsChinese == ModStudioLocalization.IsChinese)
+        {
+            return;
+        }
+
+        _cachedLanguageIsChinese = ModStudioLocalization.IsChinese;
+        RuntimeMetadataCache.Clear();
+    }
 
     private static string JoinIds(IEnumerable<string> ids)
     {

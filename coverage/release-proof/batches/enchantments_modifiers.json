@@ -1,0 +1,10 @@
+{
+  "BatchId": "enchantments_modifiers",
+  "EntityKind": "Enchantment",
+  "Title": "Stage 09 custom-content proof",
+  "Scenario": 1,
+  "TimeoutSeconds": 90,
+  "ExpectedMarkers": [
+    "[ModStudio.Graph] STAGE09_RELIC_OK"
+  ]
+}

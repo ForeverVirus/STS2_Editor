@@ -1,0 +1,19 @@
+{
+  "generatedAtUtc": "2026-03-25T19:11:16.9614812+00:00",
+  "repoRoot": "F:\\sts2_mod\\mod_projects\\STS2_editor",
+  "proofRoot": "F:\\sts2_mod\\mod_projects\\STS2_editor\\coverage\\release-proof",
+  "logPath": "C:\\Users\\Administrator\\AppData\\Roaming\\SlayTheSpire2\\logs\\godot.log",
+  "batchIds": [
+    "cards_transform_select_generate",
+    "cards_cost_playcount",
+    "cards_status_curse_passive",
+    "potions_combat",
+    "potions_noncombat",
+    "relics_stateful_combat",
+    "relics_modifier_and_merchant",
+    "events_multipage_reward",
+    "events_combat_resume",
+    "enchantments_modifiers",
+    "passive_only"
+  ]
+}

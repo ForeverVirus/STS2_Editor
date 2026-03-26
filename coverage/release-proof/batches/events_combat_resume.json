@@ -1,0 +1,12 @@
+{
+  "BatchId": "events_combat_resume",
+  "EntityKind": "Event",
+  "Title": "Stage 12 event proof",
+  "Scenario": 2,
+  "TimeoutSeconds": 60,
+  "ExpectedMarkers": [
+    "[ModStudio.Event] Starting template combat ED_STAGE12_EVENT001 encounter=LOUSE_PROGENITOR_NORMAL resume=AFTER_COMBAT",
+    "[ModStudio.Event] Resuming template event ED_STAGE12_EVENT001 -\u003E page AFTER_COMBAT",
+    "[ModStudio.Event] Proceeding out of template event ED_STAGE12_EVENT001 via option PROCEED"
+  ]
+}

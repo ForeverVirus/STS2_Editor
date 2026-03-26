@@ -14,6 +14,13 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
     private readonly List<AssetRef> _importedAssets = new();
     private readonly List<string> _runtimeAssets = new();
     private readonly Dictionary<string, Control> _propertyEditors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, int>> _choiceIndexCache = new(StringComparer.Ordinal);
+    private string _propertyEditorSignature = string.Empty;
+    private bool _propertyEditorsInvalidated = true;
+    private BehaviorGraphDefinition? _inspectorGraph;
+    private BehaviorGraphNodeDefinition? _inspectorNode;
+    private IReadOnlyList<PropertyChoice>? _cachedEventPageChoices;
+    private IReadOnlyList<PropertyChoice>? _cachedEventOptionChoices;
 
     private Label? _titleLabel;
     private RichTextLabel? _basicReadOnlyLabel;
@@ -36,6 +43,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
     private LineEdit? _graphNameEdit;
     private Label? _graphDescriptionLabel;
     private TextEdit? _graphDescriptionEdit;
+    private VBoxContainer? _previewContextRoot;
     private Label? _previewContextLabel;
     private CheckBox? _previewUpgradedCheck;
     private Label? _previewTargetLabel;
@@ -179,6 +187,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
     public event Action<string>? SelectedNodeDisplayNameChanged;
     public event Action<string>? SelectedNodeDescriptionChanged;
     public event Action<DynamicPreviewContext>? PreviewContextChanged;
+    public event Action<string>? EventOptionAddRequested;
 
     public override void _Ready()
     {
@@ -286,6 +295,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
     public void SetSelectedNode(BehaviorGraphNodeDefinition? node)
     {
+        _inspectorNode = node;
         if (_selectedNodeIdLabel != null)
         {
             _selectedNodeIdLabel.Text = node == null
@@ -318,6 +328,20 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         }
     }
 
+    public void SetInspectorGraphContext(BehaviorGraphDefinition? graph, BehaviorGraphNodeDefinition? selectedNode)
+    {
+        _inspectorGraph = graph;
+        _inspectorNode = selectedNode;
+    }
+
+    public void InvalidatePropertyEditors()
+    {
+        _propertyEditorsInvalidated = true;
+        _propertyEditorSignature = string.Empty;
+        _cachedEventPageChoices = null;
+        _cachedEventOptionChoices = null;
+    }
+
     public void SetSelectedNodeProperties(IReadOnlyDictionary<string, string> properties)
     {
         if (_selectedNodePropertyHost == null)
@@ -325,7 +349,19 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             return;
         }
 
+        var signature = string.Join("|", properties.Keys.OrderBy(key => key, StringComparer.OrdinalIgnoreCase));
+        if (!_propertyEditorsInvalidated &&
+            string.Equals(_propertyEditorSignature, signature, StringComparison.Ordinal) &&
+            _propertyEditors.Count == properties.Count)
+        {
+            ApplyPropertyEditorValues(properties);
+            return;
+        }
+
+        _propertyEditorsInvalidated = false;
+        _propertyEditorSignature = signature;
         _propertyEditors.Clear();
+        _choiceIndexCache.Clear();
         foreach (var child in _selectedNodePropertyHost.GetChildren())
         {
             child.QueueFree();
@@ -364,11 +400,94 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         }
     }
 
+    private void ApplyPropertyEditorValues(IReadOnlyDictionary<string, string> properties)
+    {
+        foreach (var pair in properties)
+        {
+            if (!_propertyEditors.TryGetValue(pair.Key, out var editor))
+            {
+                continue;
+            }
+
+            switch (editor)
+            {
+                case LineEdit lineEdit:
+                    lineEdit.Text = pair.Value ?? string.Empty;
+                    break;
+                case TextEdit textEdit:
+                    textEdit.Text = pair.Value ?? string.Empty;
+                    break;
+                case CheckBox checkBox when bool.TryParse(pair.Value, out var boolValue):
+                    checkBox.ButtonPressed = boolValue;
+                    break;
+                case SpinBox spinBox when double.TryParse(pair.Value, out var numericValue):
+                    spinBox.Value = numericValue;
+                    break;
+                case OptionButton optionButton:
+                    ApplyOptionValue(optionButton, pair.Key, pair.Value ?? string.Empty);
+                    break;
+            }
+        }
+    }
+
+    private void ApplyOptionValue(OptionButton optionButton, string propertyKey, string propertyValue)
+    {
+        if (!_choiceIndexCache.TryGetValue(propertyKey, out var indexMap))
+        {
+            indexMap = BuildChoiceIndexMap(optionButton);
+            _choiceIndexCache[propertyKey] = indexMap;
+        }
+
+        if (indexMap.TryGetValue(propertyValue, out var selectedIndex))
+        {
+            optionButton.Select(selectedIndex);
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(propertyValue))
+        {
+            optionButton.AddItem($"{ModStudioFieldDisplayNames.FormatGraphPropertyValue(propertyKey, propertyValue)} [{propertyValue}]");
+            optionButton.SetItemMetadata(optionButton.ItemCount - 1, propertyValue);
+            _choiceIndexCache[propertyKey][propertyValue] = optionButton.ItemCount - 1;
+            optionButton.Select(optionButton.ItemCount - 1);
+            return;
+        }
+
+        if (optionButton.ItemCount > 0)
+        {
+            optionButton.Select(0);
+        }
+    }
+
+    private static Dictionary<string, int> BuildChoiceIndexMap(OptionButton optionButton)
+    {
+        var map = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var index = 0; index < optionButton.ItemCount; index++)
+        {
+            var key = optionButton.GetItemMetadata(index).AsString();
+            if (!string.IsNullOrWhiteSpace(key) && !map.ContainsKey(key))
+            {
+                map[key] = index;
+            }
+        }
+
+        return map;
+    }
+
     public void SetSelectedNodeDynamicSummary(string text)
     {
         if (_selectedNodeDynamicSummaryLabel != null)
         {
             _selectedNodeDynamicSummaryLabel.Text = text ?? string.Empty;
+            _selectedNodeDynamicSummaryLabel.Visible = !string.IsNullOrWhiteSpace(text);
+        }
+    }
+
+    public void SetPreviewContextVisible(bool visible)
+    {
+        if (_previewContextRoot != null)
+        {
+            _previewContextRoot.Visible = visible;
         }
     }
 
@@ -637,29 +756,29 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         };
         page.AddChild(previewContextPanel);
 
-        var previewContextRoot = new VBoxContainer
+        _previewContextRoot = new VBoxContainer
         {
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
         };
-        previewContextRoot.AddThemeConstantOverride("separation", 6);
-        previewContextPanel.AddChild(previewContextRoot);
+        _previewContextRoot.AddThemeConstantOverride("separation", 6);
+        previewContextPanel.AddChild(_previewContextRoot);
 
         _previewContextLabel = MakeLabel(string.Empty, true);
-        previewContextRoot.AddChild(_previewContextLabel);
+        _previewContextRoot.AddChild(_previewContextLabel);
 
         _previewUpgradedCheck = new CheckBox();
         _previewUpgradedCheck.Toggled += _ => EmitPreviewContextChanged();
-        previewContextRoot.AddChild(_previewUpgradedCheck);
+        _previewContextRoot.AddChild(_previewUpgradedCheck);
 
-        previewContextRoot.AddChild(BuildPreviewTargetRow());
-        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentBlockLabel, out _previewCurrentBlockSpin, 0d, 999d, 1d, 0));
-        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentStarsLabel, out _previewCurrentStarsSpin, 0d, 999d, 1d, 0));
-        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentEnergyLabel, out _previewCurrentEnergySpin, 0d, 20d, 1d, 0));
-        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewHandCountLabel, out _previewHandCountSpin, 0d, 50d, 1d, 0));
-        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewDrawPileLabel, out _previewDrawPileSpin, 0d, 200d, 1d, 0));
-        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewDiscardPileLabel, out _previewDiscardPileSpin, 0d, 200d, 1d, 0));
-        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewExhaustPileLabel, out _previewExhaustPileSpin, 0d, 200d, 1d, 0));
-        previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewMissingHpLabel, out _previewMissingHpSpin, 0d, 999d, 1d, 0));
+        _previewContextRoot.AddChild(BuildPreviewTargetRow());
+        _previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentBlockLabel, out _previewCurrentBlockSpin, 0d, 999d, 1d, 0));
+        _previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentStarsLabel, out _previewCurrentStarsSpin, 0d, 999d, 1d, 0));
+        _previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewCurrentEnergyLabel, out _previewCurrentEnergySpin, 0d, 20d, 1d, 0));
+        _previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewHandCountLabel, out _previewHandCountSpin, 0d, 50d, 1d, 0));
+        _previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewDrawPileLabel, out _previewDrawPileSpin, 0d, 200d, 1d, 0));
+        _previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewDiscardPileLabel, out _previewDiscardPileSpin, 0d, 200d, 1d, 0));
+        _previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewExhaustPileLabel, out _previewExhaustPileSpin, 0d, 200d, 1d, 0));
+        _previewContextRoot.AddChild(BuildPreviewNumericRow(out _previewMissingHpLabel, out _previewMissingHpSpin, 0d, 999d, 1d, 0));
 
         _selectedNodeTypeLabel = MakeLabel(string.Empty, true);
         _selectedNodeIdLabel = MakeLabel(string.Empty, true);
@@ -784,6 +903,11 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
     private Control BuildPropertyEditor(string propertyKey, string propertyValue)
     {
+        if (TryCreateGraphContextEditor(propertyKey, propertyValue, out var contextEditor))
+        {
+            return contextEditor;
+        }
+
         if (TryCreateChoiceEditor(propertyKey, propertyValue, out var choiceEditor))
         {
             return choiceEditor;
@@ -830,6 +954,184 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         return lineEdit;
     }
 
+    private bool TryCreateGraphContextEditor(string propertyKey, string propertyValue, out Control editor)
+    {
+        editor = null!;
+
+        if (string.Equals(propertyKey, "option_order", StringComparison.Ordinal))
+        {
+            editor = BuildOptionOrderEditor(propertyKey, propertyValue);
+            return true;
+        }
+
+        if (string.Equals(propertyKey, "next_page_id", StringComparison.Ordinal) ||
+            string.Equals(propertyKey, "resume_page_id", StringComparison.Ordinal) ||
+            (string.Equals(propertyKey, "page_id", StringComparison.Ordinal) && !string.Equals(_inspectorNode?.NodeType, "event.page", StringComparison.OrdinalIgnoreCase)))
+        {
+            editor = BuildGraphPageChoiceEditor(propertyKey, propertyValue, allowEmpty: !string.Equals(propertyKey, "page_id", StringComparison.Ordinal));
+            return true;
+        }
+
+        return false;
+    }
+
+    private Control BuildGraphPageChoiceEditor(string propertyKey, string propertyValue, bool allowEmpty)
+    {
+        var optionButton = new OptionButton
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+
+        if (allowEmpty)
+        {
+            optionButton.AddItem(Dual("未设置", "Unset"));
+            optionButton.SetItemMetadata(0, string.Empty);
+        }
+
+        var pages = GetEventPageChoices();
+        var selectedIndex = -1;
+        foreach (var page in pages)
+        {
+            optionButton.AddItem(page.DisplayText);
+            optionButton.SetItemMetadata(optionButton.ItemCount - 1, page.Value);
+            if (string.Equals(page.Value, propertyValue, StringComparison.Ordinal))
+            {
+                selectedIndex = optionButton.ItemCount - 1;
+            }
+        }
+
+        if (selectedIndex < 0 && !string.IsNullOrWhiteSpace(propertyValue))
+        {
+            optionButton.AddItem($"{propertyValue} [{Dual("无效旧值", "Invalid legacy value")}]");
+            optionButton.SetItemMetadata(optionButton.ItemCount - 1, propertyValue);
+            selectedIndex = optionButton.ItemCount - 1;
+        }
+
+        if (selectedIndex >= 0)
+        {
+            optionButton.Select(selectedIndex);
+        }
+        else if (optionButton.ItemCount > 0)
+        {
+            optionButton.Select(0);
+        }
+
+        _choiceIndexCache[propertyKey] = BuildChoiceIndexMap(optionButton);
+
+        optionButton.ItemSelected += index =>
+        {
+            var selected = optionButton.GetItemMetadata((int)index).AsString();
+            NodePropertyChanged?.Invoke(propertyKey, selected);
+        };
+
+        return optionButton;
+    }
+
+    private Control BuildOptionOrderEditor(string propertyKey, string propertyValue)
+    {
+        var root = new VBoxContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        root.AddThemeConstantOverride("separation", 4);
+
+        var rowsHost = new VBoxContainer
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        rowsHost.AddThemeConstantOverride("separation", 4);
+        root.AddChild(rowsHost);
+
+        var optionChoices = GetEventOptionChoices();
+        var currentValues = ParseCsvValues(propertyValue);
+        if (currentValues.Count == 0)
+        {
+            currentValues.Add(string.Empty);
+        }
+
+        void EmitCurrentValue()
+        {
+            var values = rowsHost.GetChildren()
+                .OfType<HBoxContainer>()
+                .SelectMany(row => row.GetChildren().OfType<OptionButton>())
+                .Select(button => button.GetItemMetadata(button.Selected).AsString())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .ToList();
+            NodePropertyChanged?.Invoke(propertyKey, string.Join(",", values));
+        }
+
+        void AddRow(string selectedValue)
+        {
+            var row = new HBoxContainer
+            {
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+            };
+            row.AddThemeConstantOverride("separation", 4);
+
+            var optionButton = new OptionButton
+            {
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+            };
+            optionButton.AddItem(Dual("未设置", "Unset"));
+            optionButton.SetItemMetadata(0, string.Empty);
+            foreach (var choice in optionChoices)
+            {
+                optionButton.AddItem(choice.DisplayText);
+                optionButton.SetItemMetadata(optionButton.ItemCount - 1, choice.Value);
+            }
+
+            var selectedIndex = 0;
+            for (var index = 0; index < optionButton.ItemCount; index++)
+            {
+                if (string.Equals(optionButton.GetItemMetadata(index).AsString(), selectedValue, StringComparison.Ordinal))
+                {
+                    selectedIndex = index;
+                    break;
+                }
+            }
+
+            optionButton.Select(selectedIndex);
+            _choiceIndexCache[$"{propertyKey}:{row.GetInstanceId()}"] = BuildChoiceIndexMap(optionButton);
+            optionButton.ItemSelected += _ => EmitCurrentValue();
+            row.AddChild(optionButton);
+
+            var removeButton = MakeButton(Dual("删除", "Remove"), () =>
+            {
+                row.QueueFree();
+                CallDeferred(nameof(EmitDeferredNodePropertyChanged), propertyKey, string.Join(",", rowsHost.GetChildren()
+                    .OfType<HBoxContainer>()
+                    .Where(existing => existing != row)
+                    .SelectMany(existing => existing.GetChildren().OfType<OptionButton>())
+                    .Select(button => button.GetItemMetadata(button.Selected).AsString())
+                    .Where(value => !string.IsNullOrWhiteSpace(value))));
+            });
+            row.AddChild(removeButton);
+            rowsHost.AddChild(row);
+        }
+
+        foreach (var value in currentValues)
+        {
+            AddRow(value);
+        }
+
+        var addButton = MakeButton(Dual("添加选项", "Add Option"), () =>
+        {
+            if (string.Equals(_inspectorNode?.NodeType, "event.page", StringComparison.OrdinalIgnoreCase) &&
+                _inspectorNode.Properties.TryGetValue("page_id", out var pageId) &&
+                !string.IsNullOrWhiteSpace(pageId))
+            {
+                EventOptionAddRequested?.Invoke(pageId);
+                return;
+            }
+
+            AddRow(string.Empty);
+            EmitCurrentValue();
+        });
+        root.AddChild(addButton);
+
+        return root;
+    }
+
     private static string GetGraphPropertyHelpText(string propertyKey)
     {
         return propertyKey switch
@@ -844,6 +1146,12 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             "preview_multiplier_key" => Dual("选择公式乘数来自哪个上下文值，例如手牌数、能量、当前星数。真正的预览结果始终由右侧上下文决定。", "Chooses which context value drives the formula multiplier, such as hand count, energy, or stars. The final preview always comes from the preview context on the right."),
             "amount" => Dual("固定值模式下的直接数值。", "Direct numeric value used in literal mode."),
             "count" => Dual("要移动或生成的数量。填 0 代表全部。", "How many cards to move or create. Use 0 to mean all matching cards."),
+            "left" => Dual("比较左值。可以填固定值，也可以填 $state.xxx、$target 这类引用。", "Left side of the comparison. Supports literal values and references such as $state.xxx or $target."),
+            "right" => Dual("比较右值。可以填固定值，也可以填 $state.xxx、$target 这类引用。", "Right side of the comparison. Supports literal values and references such as $state.xxx or $target."),
+            "key" => Dual("要写入的图状态键。后续节点可以通过 $state.xxx 读取它。", "Graph state key to write. Later nodes can read it through $state.xxx."),
+            "value" => Dual("写入到状态键里的值。可以是固定值，也可以是 $state.xxx、$target 这类引用。", "Value written into the state key. Supports literals and references such as $state.xxx or $target."),
+            "delta" => Dual("在当前状态值基础上增加的数值。", "Numeric amount added on top of the current stored value."),
+            "factor" => Dual("当前状态值要乘上的倍率。", "Multiplier applied to the current stored value."),
             "target" => Dual("节点作用的目标。", "The target affected by this node."),
             "source_pile" => Dual("从哪个牌堆筛选现有卡牌。", "Which pile to search for existing cards."),
             "target_pile" => Dual("把卡牌移动到哪个牌堆。", "Which pile receives the moved cards."),
@@ -851,6 +1159,10 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             "include_x_cost" => Dual("筛选时是否把 X 费牌也视为可匹配。", "Whether X-cost cards are allowed by this filter."),
             "card_type_scope" => Dual("按卡牌类型筛选，例如只拿攻击/技能/能力牌。", "Filter by card type, such as attack, skill, or power cards."),
             "props" => Dual("附加行为标记，例如不可格挡、位移等。", "Additional behavior flags such as unblockable or move."),
+            "condition" => Dual("分支要直接计算的条件表达式。也可以不填，改用下方的条件键。", "Condition expression evaluated by the branch. Leave empty to use the condition key instead."),
+            "condition_key" => Dual("分支读取的布尔状态键。通常由上游 compare 节点通过 result_key 写入。", "Boolean state key read by the branch. This is commonly written by an upstream compare node via result_key."),
+            "result_key" => Dual("compare 节点会把比较结果写到这个状态键里，branch 再通过 condition_key 读取。", "The compare node writes its boolean result into this state key, and a later branch reads it through condition_key."),
+            "status" => Dual("要设置到当前附魔上的状态。", "Status applied to the current enchantment."),
             "page_id" => Dual("事件页面的唯一 ID。其他跳页和选项会引用它。", "Unique id for this event page. Other event nodes can jump to or reference it."),
             "option_id" => Dual("事件选项的唯一 ID。页面会用它决定选项顺序。", "Unique id for this event option. Pages use it to determine option order."),
             "next_page_id" => Dual("选项或跳页节点执行后要前往的页面 ID。", "Page id to move to after this option or goto-page node resolves."),
@@ -858,9 +1170,13 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             "encounter_id" => Dual("事件触发战斗时要进入的遭遇 ID。", "Encounter id used when this event starts combat."),
             "reward_kind" => Dual("事件选项实际发放的奖励类型。仅修改标题文字不会改变真正奖励。", "Actual reward type granted by this event choice. Changing title text alone does not change the reward."),
             "reward_amount" => Dual("事件奖励的数值，例如金币数量、抽牌数、伤害值。", "Numeric amount applied by the event reward, such as gold, draw count, or damage."),
+            "reward_count" => Dual("当奖励可堆叠时，表示要发放多少份奖励。", "When the reward kind supports stacking, this controls how many copies are granted."),
             "reward_target" => Dual("事件奖励作用的目标。", "Target affected by the event reward."),
             "reward_props" => Dual("事件伤害或格挡奖励的附加属性。", "Additional flags used by event damage or block rewards."),
             "reward_power_id" => Dual("当奖励类型为能力时，要施加的能力 ID。", "Power id to apply when the reward kind is power."),
+            "card_id" => Dual("当奖励类型是卡牌时，要发放的具体卡牌 ID。", "Concrete card id used when the reward kind grants cards."),
+            "relic_id" => Dual("当奖励类型是遗物时，要发放的具体遗物 ID。", "Concrete relic id used when the reward kind grants relics."),
+            "potion_id" => Dual("当奖励类型是药水时，要发放的具体药水 ID。", "Concrete potion id used when the reward kind grants potions."),
             "is_proceed" => Dual("该选项执行后是否直接结束当前事件。", "Whether this option should immediately end the current event after resolving."),
             "save_choice_to_history" => Dual("是否把这个选项写入事件历史。", "Whether this option should be saved into event choice history."),
             _ => string.Empty
@@ -870,7 +1186,8 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
     private bool TryCreateChoiceEditor(string propertyKey, string propertyValue, out Control editor)
     {
         editor = null!;
-        if (!TryGetChoiceOptions(propertyKey, out var choices))
+        var choices = GetChoiceOptionsForCurrentNode(propertyKey);
+        if (choices.Count == 0)
         {
             return false;
         }
@@ -901,6 +1218,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         }
 
         string? autoSelectedValue = null;
+        _choiceIndexCache[propertyKey] = BuildChoiceIndexMap(optionButton);
 
         if (selectedIndex >= 0)
         {
@@ -925,6 +1243,115 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
         editor = optionButton;
         return true;
+    }
+
+    private IReadOnlyList<PropertyChoice> GetChoiceOptionsForCurrentNode(string propertyKey)
+    {
+        if (ShouldUseStatusValueChoices(propertyKey))
+        {
+            return FieldChoiceProvider.GetGraphChoices("status")
+                .Select(choice => new PropertyChoice(choice.Value, choice.Display))
+                .ToList();
+        }
+
+        return TryGetChoiceOptions(propertyKey, out var choices)
+            ? choices
+            : Array.Empty<PropertyChoice>();
+    }
+
+    private bool ShouldUseStatusValueChoices(string propertyKey)
+    {
+        if (!string.Equals(propertyKey, "value", StringComparison.Ordinal) || _inspectorNode == null)
+        {
+            return false;
+        }
+
+        if (!string.Equals(_inspectorNode.NodeType, "value.set", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return _inspectorNode.Properties.TryGetValue("key", out var key) &&
+               string.Equals(key?.Trim(), "Status", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IReadOnlyList<PropertyChoice> GetEventPageChoices()
+    {
+        if (_cachedEventPageChoices != null)
+        {
+            return _cachedEventPageChoices;
+        }
+
+        if (_inspectorGraph == null)
+        {
+            return Array.Empty<PropertyChoice>();
+        }
+
+        _cachedEventPageChoices = _inspectorGraph.Nodes
+            .Where(node => string.Equals(node.NodeType, "event.page", StringComparison.OrdinalIgnoreCase))
+            .Select(node =>
+            {
+                var pageId = node.Properties.TryGetValue("page_id", out var rawPageId) && !string.IsNullOrWhiteSpace(rawPageId)
+                    ? rawPageId
+                    : node.NodeId;
+                var title = node.Properties.TryGetValue("title", out var rawTitle) && !string.IsNullOrWhiteSpace(rawTitle)
+                    ? rawTitle
+                    : pageId;
+                return new PropertyChoice(pageId, $"{title} [{pageId}]");
+            })
+            .GroupBy(choice => choice.Value, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .OrderBy(choice => choice.DisplayText, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return _cachedEventPageChoices;
+    }
+
+    private IReadOnlyList<PropertyChoice> GetEventOptionChoices()
+    {
+        if (_cachedEventOptionChoices != null)
+        {
+            return _cachedEventOptionChoices;
+        }
+
+        if (_inspectorGraph == null)
+        {
+            return Array.Empty<PropertyChoice>();
+        }
+
+        _cachedEventOptionChoices = _inspectorGraph.Nodes
+            .Where(node => string.Equals(node.NodeType, "event.option", StringComparison.OrdinalIgnoreCase))
+            .Select(node =>
+            {
+                var optionId = node.Properties.TryGetValue("option_id", out var rawOptionId) && !string.IsNullOrWhiteSpace(rawOptionId)
+                    ? rawOptionId
+                    : node.NodeId;
+                var title = node.Properties.TryGetValue("title", out var rawTitle) && !string.IsNullOrWhiteSpace(rawTitle)
+                    ? rawTitle
+                    : optionId;
+                var pageId = node.Properties.TryGetValue("page_id", out var rawPageId) && !string.IsNullOrWhiteSpace(rawPageId)
+                    ? rawPageId
+                    : Dual("未绑定页", "No Page");
+                return new PropertyChoice(optionId, $"{title} [{optionId}] · {pageId}");
+            })
+            .GroupBy(choice => choice.Value, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .OrderBy(choice => choice.DisplayText, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return _cachedEventOptionChoices;
+    }
+
+    private static List<string> ParseCsvValues(string rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return new List<string>();
+        }
+
+        return rawValue
+            .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
     }
 
     private void EmitDeferredNodePropertyChanged(string propertyKey, string value)

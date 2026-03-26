@@ -1,7 +1,9 @@
 using System.Reflection;
+using System.Globalization;
 using HarmonyLib;
 using Godot;
 using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Commands.Builders;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
@@ -10,11 +12,16 @@ using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Logging;
+using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
+using MegaCrit.Sts2.Core.Rewards;
+using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.TestSupport;
+using MegaCrit.Sts2.Core.ValueProps;
 using STS2_Editor.Scripts.Editor.Core.Models;
 using STS2_Editor.Scripts.Editor.Graph;
 
@@ -40,6 +47,433 @@ internal static class RuntimeGraphDispatcher
     public static bool ShouldUseGraphForPotion(PotionModel potion)
     {
         return TryGetGraphOverride(ModStudioEntityKind.Potion, potion.Id.Entry, out _, out _);
+    }
+
+    public static bool ShouldUseGraphForEnchantmentOnEnchant(EnchantmentModel enchantment)
+    {
+        return TryGetGraphOverride(ModStudioEntityKind.Enchantment, enchantment.Id.Entry, out _, out var graph) &&
+               !string.IsNullOrWhiteSpace(ResolveEntryNode(graph!, "enchantment.on_enchant", allowDefaultFallback: false));
+    }
+
+    public static bool TryEvaluateEnchantmentModifierDecimal(
+        EnchantmentModel enchantment,
+        string triggerId,
+        decimal baseValue,
+        ValueProp props,
+        out decimal result)
+    {
+        result = 0m;
+        if (!TryGetGraphOverride(ModStudioEntityKind.Enchantment, enchantment.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, triggerId, allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var card = enchantment.Card;
+        var owner = card.Owner;
+        var context = new BehaviorGraphExecutionContext
+        {
+            Graph = graph,
+            TriggerId = triggerId,
+            SourceModel = enchantment,
+            Card = card,
+            Enchantment = enchantment,
+            Owner = owner,
+            CombatState = card.CombatState ?? owner.Creature.CombatState,
+            RunState = owner.RunState,
+            Target = card.CurrentTarget
+        };
+        context["modifier_base"] = baseValue;
+        context["modifier_props"] = props.ToString();
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        if (!context.TryGetState<object>("modifier_result", out var rawValue))
+        {
+            return false;
+        }
+
+        result = rawValue switch
+        {
+            decimal decimalValue => decimalValue,
+            int intValue => intValue,
+            long longValue => longValue,
+            float floatValue => (decimal)floatValue,
+            double doubleValue => (decimal)doubleValue,
+            string stringValue when decimal.TryParse(stringValue, out var parsed) => parsed,
+            _ => 0m
+        };
+        return true;
+    }
+
+    public static bool TryEvaluateEnchantmentPlayCountModifier(
+        EnchantmentModel enchantment,
+        int originalPlayCount,
+        out int result)
+    {
+        result = originalPlayCount;
+        if (!TryGetGraphOverride(ModStudioEntityKind.Enchantment, enchantment.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, "enchantment.modify_play_count", allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var card = enchantment.Card;
+        var owner = card.Owner;
+        var context = new BehaviorGraphExecutionContext
+        {
+            Graph = graph,
+            TriggerId = "enchantment.modify_play_count",
+            SourceModel = enchantment,
+            Card = card,
+            Enchantment = enchantment,
+            Owner = owner,
+            CombatState = card.CombatState ?? owner.Creature.CombatState,
+            RunState = owner.RunState,
+            Target = card.CurrentTarget
+        };
+        context["play_count_base"] = originalPlayCount;
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        if (!context.TryGetState<object>("modifier_result", out var rawValue))
+        {
+            return false;
+        }
+
+        result = rawValue switch
+        {
+            int intValue => intValue,
+            decimal decimalValue => (int)decimalValue,
+            long longValue => (int)longValue,
+            float floatValue => (int)floatValue,
+            double doubleValue => (int)doubleValue,
+            string stringValue when int.TryParse(stringValue, out var parsed) => parsed,
+            _ => originalPlayCount
+        };
+        return true;
+    }
+
+    public static bool TryEvaluateRelicDecimalModifier(
+        RelicModel relic,
+        string triggerId,
+        string baseStateKey,
+        decimal baseValue,
+        Action<BehaviorGraphExecutionContext>? configureContext,
+        out decimal result)
+    {
+        result = baseValue;
+        if (!TryGetGraphOverride(ModStudioEntityKind.Relic, relic.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, triggerId, allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var context = new BehaviorGraphExecutionContext
+        {
+            Graph = graph,
+            TriggerId = triggerId,
+            SourceModel = relic,
+            Relic = relic,
+            Owner = relic.Owner,
+            CombatState = relic.Owner?.Creature?.CombatState,
+            RunState = relic.Owner?.RunState
+        };
+        context["modifier_base"] = baseValue;
+        context[baseStateKey] = baseValue;
+        PopulateRelicStateSnapshot(context, relic);
+        configureContext?.Invoke(context);
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        if (!context.TryGetState<object>("modifier_result", out var rawValue))
+        {
+            return false;
+        }
+
+        result = rawValue switch
+        {
+            decimal decimalValue => decimalValue,
+            int intValue => intValue,
+            long longValue => longValue,
+            float floatValue => (decimal)floatValue,
+            double doubleValue => (decimal)doubleValue,
+            string stringValue when decimal.TryParse(stringValue, out var parsed) => parsed,
+            _ => baseValue
+        };
+        return true;
+    }
+
+    public static bool TryEvaluateRelicDecimalModifier(
+        RelicModel relic,
+        string triggerId,
+        string baseStateKey,
+        decimal baseValue,
+        out decimal result)
+    {
+        return TryEvaluateRelicDecimalModifier(relic, triggerId, baseStateKey, baseValue, configureContext: null, out result);
+    }
+
+    public static bool TryEvaluateRelicIntModifier(
+        RelicModel relic,
+        string triggerId,
+        string baseStateKey,
+        int baseValue,
+        out int result)
+    {
+        result = baseValue;
+        if (!TryGetGraphOverride(ModStudioEntityKind.Relic, relic.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, triggerId, allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var context = new BehaviorGraphExecutionContext
+        {
+            Graph = graph,
+            TriggerId = triggerId,
+            SourceModel = relic,
+            Relic = relic,
+            Owner = relic.Owner,
+            CombatState = relic.Owner?.Creature?.CombatState,
+            RunState = relic.Owner?.RunState
+        };
+        context["modifier_base"] = baseValue;
+        context[baseStateKey] = baseValue;
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        if (!context.TryGetState<object>("modifier_result", out var rawValue))
+        {
+            return false;
+        }
+
+        result = rawValue switch
+        {
+            int intValue => intValue,
+            decimal decimalValue => (int)decimalValue,
+            long longValue => (int)longValue,
+            float floatValue => (int)floatValue,
+            double doubleValue => (int)doubleValue,
+            string stringValue when int.TryParse(stringValue, out var parsed) => parsed,
+            _ => baseValue
+        };
+        return true;
+    }
+
+    public static bool TryEvaluateRelicMaxEnergyModifier(
+        RelicModel relic,
+        decimal baseValue,
+        out decimal result)
+    {
+        return TryEvaluateRelicDecimalModifier(relic, "relic.modify_max_energy", "max_energy_base", baseValue, out result);
+    }
+
+    public static bool TryApplyRelicRewardModifier(
+        RelicModel relic,
+        string triggerId,
+        Player player,
+        List<Reward> rewards,
+        AbstractRoom? room,
+        bool? isMimicked,
+        out bool modified)
+    {
+        modified = false;
+        if (player != relic.Owner ||
+            !TryGetGraphOverride(ModStudioEntityKind.Relic, relic.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, triggerId, allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var context = BuildHookContext(relic, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context.Graph = graph;
+        context.TriggerId = triggerId;
+        context["reward_list"] = rewards;
+        context["HookPlayer"] = player;
+        context["RoomType"] = room?.RoomType.ToString() ?? string.Empty;
+        context["RoomIsCombat"] = room?.RoomType.IsCombatRoom() ?? false;
+        context["IsMimicked"] = isMimicked ?? false;
+        context["CurrentActIndex"] = player.RunState.CurrentActIndex;
+        context["IsFinalAct"] = player.RunState.CurrentActIndex >= player.RunState.Acts.Count - 1;
+        PopulateRelicStateSnapshot(context, relic);
+
+        var beforeCount = rewards.Count;
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        modified = rewards.Count != beforeCount || TryResolveContextBool(context, "reward_modified");
+        return true;
+    }
+
+    public static bool TryApplyRelicCardRewardOptionsModifier(
+        RelicModel relic,
+        string triggerId,
+        Player player,
+        List<CardCreationResult> cardRewardOptions,
+        CardCreationOptions creationOptions,
+        out bool modified)
+    {
+        modified = false;
+        if (player != relic.Owner ||
+            !TryGetGraphOverride(ModStudioEntityKind.Relic, relic.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, triggerId, allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var context = BuildHookContext(relic, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context.Graph = graph;
+        context.TriggerId = triggerId;
+        context["HookPlayer"] = player;
+        context["card_reward_options"] = cardRewardOptions;
+        context["card_reward_creation_options"] = creationOptions;
+        context["CurrentRoomType"] = player.RunState.CurrentRoom?.RoomType.ToString() ?? string.Empty;
+        context["CurrentRoomIsCombat"] = player.RunState.CurrentRoom?.RoomType.IsCombatRoom() ?? false;
+        PopulateRelicStateSnapshot(context, relic);
+
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        modified = TryResolveContextBool(context, "card_reward_options_modified");
+        return true;
+    }
+
+    public static bool TryEvaluateRelicBoolHook(
+        RelicModel relic,
+        string triggerId,
+        Player player,
+        Action<BehaviorGraphExecutionContext>? configureContext,
+        out bool result)
+    {
+        result = true;
+        if (player != relic.Owner ||
+            !TryGetGraphOverride(ModStudioEntityKind.Relic, relic.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, triggerId, allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var context = BuildHookContext(relic, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context.Graph = graph;
+        context.TriggerId = triggerId;
+        context["HookPlayer"] = player;
+        PopulateRelicStateSnapshot(context, relic);
+        configureContext?.Invoke(context);
+
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        if (!context.TryGetState<object>("hook_result", out var rawValue))
+        {
+            return false;
+        }
+
+        result = rawValue switch
+        {
+            bool boolValue => boolValue,
+            string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
+            int intValue => intValue != 0,
+            decimal decimalValue => decimalValue != 0m,
+            _ => true
+        };
+        return true;
+    }
+
+    public static bool TryApplyRelicMapModifier(
+        RelicModel relic,
+        string triggerId,
+        IRunState runState,
+        ActMap map,
+        int actIndex,
+        out ActMap result)
+    {
+        result = map;
+        if (!TryGetGraphOverride(ModStudioEntityKind.Relic, relic.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, triggerId, allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var context = BuildHookContext(relic, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context.Graph = graph;
+        context.TriggerId = triggerId;
+        context["generated_map_input"] = map;
+        context["generated_map_result"] = map;
+        context["ActIndex"] = actIndex;
+        context["CurrentActIndex"] = actIndex;
+        PopulateRelicStateSnapshot(context, relic);
+
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        if (!context.TryGetState<object>("generated_map_result", out var rawValue) ||
+            rawValue is not ActMap graphMap)
+        {
+            return false;
+        }
+
+        result = graphMap;
+        return true;
+    }
+
+    public static bool TryApplyRelicUnknownRoomTypeModifier(
+        RelicModel relic,
+        IRunState runState,
+        IReadOnlySet<RoomType> roomTypes,
+        out IReadOnlySet<RoomType> result)
+    {
+        result = roomTypes;
+        if (!TryGetGraphOverride(ModStudioEntityKind.Relic, relic.Id.Entry, out _, out var graph))
+        {
+            return false;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, "relic.modify_unknown_map_point_room_types", allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return false;
+        }
+
+        var context = BuildHookContext(relic, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context.Graph = graph;
+        context.TriggerId = "relic.modify_unknown_map_point_room_types";
+        context["unknown_room_types"] = new HashSet<RoomType>(roomTypes);
+        PopulateRelicStateSnapshot(context, relic);
+
+        ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId).GetAwaiter().GetResult();
+        if (!context.TryGetState<object>("unknown_room_types_result", out var rawValue) ||
+            rawValue is not HashSet<RoomType> updated)
+        {
+            return false;
+        }
+
+        result = updated;
+        return true;
     }
 
     public static async Task ExecuteCardPlayWrapperAsync(
@@ -273,6 +707,37 @@ internal static class RuntimeGraphDispatcher
             () => model.BeforeCardPlayed(cardPlay));
     }
 
+    public static Task ExecuteBeforeAttackHookAsync(AbstractModel model, AttackCommand attackCommand)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["attack_command"] = attackCommand;
+        return ExecuteHookAsync(
+            model,
+            "before_attack",
+            context,
+            () => model.BeforeAttack(attackCommand));
+    }
+
+    public static Task ExecuteAfterAttackHookAsync(AbstractModel model, AttackCommand attackCommand)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["attack_command"] = attackCommand;
+        return ExecuteHookAsync(
+            model,
+            "after_attack",
+            context,
+            () => model.AfterAttack(attackCommand));
+    }
+
+    public static Task ExecuteAfterActEnteredHookAsync(AbstractModel model)
+    {
+        return ExecuteHookAsync(
+            model,
+            "after_act_entered",
+            BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null),
+            () => model.AfterActEntered());
+    }
+
     public static Task ExecuteAfterCardPlayedHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, CardPlay cardPlay)
     {
         return ExecuteHookAsync(
@@ -331,7 +796,7 @@ internal static class RuntimeGraphDispatcher
             RunState = card.Owner.RunState,
             Target = cardPlay.Target
         };
-        await Executor.ExecuteAsync(graph!, context, entryNodeId);
+        await ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId);
     }
 
     private static async Task ExecutePotionOnUseAsync(PotionModel potion, PlayerChoiceContext choiceContext, Creature? target)
@@ -355,7 +820,7 @@ internal static class RuntimeGraphDispatcher
             RunState = potion.Owner.RunState,
             Target = target
         };
-        await Executor.ExecuteAsync(graph!, context, entryNodeId);
+        await ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId);
     }
 
     private static async Task ExecuteEnchantmentOnPlayAsync(EnchantmentModel enchantment, PlayerChoiceContext choiceContext, CardPlay cardPlay)
@@ -381,7 +846,694 @@ internal static class RuntimeGraphDispatcher
             RunState = owner.RunState,
             Target = cardPlay.Target
         };
-        await Executor.ExecuteAsync(graph!, context, ResolveEntryNode(graph!, "enchantment.on_play"));
+        await ExecuteGraphAndApplyStateAsync(graph!, context, ResolveEntryNode(graph!, "enchantment.on_play"));
+    }
+
+    public static async Task ExecuteEnchantmentOnEnchantAsync(EnchantmentModel enchantment)
+    {
+        if (!TryGetGraphOverride(ModStudioEntityKind.Enchantment, enchantment.Id.Entry, out _, out var graph))
+        {
+            return;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, "enchantment.on_enchant", allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return;
+        }
+
+        var card = enchantment.Card;
+        var owner = card.Owner;
+        var context = new BehaviorGraphExecutionContext
+        {
+            Graph = graph,
+            TriggerId = "enchantment.on_enchant",
+            SourceModel = enchantment,
+            Card = card,
+            Enchantment = enchantment,
+            Owner = owner,
+            CombatState = card.CombatState ?? owner.Creature.CombatState,
+            RunState = owner.RunState,
+            Target = card.CurrentTarget
+        };
+        await ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId);
+    }
+
+    public static Task ExecuteAfterCardDrawnHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, CardModel card, bool fromHandDraw)
+    {
+        return ExecuteHookAsync(
+            model,
+            "after_card_drawn",
+            BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: card.CurrentTarget, card),
+            () => model.AfterCardDrawn(choiceContext, card, fromHandDraw));
+    }
+
+    public static Task ExecuteAfterCardEnteredCombatHookAsync(AbstractModel model, CardModel card)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: card.CurrentTarget, card);
+        context["EnteredCardOwnerIsOwner"] = model is RelicModel relic && card.Owner == relic.Owner;
+        context["EnteredCardIsColorless"] = card.VisualCardPool?.IsColorless ?? false;
+        return ExecuteHookAsync(
+            model,
+            "after_card_entered_combat",
+            context,
+            () => model.AfterCardEnteredCombat(card));
+    }
+
+    public static Task ExecuteAfterCardChangedPilesHookAsync(AbstractModel model, CardModel card, PileType oldPileType, AbstractModel? source)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: card.CurrentTarget, card);
+        context["old_pile_type"] = oldPileType.ToString();
+        if (source != null)
+        {
+            context["hook_source_model"] = source;
+            context["hook_source_model_id"] = source.Id.Entry;
+        }
+
+        return ExecuteHookAsync(
+            model,
+            "after_card_changed_piles",
+            context,
+            () => model.AfterCardChangedPiles(card, oldPileType, source));
+    }
+
+    public static Task ExecuteAfterCardChangedPilesLateHookAsync(AbstractModel model, CardModel card, PileType oldPileType, AbstractModel? source)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: card.CurrentTarget, card);
+        context["old_pile_type"] = oldPileType.ToString();
+        if (source != null)
+        {
+            context["hook_source_model"] = source;
+            context["hook_source_model_id"] = source.Id.Entry;
+        }
+
+        return ExecuteHookAsync(
+            model,
+            "after_card_changed_piles_late",
+            context,
+            () => model.AfterCardChangedPilesLate(card, oldPileType, source));
+    }
+
+    public static Task ExecuteAfterCardExhaustedHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, CardModel card, bool causedByEthereal)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: card.CurrentTarget, card);
+        context["caused_by_ethereal"] = causedByEthereal.ToString();
+        context["ExhaustedCausedByEthereal"] = causedByEthereal;
+        context["CardOwnerIsOwner"] = model is RelicModel relic && card.Owner == relic.Owner;
+        return ExecuteHookAsync(
+            model,
+            "after_card_exhausted",
+            context,
+            () => model.AfterCardExhausted(choiceContext, card, causedByEthereal));
+    }
+
+    public static Task ExecuteAfterDamageReceivedHookAsync(
+        AbstractModel model,
+        PlayerChoiceContext choiceContext,
+        Creature target,
+        DamageResult result,
+        ValueProp props,
+        Creature? dealer,
+        CardModel? cardSource)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target, cardSource);
+        context["damage_result"] = result;
+        context["damage_props"] = props.ToString();
+        if (dealer != null)
+        {
+            context["damage_dealer"] = dealer;
+            context["damage_dealer_id"] = dealer.ModelId.Entry;
+        }
+
+        return ExecuteHookAsync(
+            model,
+            "after_damage_received",
+            context,
+            () => model.AfterDamageReceived(choiceContext, target, result, props, dealer, cardSource));
+    }
+
+    public static Task ExecuteAfterDamageReceivedLateHookAsync(
+        AbstractModel model,
+        PlayerChoiceContext choiceContext,
+        Creature target,
+        DamageResult result,
+        ValueProp props,
+        Creature? dealer,
+        CardModel? cardSource)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target, cardSource);
+        context["damage_result"] = result;
+        context["damage_props"] = props.ToString();
+        if (dealer != null)
+        {
+            context["damage_dealer"] = dealer;
+            context["damage_dealer_id"] = dealer.ModelId.Entry;
+        }
+
+        return ExecuteHookAsync(
+            model,
+            "after_damage_received_late",
+            context,
+            () => model.AfterDamageReceivedLate(choiceContext, target, result, props, dealer, cardSource));
+    }
+
+    public static Task ExecuteAfterDamageGivenHookAsync(
+        AbstractModel model,
+        PlayerChoiceContext choiceContext,
+        Creature? dealer,
+        DamageResult result,
+        ValueProp props,
+        Creature target,
+        CardModel? cardSource)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target, cardSource);
+        if (model is RelicModel relic)
+        {
+            context["DealerIsOwnerOrPetOwner"] = dealer == relic.Owner?.Creature || dealer?.PetOwner == relic.Owner;
+        }
+        context["TargetIsPlayer"] = target.IsPlayer;
+        context["BlockWasBroken"] = result.WasBlockBroken;
+        return ExecuteHookAsync(
+            model,
+            "after_damage_given",
+            context,
+            () => model.AfterDamageGiven(choiceContext, dealer, result, props, target, cardSource));
+    }
+
+    public static Task ExecuteAfterGoldGainedHookAsync(AbstractModel model, Player player)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["player_net_id"] = player.NetId.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_gold_gained",
+            context,
+            () => model.AfterGoldGained(player));
+    }
+
+    public static Task ExecuteAfterCurrentHpChangedHookAsync(AbstractModel model, Creature creature, decimal delta)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: creature, card: null);
+        context["Delta"] = delta;
+        context["CurrentHp"] = creature.CurrentHp;
+        context["MaxHp"] = creature.MaxHp;
+        context["IsInCombat"] = CombatManager.Instance.IsInProgress;
+        if (model is RelicModel relic)
+        {
+            context["TargetIsOwner"] = creature == relic.Owner?.Creature;
+            if (relic.DynamicVars.TryGetValue("HpThreshold", out var threshold))
+            {
+                context["CurrentHpAboveThreshold"] = creature.CurrentHp > creature.MaxHp * (threshold.BaseValue / 100m);
+            }
+        }
+
+        return ExecuteHookAsync(
+            model,
+            "after_current_hp_changed",
+            context,
+            () => model.AfterCurrentHpChanged(creature, delta));
+    }
+
+    public static Task ExecuteAfterPotionDiscardedHookAsync(AbstractModel model, PotionModel potion)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion, target: null, card: null);
+        context["IsInCombat"] = CombatManager.Instance.IsInProgress;
+        if (model is RelicModel relic)
+        {
+            context["OwnerPotionCount"] = relic.Owner?.Potions.Count() ?? 0;
+        }
+
+        return ExecuteHookAsync(
+            model,
+            "after_potion_discarded",
+            context,
+            () => model.AfterPotionDiscarded(potion));
+    }
+
+    public static Task ExecuteAfterPotionProcuredHookAsync(AbstractModel model, PotionModel potion)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion, target: null, card: null);
+        context["IsInCombat"] = CombatManager.Instance.IsInProgress;
+        if (model is RelicModel relic)
+        {
+            context["OwnerPotionCount"] = relic.Owner?.Potions.Count() ?? 0;
+        }
+
+        return ExecuteHookAsync(
+            model,
+            "after_potion_procured",
+            context,
+            () => model.AfterPotionProcured(potion));
+    }
+
+    public static Task ExecuteAfterOrbChanneledHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player player, OrbModel orb)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: player.Creature, card: null);
+        context["HookPlayerIsOwner"] = model is RelicModel relic && player == relic.Owner;
+        context["hook_orb_model"] = orb;
+        return ExecuteHookAsync(
+            model,
+            "after_orb_channeled",
+            context,
+            () => model.AfterOrbChanneled(choiceContext, player, orb));
+    }
+
+    public static Task ExecuteAfterBlockClearedHookAsync(AbstractModel model, Creature creature)
+    {
+        if (model is RelicModel relic && creature != relic.Owner?.Creature)
+        {
+            return model.AfterBlockCleared(creature);
+        }
+
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: creature, card: null);
+        context["CombatRound"] = creature.CombatState?.RoundNumber ?? 0;
+        return ExecuteHookAsync(
+            model,
+            "after_block_cleared",
+            context,
+            () => model.AfterBlockCleared(creature));
+    }
+
+    public static Task ExecuteAfterRestSiteHealHookAsync(AbstractModel model, Player player, bool isMimicked)
+    {
+        if (model is RelicModel relic && player != relic.Owner)
+        {
+            return model.AfterRestSiteHeal(player, isMimicked);
+        }
+
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: player.Creature, card: null);
+        context["IsMimicked"] = isMimicked;
+        return ExecuteHookAsync(
+            model,
+            "after_rest_site_heal",
+            context,
+            () => model.AfterRestSiteHeal(player, isMimicked));
+    }
+
+    public static Task ExecuteAfterDiedToDoomHookAsync(AbstractModel model, HookPlayerChoiceContext choiceContext, IReadOnlyList<Creature> creatures)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null);
+        if (model is RelicModel relic)
+        {
+            var doomedDeaths = creatures.Count(creature => creature != relic.Owner?.Creature);
+            context["DoomDeathCount"] = doomedDeaths;
+            if (relic.DynamicVars.TryGetValue("Heal", out var healVar))
+            {
+                context["DoomHealAmount"] = healVar.BaseValue * doomedDeaths;
+            }
+            else
+            {
+                context["DoomHealAmount"] = doomedDeaths;
+            }
+        }
+
+        return ExecuteHookAsync(
+            model,
+            "after_died_to_doom",
+            context,
+            () => choiceContext.AssignTaskAndWaitForPauseOrCompletion(model.AfterDiedToDoom(choiceContext, creatures)));
+    }
+
+    public static Task ExecuteAfterDeathHookAsync(AbstractModel model, HookPlayerChoiceContext choiceContext, Creature creature, bool wasRemovalPrevented, float deathAnimLength)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: creature, card: null);
+        if (model is RelicModel relic)
+        {
+            context["DeathTargetIsEnemy"] = creature.Side != relic.Owner?.Creature?.Side;
+        }
+        context["WasRemovalPrevented"] = wasRemovalPrevented;
+        context["DeathAnimLength"] = deathAnimLength;
+        return ExecuteHookAsync(
+            model,
+            "after_death",
+            context,
+            () => choiceContext.AssignTaskAndWaitForPauseOrCompletion(model.AfterDeath(choiceContext, creature, wasRemovalPrevented, deathAnimLength)));
+    }
+
+    public static Task ExecuteAfterPreventingBlockClearHookAsync(AbstractModel preventer, Creature creature)
+    {
+        var context = BuildHookContext(preventer, choiceContext: null, cardPlay: null, potion: null, target: creature, card: null);
+        if (preventer is RelicModel relic)
+        {
+            context["PreventerIsSelf"] = true;
+            context["CurrentBlock"] = creature.Block;
+            context["BlockAboveCap"] = Math.Max(0, creature.Block - 10);
+            context["CreatureIsOwner"] = creature == relic.Owner?.Creature;
+        }
+
+        return ExecuteHookAsync(
+            preventer,
+            "after_preventing_block_clear",
+            context,
+            () => preventer.AfterPreventingBlockClear(preventer, creature));
+    }
+
+    public static Task ExecuteAfterPreventingDeathHookAsync(AbstractModel preventer, Creature creature)
+    {
+        var context = BuildHookContext(preventer, choiceContext: null, cardPlay: null, potion: null, target: creature, card: null);
+        if (preventer is RelicModel relic)
+        {
+            context["TargetIsOwner"] = creature == relic.Owner?.Creature;
+            if (relic.DynamicVars.TryGetValue("Heal", out var healVar))
+            {
+                context["ReviveHealAmount"] = Math.Max(1m, creature.MaxHp * (healVar.BaseValue / 100m));
+            }
+        }
+
+        return ExecuteHookAsync(
+            preventer,
+            "after_preventing_death",
+            context,
+            () => preventer.AfterPreventingDeath(creature));
+    }
+
+    public static Task ExecuteAfterStarsSpentHookAsync(AbstractModel model, int amount, Player spender)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: spender.Creature, card: null);
+        context["HookPlayerIsOwner"] = model is RelicModel relic && spender == relic.Owner;
+        context["StarsSpentAmount"] = amount;
+        return ExecuteHookAsync(
+            model,
+            "after_stars_spent",
+            context,
+            () => model.AfterStarsSpent(amount, spender));
+    }
+
+    public static Task ExecuteBeforeTurnEndVeryEarlyHookAsync(AbstractModel model, HookPlayerChoiceContext choiceContext, CombatSide side)
+    {
+        var context = BuildBeforeTurnEndContext(model, choiceContext, side);
+        return ExecuteHookAsync(
+            model,
+            "before_turn_end_very_early",
+            context,
+            () => choiceContext.AssignTaskAndWaitForPauseOrCompletion(model.BeforeTurnEndVeryEarly(choiceContext, side)));
+    }
+
+    public static Task ExecuteBeforeTurnEndEarlyHookAsync(AbstractModel model, HookPlayerChoiceContext choiceContext, CombatSide side)
+    {
+        var context = BuildBeforeTurnEndContext(model, choiceContext, side);
+        return ExecuteHookAsync(
+            model,
+            "before_turn_end_early",
+            context,
+            () => choiceContext.AssignTaskAndWaitForPauseOrCompletion(model.BeforeTurnEndEarly(choiceContext, side)));
+    }
+
+    public static Task ExecuteBeforeTurnEndHookAsync(AbstractModel model, HookPlayerChoiceContext choiceContext, CombatSide side)
+    {
+        var context = BuildBeforeTurnEndContext(model, choiceContext, side);
+        return ExecuteHookAsync(
+            model,
+            "before_turn_end",
+            context,
+            () => choiceContext.AssignTaskAndWaitForPauseOrCompletion(model.BeforeTurnEnd(choiceContext, side)));
+    }
+
+    public static Task ExecuteAfterCardDiscardedHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, CardModel card)
+    {
+        var target = model is RelicModel { Owner: not null } relic
+            ? relic.Owner.RunState.Rng.CombatTargets.NextItem(relic.Owner.Creature.CombatState.HittableEnemies)
+            : null;
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target, card);
+        context["DiscardingOwnerIsOwner"] = model is RelicModel cardRelic && card.Owner == cardRelic.Owner;
+        context["IsOwnerCurrentSide"] = model is RelicModel sideRelic && sideRelic.Owner?.Creature?.Side == sideRelic.Owner?.Creature?.CombatState?.CurrentSide;
+        return ExecuteHookAsync(
+            model,
+            "after_card_discarded",
+            context,
+            () => model.AfterCardDiscarded(choiceContext, card));
+    }
+
+    public static Task ExecuteAfterShuffleHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player shuffler)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: shuffler.Creature, card: null);
+        context["HookPlayerIsOwner"] = model is RelicModel relic && shuffler == relic.Owner;
+        return ExecuteHookAsync(
+            model,
+            "after_shuffle",
+            context,
+            () => model.AfterShuffle(choiceContext, shuffler));
+    }
+
+    public static Task ExecuteAfterHandEmptiedHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player player)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: player.Creature, card: null);
+        context["HookPlayerIsOwner"] = model is RelicModel relic && player == relic.Owner;
+        context["IsPlayPhase"] = CombatManager.Instance.IsPlayPhase;
+        return ExecuteHookAsync(
+            model,
+            "after_hand_emptied",
+            context,
+            () => model.AfterHandEmptied(choiceContext, player));
+    }
+
+    public static Task ExecuteAfterPlayerTurnStartHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player player)
+    {
+        return ExecuteHookAsync(
+            model,
+            "after_player_turn_start",
+            BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null),
+            () => model.AfterPlayerTurnStart(choiceContext, player));
+    }
+
+    public static Task ExecuteAfterPlayerTurnStartEarlyHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player player)
+    {
+        return ExecuteHookAsync(
+            model,
+            "after_player_turn_start_early",
+            BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null),
+            () => model.AfterPlayerTurnStartEarly(choiceContext, player));
+    }
+
+    public static Task ExecuteAfterPlayerTurnStartLateHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player player)
+    {
+        return ExecuteHookAsync(
+            model,
+            "after_player_turn_start_late",
+            BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null),
+            () => model.AfterPlayerTurnStartLate(choiceContext, player));
+    }
+
+    public static Task ExecuteBeforeCombatStartHookAsync(AbstractModel model)
+    {
+        return ExecuteHookAsync(
+            model,
+            "before_combat_start",
+            BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null),
+            () => model.BeforeCombatStart());
+    }
+
+    public static Task ExecuteBeforeCombatStartLateHookAsync(AbstractModel model)
+    {
+        return ExecuteHookAsync(
+            model,
+            "before_combat_start_late",
+            BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null),
+            () => model.BeforeCombatStartLate());
+    }
+
+    public static async Task ExecuteRelicAfterObtainedAsync(RelicModel relic)
+    {
+        if (!TryGetGraphOverride(ModStudioEntityKind.Relic, relic.Id.Entry, out _, out var graph))
+        {
+            await relic.AfterObtained();
+            return;
+        }
+
+        var entryNodeId = ResolveEntryNode(graph!, "relic.after_obtained", allowDefaultFallback: false);
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            await relic.AfterObtained();
+            return;
+        }
+
+        var context = new BehaviorGraphExecutionContext
+        {
+            Graph = graph,
+            TriggerId = "relic.after_obtained",
+            SourceModel = relic,
+            Relic = relic,
+            Owner = relic.Owner,
+            RunState = relic.Owner?.RunState,
+            CombatState = relic.Owner?.Creature?.CombatState
+        };
+        context["IsInCombat"] = CombatManager.Instance.IsInProgress;
+        context["OwnerPotionCount"] = relic.Owner?.Potions.Count() ?? 0;
+        PopulateRelicStateSnapshot(context, relic);
+        await ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId);
+    }
+
+    public static Task ExecuteAfterCombatEndHookAsync(AbstractModel model, CombatRoom room)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["combat_room"] = room;
+        context["combat_room_type"] = room.RoomType.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_combat_end",
+            context,
+            () => model.AfterCombatEnd(room));
+    }
+
+    public static Task ExecuteAfterCombatVictoryEarlyHookAsync(AbstractModel model, CombatRoom room)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["combat_room"] = room;
+        context["combat_room_type"] = room.RoomType.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_combat_victory_early",
+            context,
+            () => model.AfterCombatVictoryEarly(room));
+    }
+
+    public static Task ExecuteAfterCombatVictoryHookAsync(AbstractModel model, CombatRoom room)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["combat_room"] = room;
+        context["combat_room_type"] = room.RoomType.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_combat_victory",
+            context,
+            () => model.AfterCombatVictory(room));
+    }
+
+    public static Task ExecuteAfterRoomEnteredHookAsync(AbstractModel model, AbstractRoom room)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["room"] = room;
+        context["room_type"] = room.RoomType.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_room_entered",
+            context,
+            () => model.AfterRoomEntered(room));
+    }
+
+    public static Task ExecuteBeforeHandDrawHookAsync(AbstractModel model, Player player, PlayerChoiceContext choiceContext, CombatState combatState)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null);
+        context["player_net_id"] = player.NetId.ToString();
+        context["hook_combat_state"] = combatState;
+        context["HookPlayerIsOwner"] = model is RelicModel relic && player == relic.Owner;
+        context["CombatRound"] = combatState.RoundNumber;
+        return ExecuteHookAsync(
+            model,
+            "before_hand_draw",
+            context,
+            () => model.BeforeHandDraw(player, choiceContext, combatState));
+    }
+
+    public static Task ExecuteBeforeHandDrawLateHookAsync(AbstractModel model, Player player, PlayerChoiceContext choiceContext, CombatState combatState)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null);
+        context["player_net_id"] = player.NetId.ToString();
+        context["hook_combat_state"] = combatState;
+        context["HookPlayerIsOwner"] = model is RelicModel relic && player == relic.Owner;
+        context["CombatRound"] = combatState.RoundNumber;
+        return ExecuteHookAsync(
+            model,
+            "before_hand_draw_late",
+            context,
+            () => model.BeforeHandDrawLate(player, choiceContext, combatState));
+    }
+
+    public static Task ExecuteAfterEnergyResetHookAsync(AbstractModel model, Player player)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["player_net_id"] = player.NetId.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_energy_reset",
+            context,
+            () => model.AfterEnergyReset(player));
+    }
+
+    public static Task ExecuteAfterEnergyResetLateHookAsync(AbstractModel model, Player player)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["player_net_id"] = player.NetId.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_energy_reset_late",
+            context,
+            () => model.AfterEnergyResetLate(player));
+    }
+
+    public static Task ExecuteAfterSideTurnStartHookAsync(AbstractModel model, CombatSide side, CombatState combatState)
+    {
+        var context = BuildHookContext(model, choiceContext: null, cardPlay: null, potion: null, target: null, card: null);
+        context["combat_side"] = side.ToString();
+        context["hook_combat_state"] = combatState;
+        return ExecuteHookAsync(
+            model,
+            "after_side_turn_start",
+            context,
+            () => model.AfterSideTurnStart(side, combatState));
+    }
+
+    public static Task ExecuteBeforeSideTurnStartHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, CombatSide side, CombatState combatState)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null);
+        context["combat_side"] = side.ToString();
+        context["hook_combat_state"] = combatState;
+        return ExecuteHookAsync(
+            model,
+            "before_side_turn_start",
+            context,
+            () => model.BeforeSideTurnStart(choiceContext, side, combatState));
+    }
+
+    public static Task ExecuteBeforePlayPhaseStartHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player player)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null);
+        context["player_net_id"] = player.NetId.ToString();
+        return ExecuteHookAsync(
+            model,
+            "before_play_phase_start",
+            context,
+            () => model.BeforePlayPhaseStart(choiceContext, player));
+    }
+
+    public static Task ExecuteAfterTurnEndHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, CombatSide side)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null);
+        context["combat_side"] = side.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_turn_end",
+            context,
+            () => model.AfterTurnEnd(choiceContext, side));
+    }
+
+    public static Task ExecuteAfterTurnEndLateHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, CombatSide side)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null);
+        context["combat_side"] = side.ToString();
+        return ExecuteHookAsync(
+            model,
+            "after_turn_end_late",
+            context,
+            () => model.AfterTurnEndLate(choiceContext, side));
+    }
+
+    public static Task ExecuteBeforeFlushHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player player)
+    {
+        return ExecuteHookAsync(
+            model,
+            "before_flush",
+            BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null),
+            () => model.BeforeFlush(choiceContext, player));
+    }
+
+    public static Task ExecuteBeforeFlushLateHookAsync(AbstractModel model, PlayerChoiceContext choiceContext, Player player)
+    {
+        return ExecuteHookAsync(
+            model,
+            "before_flush_late",
+            BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null),
+            () => model.BeforeFlushLate(choiceContext, player));
     }
 
     private static async Task ExecuteHookAsync(
@@ -411,7 +1563,7 @@ internal static class RuntimeGraphDispatcher
             return;
         }
 
-        await Executor.ExecuteAsync(graph!, context, entryNodeId);
+        await ExecuteGraphAndApplyStateAsync(graph!, context, entryNodeId);
     }
 
     private static BehaviorGraphExecutionContext BuildHookContext(
@@ -419,7 +1571,8 @@ internal static class RuntimeGraphDispatcher
         PlayerChoiceContext? choiceContext,
         CardPlay? cardPlay,
         PotionModel? potion,
-        Creature? target)
+        Creature? target,
+        CardModel? card = null)
     {
         return model switch
         {
@@ -428,7 +1581,7 @@ internal static class RuntimeGraphDispatcher
                 ChoiceContext = choiceContext,
                 SourceModel = relic,
                 CardPlay = cardPlay,
-                Card = cardPlay?.Card,
+                Card = card ?? cardPlay?.Card,
                 Potion = potion,
                 Relic = relic,
                 Owner = relic.Owner,
@@ -441,7 +1594,7 @@ internal static class RuntimeGraphDispatcher
                 ChoiceContext = choiceContext,
                 SourceModel = enchantment,
                 CardPlay = cardPlay,
-                Card = enchantment.Card,
+                Card = card ?? enchantment.Card,
                 Potion = potion,
                 Enchantment = enchantment,
                 Owner = enchantment.Card.Owner,
@@ -454,10 +1607,284 @@ internal static class RuntimeGraphDispatcher
                 ChoiceContext = choiceContext,
                 SourceModel = model,
                 CardPlay = cardPlay,
-                Card = cardPlay?.Card,
+                Card = card ?? cardPlay?.Card,
                 Potion = potion,
                 Target = target
             }
+        };
+    }
+
+    private static BehaviorGraphExecutionContext BuildBeforeTurnEndContext(AbstractModel model, HookPlayerChoiceContext choiceContext, CombatSide side)
+    {
+        var context = BuildHookContext(model, choiceContext, cardPlay: null, potion: null, target: null, card: null);
+        context["TurnSide"] = side.ToString();
+        if (model is RelicModel relic && relic.Owner != null)
+        {
+            context["IsOwnerTurnSide"] = side == relic.Owner.Creature.Side;
+            context["OwnerSide"] = relic.Owner.Creature.Side.ToString();
+            context["HandCount"] = PileType.Hand.GetPile(relic.Owner).Cards.Count;
+            context["CurrentBlock"] = relic.Owner.Creature.Block;
+            context["CombatRound"] = relic.Owner.Creature.CombatState?.RoundNumber ?? 0;
+            context["PlayedAttackThisTurn"] = CombatManager.Instance.History.CardPlaysFinished.Any(entry =>
+                entry.HappenedThisTurn(relic.Owner.Creature.CombatState) &&
+                entry.CardPlay.Card.Type == CardType.Attack &&
+                entry.CardPlay.Card.Owner == relic.Owner);
+        }
+
+        return context;
+    }
+
+    private static void PopulateRelicStateSnapshot(BehaviorGraphExecutionContext context, RelicModel relic)
+    {
+        context["Status"] = relic.Status.ToString();
+        context["IsUsedUp"] = relic.IsUsedUp;
+        context["DisplayAmount"] = relic.DisplayAmount;
+
+        foreach (var pair in relic.DynamicVars)
+        {
+            context[pair.Key] = pair.Value.BaseValue;
+        }
+
+        var properties = relic.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public);
+        foreach (var property in properties)
+        {
+            if (!property.CanRead || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            object? value;
+            try
+            {
+                value = property.GetValue(relic);
+            }
+            catch
+            {
+                continue;
+            }
+
+            switch (value)
+            {
+                case null:
+                    continue;
+                case bool or int or long or decimal or double or float or string:
+                    context[property.Name] = value;
+                    break;
+                case Enum enumValue:
+                    context[property.Name] = enumValue.ToString();
+                    break;
+            }
+        }
+
+        var nonPublicProperties = relic.GetType().GetProperties(BindingFlags.Instance | BindingFlags.NonPublic);
+        foreach (var property in nonPublicProperties)
+        {
+            if (!property.CanRead || property.GetIndexParameters().Length > 0 || context.State.ContainsKey(property.Name))
+            {
+                continue;
+            }
+
+            object? value;
+            try
+            {
+                value = property.GetValue(relic);
+            }
+            catch
+            {
+                continue;
+            }
+
+            switch (value)
+            {
+                case null:
+                    continue;
+                case bool or int or long or decimal or double or float or string:
+                    context[property.Name] = value;
+                    break;
+                case Enum enumValue:
+                    context[property.Name] = enumValue.ToString();
+                    break;
+            }
+        }
+
+        var fields = relic.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        foreach (var field in fields)
+        {
+            if (context.State.ContainsKey(field.Name))
+            {
+                continue;
+            }
+
+            object? value;
+            try
+            {
+                value = field.GetValue(relic);
+            }
+            catch
+            {
+                continue;
+            }
+
+            switch (value)
+            {
+                case null:
+                    continue;
+                case bool or int or long or decimal or double or float or string:
+                    context[field.Name] = value;
+                    break;
+                case Enum enumValue:
+                    context[field.Name] = enumValue.ToString();
+                    break;
+            }
+        }
+    }
+
+    private static async Task ExecuteGraphAndApplyStateAsync(
+        BehaviorGraphDefinition graph,
+        BehaviorGraphExecutionContext context,
+        string entryNodeId)
+    {
+        await Executor.ExecuteAsync(graph, context, entryNodeId);
+        if (context.SourceModel != null)
+        {
+            ApplyModelStateWriteBack(context.SourceModel, context);
+        }
+    }
+
+    private static void ApplyModelStateWriteBack(AbstractModel model, BehaviorGraphExecutionContext context)
+    {
+        foreach (var pair in context.State)
+        {
+            if (!TryWriteProperty(model, pair.Key, pair.Value))
+            {
+                TryWriteField(model, pair.Key, pair.Value);
+            }
+        }
+    }
+
+    private static bool TryWriteProperty(AbstractModel model, string key, object? rawValue)
+    {
+        var property = model.GetType().GetProperty(key, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (property == null || !property.CanWrite || property.GetIndexParameters().Length > 0)
+        {
+            return false;
+        }
+
+        if (!TryConvertMemberValue(rawValue, property.PropertyType, out var converted))
+        {
+            return false;
+        }
+
+        try
+        {
+            var current = property.CanRead ? property.GetValue(model) : null;
+            if (Equals(current, converted))
+            {
+                return true;
+            }
+
+            property.SetValue(model, converted);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryWriteField(AbstractModel model, string key, object? rawValue)
+    {
+        var field = model.GetType().GetField(key, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (field == null || field.IsInitOnly)
+        {
+            return false;
+        }
+
+        if (!TryConvertMemberValue(rawValue, field.FieldType, out var converted))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (Equals(field.GetValue(model), converted))
+            {
+                return true;
+            }
+
+            field.SetValue(model, converted);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryConvertMemberValue(object? rawValue, Type targetType, out object? converted)
+    {
+        converted = null;
+        if (rawValue == null)
+        {
+            return !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) != null;
+        }
+
+        if (targetType.IsInstanceOfType(rawValue))
+        {
+            converted = rawValue;
+            return true;
+        }
+
+        var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+        try
+        {
+            if (underlyingType.IsEnum)
+            {
+                if (rawValue is string stringValue && Enum.TryParse(underlyingType, stringValue, ignoreCase: true, out var enumValue))
+                {
+                    converted = enumValue;
+                    return true;
+                }
+
+                if (rawValue is IConvertible)
+                {
+                    converted = Enum.ToObject(underlyingType, rawValue);
+                    return true;
+                }
+
+                return false;
+            }
+
+            if (rawValue is string decimalString && underlyingType == typeof(decimal) &&
+                decimal.TryParse(decimalString, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsedDecimal))
+            {
+                converted = parsedDecimal;
+                return true;
+            }
+
+            if (rawValue is IConvertible)
+            {
+                converted = Convert.ChangeType(rawValue, underlyingType, CultureInfo.InvariantCulture);
+                return true;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveContextBool(BehaviorGraphExecutionContext context, string key)
+    {
+        return context.TryGetState<object>(key, out var rawValue) && rawValue switch
+        {
+            bool boolValue => boolValue,
+            string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
+            int intValue => intValue != 0,
+            decimal decimalValue => decimalValue != 0m,
+            _ => false
         };
     }
 

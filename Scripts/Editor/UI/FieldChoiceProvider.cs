@@ -1,4 +1,5 @@
-using MegaCrit.Sts2.Core.Entities.Cards;
+﻿using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Enchantments;
 using MegaCrit.Sts2.Core.Entities.Gold;
 using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.Entities.Relics;
@@ -6,7 +7,9 @@ using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.ValueProps;
+using STS2_Editor.Scripts.Editor.Core.Models;
 using STS2_Editor.Scripts.Editor.Core.Utilities;
 using STS2_Editor.Scripts.Editor.Graph;
 
@@ -14,24 +17,35 @@ namespace STS2_Editor.Scripts.Editor.UI;
 
 internal static class FieldChoiceProvider
 {
-    public static IReadOnlyList<(string Value, string Display)> GetBasicChoices(string key)
+    private static readonly Dictionary<string, IReadOnlyList<(string Value, string Display)>> BasicChoiceCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, IReadOnlyList<(string Value, string Display)>> GraphChoiceCache = new(StringComparer.OrdinalIgnoreCase);
+    private static bool? _cachedLanguageIsChinese;
+
+    public static IReadOnlyList<(string Value, string Display)> GetBasicChoices(ModStudioEntityKind kind, string key)
     {
-        return key switch
+        EnsureCacheLanguage();
+        var cacheKey = $"{kind}:{key}";
+        if (BasicChoiceCache.TryGetValue(cacheKey, out var cached))
+        {
+            return cached;
+        }
+
+        var result = key switch
         {
             "type" => Enum.GetNames<CardType>()
-                .Select(value => (value, ModStudioFieldDisplayNames.FormatGraphPropertyValue(key, value)))
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
                 .ToList(),
-            "rarity" => GetRarityChoices(),
+            "rarity" => GetRarityChoices(kind),
             "target_type" => Enum.GetNames<TargetType>()
-                .Select(value => (value, ModStudioFieldDisplayNames.FormatGraphPropertyValue(key, value)))
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
                 .ToList(),
             "usage" => Enum.GetNames<PotionUsage>()
-                .Select(value => (value, ModStudioFieldDisplayNames.FormatGraphPropertyValue(key, value)))
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
                 .ToList(),
             "layout_type" => Enum.GetNames<EventLayoutType>()
-                .Select(value => (value, ModStudioFieldDisplayNames.FormatValue(value)))
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
                 .ToList(),
-            "pool_id" => GetPoolChoices(),
+            "pool_id" => GetPoolChoices(kind),
             "card_id" => GetCardChoices(),
             "replacement_card_id" => GetCardChoices(),
             "relic_id" => GetRelicChoices(),
@@ -45,11 +59,20 @@ internal static class FieldChoiceProvider
             "enchantment_id" => GetEnchantmentChoices(),
             _ => Array.Empty<(string, string)>()
         };
+
+        BasicChoiceCache[cacheKey] = result;
+        return result;
     }
 
     public static IReadOnlyList<(string Value, string Display)> GetGraphChoices(string key)
     {
-        return key switch
+        EnsureCacheLanguage();
+        if (GraphChoiceCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var result = key switch
         {
             "target" => new[]
             {
@@ -71,6 +94,7 @@ internal static class FieldChoiceProvider
             "reward_power_id" => GetPowerChoices(),
             "encounter_id" => GetEncounterChoices(),
             "operator" => GetOperatorChoices(),
+            "status" => GetEnchantmentStatusChoices(),
             "dynamic_source_kind" => GetDynamicSourceKindChoices(),
             "base_override_mode" => GetOverrideModeChoices(),
             "extra_override_mode" => GetOverrideModeChoices(),
@@ -96,8 +120,14 @@ internal static class FieldChoiceProvider
             "selection_mode" => GetSelectionModeChoices(),
             "source_pile" => GetPileChoices(),
             "prompt_kind" => GetPromptKindChoices(),
+            "reward_room_type" => GetRoomTypeChoices(),
+            "room_type" => GetRoomTypeChoices(),
+            "map_kind" => GetMapKindChoices(),
             _ => Array.Empty<(string, string)>()
         };
+
+        GraphChoiceCache[key] = result;
+        return result;
     }
 
     public static IReadOnlyList<(string Value, string Display)> GetDynamicVarChoices(AbstractModel? model = null)
@@ -120,17 +150,24 @@ internal static class FieldChoiceProvider
             .ToList();
     }
 
-    private static IReadOnlyList<(string Value, string Display)> GetPoolChoices()
+    private static IReadOnlyList<(string Value, string Display)> GetPoolChoices(ModStudioEntityKind kind)
     {
-        var results = new List<(string, string)>();
-        results.AddRange(ModelDb.AllCardPools.Select(pool => (pool.Id.Entry, $"{pool.Title} [{pool.Id.Entry}]")));
-        results.AddRange(ModelDb.AllRelicPools.Select(pool => (pool.Id.Entry, $"{pool.Id.Entry} [{pool.GetType().Name}]")));
-        results.AddRange(ModelDb.AllPotionPools.Select(pool => (pool.Id.Entry, $"{pool.Id.Entry} [{pool.GetType().Name}]")));
-        return results
-            .GroupBy(pair => pair.Item1, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return kind switch
+        {
+            ModStudioEntityKind.Card => ModelDb.AllCardPools
+                .Select(pool => (pool.Id.Entry, ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", pool.Id.Entry)))
+                .OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            ModStudioEntityKind.Relic => ModelDb.AllRelicPools
+                .Select(pool => (pool.Id.Entry, ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", pool.Id.Entry)))
+                .OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            ModStudioEntityKind.Potion => ModelDb.AllPotionPools
+                .Select(pool => (pool.Id.Entry, ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", pool.Id.Entry)))
+                .OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            _ => Array.Empty<(string, string)>()
+        };
     }
 
     private static IReadOnlyList<(string Value, string Display)> GetPowerChoices()
@@ -197,15 +234,19 @@ internal static class FieldChoiceProvider
             .ToList();
     }
 
-    private static IReadOnlyList<(string Value, string Display)> GetRarityChoices()
+    private static IReadOnlyList<(string Value, string Display)> GetRarityChoices(ModStudioEntityKind kind)
     {
-        var values = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var name in Enum.GetNames<CardRarity>()) values.Add(name);
-        foreach (var name in Enum.GetNames<RelicRarity>()) values.Add(name);
-        foreach (var name in Enum.GetNames<PotionRarity>()) values.Add(name);
+        IEnumerable<string> values = kind switch
+        {
+            ModStudioEntityKind.Card => Enum.GetNames<CardRarity>(),
+            ModStudioEntityKind.Relic => Enum.GetNames<RelicRarity>(),
+            ModStudioEntityKind.Potion => Enum.GetNames<PotionRarity>(),
+            _ => Array.Empty<string>()
+        };
+
         return values
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
-            .Select(value => (value, ModStudioFieldDisplayNames.FormatValue(value)))
+            .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue("rarity", value)))
             .ToList();
     }
 
@@ -301,6 +342,21 @@ internal static class FieldChoiceProvider
         };
     }
 
+    private static IReadOnlyList<(string Value, string Display)> GetRoomTypeChoices()
+    {
+        return Enum.GetNames<RoomType>()
+            .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue("room_type", value)))
+            .ToList();
+    }
+
+    private static IReadOnlyList<(string Value, string Display)> GetMapKindChoices()
+    {
+        return
+        [
+            ("golden_path", ModStudioFieldDisplayNames.FormatPropertyValue("map_kind", "golden_path"))
+        ];
+    }
+
     private static IReadOnlyList<(string Value, string Display)> GetRewardKindChoices()
     {
         return new[]
@@ -333,6 +389,14 @@ internal static class FieldChoiceProvider
             ("gte", Dual("大于等于", ">="))
         };
     }
+
+    private static IReadOnlyList<(string Value, string Display)> GetEnchantmentStatusChoices()
+    {
+        return Enum.GetNames<EnchantmentStatus>()
+            .Select(value => (value, ModStudioFieldDisplayNames.FormatGraphPropertyValue("status", value)))
+            .ToList();
+    }
+
 
     private static IReadOnlyList<(string Value, string Display)> GetDynamicSourceKindChoices()
     {
@@ -418,31 +482,6 @@ internal static class FieldChoiceProvider
         };
     }
 
-    #if false
-    private static IReadOnlyList<(string Value, string Display)> GetRewardKindChoicesV2()
-    {
-        return new[]
-        {
-            ("gold", Dual("閲戝竵", "Gold")),
-            ("energy", Dual("鑳介噺", "Energy")),
-            ("stars", Dual("鏄熸暟", "Stars")),
-            ("draw", Dual("鎶界墝", "Draw")),
-            ("block", Dual("鏍兼尅", "Block")),
-            ("heal", Dual("娌荤枟", "Heal")),
-            ("damage", Dual("浼ゅ", "Damage")),
-            ("max_hp", Dual("鏈€澶х敓鍛?, "Max HP")),
-            ("power", Dual("鑳藉姏", "Power")),
-            ("card", Dual("鍗＄墝濂栧姳", "Card Reward")),
-            ("relic", Dual("閬楃墿濂栧姳", "Relic Reward")),
-            ("potion", Dual("鑽按濂栧姳", "Potion Reward")),
-            ("special_card", Dual("鐗规畩鍗＄墝濂栧姳", "Special Card Reward")),
-            ("remove_card", Dual("绉婚櫎鍗＄墝濂栧姳", "Card Removal Reward")),
-            ("custom", Dual("鑷畾涔夊崰浣?, "Custom Placeholder"))
-        };
-    }
-
-    #endif
-
     private static IReadOnlyList<(string Value, string Display)> GetRewardKindChoicesV2()
     {
         return new[]
@@ -485,5 +524,17 @@ internal static class FieldChoiceProvider
     private static string Dual(string zh, string en)
     {
         return ModStudioLocalization.IsChinese ? zh : en;
+    }
+
+    private static void EnsureCacheLanguage()
+    {
+        if (_cachedLanguageIsChinese == ModStudioLocalization.IsChinese)
+        {
+            return;
+        }
+
+        _cachedLanguageIsChinese = ModStudioLocalization.IsChinese;
+        BasicChoiceCache.Clear();
+        GraphChoiceCache.Clear();
     }
 }

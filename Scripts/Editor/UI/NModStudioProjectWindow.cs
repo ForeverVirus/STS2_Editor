@@ -39,6 +39,8 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
     private bool _assetTabLoadedForCurrentItem;
     private bool _graphTabLoadedForCurrentItem;
     private bool _graphCanvasSignalsWired;
+    private BehaviorGraphDefinition? _cachedCompiledEventGraph;
+    private EventGraphValidationResult? _cachedCompiledEventResult;
     private string _currentProjectPath = string.Empty;
     private EditorProject? _project;
     private ModStudioEntityKind _currentKind = ModStudioEntityKind.Card;
@@ -236,6 +238,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _detailPanel.NodePropertyChanged += OnSelectedNodePropertyChanged;
         _detailPanel.SelectedNodeDisplayNameChanged += OnSelectedNodeDisplayNameChanged;
         _detailPanel.SelectedNodeDescriptionChanged += OnSelectedNodeDescriptionChanged;
+        _detailPanel.EventOptionAddRequested += OnEventOptionAddRequested;
         body.AddChild(_detailPanel);
         _detailPanel.SetTab(_centerEditor.Tabs.CurrentTab);
 
@@ -808,9 +811,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         var cache = new EntityEditorViewCache
         {
             OriginalMetadata = new Dictionary<string, string>(originalMetadata, StringComparer.Ordinal),
-            MergedMetadata = mergedMetadata,
-            RuntimeAssetCandidates = _assetBindingService.GetRuntimeAssetCandidates(item.Kind).ToList(),
-            ImportedAssets = GetImportedAssetsForKind(item.Kind)
+            MergedMetadata = mergedMetadata
         };
 
         _entityViewCache[cacheKey] = cache;
@@ -847,7 +848,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         }
 
         var title = ResolveEntityDisplayTitle(item, cache.MergedMetadata);
-        _centerEditor.BasicEditor.BindMetadata(title, BuildBasicEditorMetadata(item.Kind, cache.MergedMetadata));
+        _centerEditor.BasicEditor.BindMetadata(title, item.Kind, BuildBasicEditorMetadata(item.Kind, cache.MergedMetadata));
         _detailPanel.SetBasicText(BuildBasicDetailsText(item, BuildBasicEditorMetadata(item.Kind, cache.OriginalMetadata)));
     }
 
@@ -899,8 +900,12 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         cache.OriginalMetadata = new Dictionary<string, string>(GetOriginalMetadata(_currentItem), StringComparer.Ordinal);
         var envelope = GetEnvelope(_currentKind, _currentItem.EntityId);
         cache.MergedMetadata = MergeMetadata(cache.OriginalMetadata, envelope);
-        cache.RuntimeAssetCandidates = _assetBindingService.GetRuntimeAssetCandidates(_currentKind).ToList();
-        cache.ImportedAssets = GetImportedAssetsForKind(_currentKind);
+        if (_assetTabLoadedForCurrentItem && !cache.AssetsLoaded)
+        {
+            cache.RuntimeAssetCandidates = _assetBindingService.GetRuntimeAssetCandidates(_currentKind).ToList();
+            cache.ImportedAssets = GetImportedAssetsForKind(_currentKind);
+            cache.AssetsLoaded = true;
+        }
         if (clearAutoGraph)
         {
             cache.AutoGraph = null;
@@ -916,6 +921,13 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         {
             ShowAssetFallback(item, cache);
             return;
+        }
+
+        if (!cache.AssetsLoaded)
+        {
+            cache.RuntimeAssetCandidates = _assetBindingService.GetRuntimeAssetCandidates(item.Kind).ToList();
+            cache.ImportedAssets = GetImportedAssetsForKind(item.Kind);
+            cache.AssetsLoaded = true;
         }
 
         var envelope = GetEnvelope(item.Kind, item.EntityId);
@@ -1052,12 +1064,12 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         var title = ResolveEntityDisplayTitle(item, metadata);
         var summary = item.Kind switch
         {
-            ModStudioEntityKind.Character => $"HP {MetadataOrFallback(metadata, "starting_hp", "0")} | Gold {MetadataOrFallback(metadata, "starting_gold", "0")} | Energy {MetadataOrFallback(metadata, "max_energy", "0")}",
-            ModStudioEntityKind.Card => $"{MetadataOrFallback(metadata, "type", "Attack")} | {MetadataOrFallback(metadata, "rarity", "Common")} | Pool {MetadataOrFallback(metadata, "pool_id", "-")}",
-            ModStudioEntityKind.Relic => $"{MetadataOrFallback(metadata, "rarity", "Common")} | Pool {MetadataOrFallback(metadata, "pool_id", "-")}",
-            ModStudioEntityKind.Potion => $"{MetadataOrFallback(metadata, "rarity", "Common")} | {MetadataOrFallback(metadata, "usage", "CombatOnly")} | {MetadataOrFallback(metadata, "target_type", "Self")}",
-            ModStudioEntityKind.Event => $"{MetadataOrFallback(metadata, "layout_type", "Default")} | Shared {MetadataOrFallback(metadata, "is_shared", "True")}",
-            ModStudioEntityKind.Enchantment => $"Show Amount {MetadataOrFallback(metadata, "show_amount", "False")} | Icon {MetadataOrFallback(metadata, "icon_path", "-")}",
+            ModStudioEntityKind.Character => $"HP {MetadataOrFallback(metadata, "starting_hp", "0")} | {Dual("金币", "Gold")} {MetadataOrFallback(metadata, "starting_gold", "0")} | {Dual("能量", "Energy")} {MetadataOrFallback(metadata, "max_energy", "0")}",
+            ModStudioEntityKind.Card => $"{ModStudioFieldDisplayNames.FormatPropertyValue("type", MetadataOrFallback(metadata, "type", "Attack"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))}",
+            ModStudioEntityKind.Relic => $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))}",
+            ModStudioEntityKind.Potion => $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("usage", MetadataOrFallback(metadata, "usage", "CombatOnly"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("target_type", MetadataOrFallback(metadata, "target_type", "Self"))}",
+            ModStudioEntityKind.Event => $"{ModStudioFieldDisplayNames.FormatPropertyValue("layout_type", MetadataOrFallback(metadata, "layout_type", "Default"))} | {Dual("共享", "Shared")} {ModStudioFieldDisplayNames.FormatPropertyValue("is_shared", MetadataOrFallback(metadata, "is_shared", "True"))}",
+            ModStudioEntityKind.Enchantment => $"{Dual("显示数值", "Show Amount")} {ModStudioFieldDisplayNames.FormatPropertyValue("show_amount", MetadataOrFallback(metadata, "show_amount", "False"))} | {Dual("图标", "Icon")} {MetadataOrFallback(metadata, "icon_path", "-")}",
             _ => fallback.Summary
         };
 

@@ -1,6 +1,7 @@
 using STS2_Editor.Scripts.Editor.Core.Models;
 using STS2_Editor.Scripts.Editor.Core.Utilities;
 using STS2_Editor.Scripts.Editor.Packaging;
+using MegaCrit.Sts2.Core.Logging;
 
 namespace STS2_Editor.Scripts.Editor.Runtime;
 
@@ -42,6 +43,7 @@ public sealed class RuntimePackageBackend
         LoadSessionStates();
         NormalizeSessionStates();
         ResolveCurrentSession();
+        Log.Info($"[ModStudio.Package] Installed={_installedPackages.Count} SessionStates={_sessionStates.Count} Active={string.Join(", ", _sessionStates.Where(state => state.Enabled && state.SessionEnabled).OrderBy(state => state.LoadOrder).Select(state => state.PackageKey))}");
     }
 
     public void RefreshInstalledPackages()

@@ -552,9 +552,12 @@ public sealed partial class NModStudioProjectWindow
 
         WithSuppressedDirty(() =>
         {
+            var summaryText = BuildSelectedNodeInspectorSummaryText(graph, selectedNode);
+            _detailPanel.SetInspectorGraphContext(graph, selectedNode);
             _detailPanel.SetSelectedNode(selectedNode);
-            _detailPanel.SetSelectedNodeDynamicSummary(BuildSelectedNodeInspectorSummaryText(graph, selectedNode));
+            _detailPanel.SetSelectedNodeDynamicSummary(summaryText);
             _detailPanel.SetSelectedNodeProperties(BuildEditableNodeProperties(selectedNode));
+            _detailPanel.SetPreviewContextVisible(ShouldShowPreviewContextForSelectedNode(selectedNode));
         });
     }
 
@@ -623,7 +626,141 @@ public sealed partial class NModStudioProjectWindow
             }
         }
 
-        return properties;
+        return FilterInspectorProperties(node, properties);
+    }
+
+    private IReadOnlyDictionary<string, string> FilterInspectorProperties(BehaviorGraphNodeDefinition node, IReadOnlyDictionary<string, string> properties)
+    {
+        var nodeType = (node.NodeType ?? string.Empty).Trim().ToLowerInvariant();
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var key in GetAllowedInspectorKeys(node, properties))
+        {
+            if (properties.TryGetValue(key, out var value))
+            {
+                result[key] = value;
+            }
+        }
+
+        return result;
+    }
+
+    private IReadOnlyCollection<string> GetAllowedInspectorKeys(BehaviorGraphNodeDefinition node, IReadOnlyDictionary<string, string> properties)
+    {
+        var nodeType = (node.NodeType ?? string.Empty).Trim().ToLowerInvariant();
+        var dynamicPropertyKey = GetPrimaryDynamicPropertyKey(node);
+        var dynamicAmount = dynamicPropertyKey == null ? null : EnsureDynamicValueDefinition(node, dynamicPropertyKey);
+
+        if (nodeType is "flow.entry" or "flow.exit" or "event.proceed")
+        {
+            return Array.Empty<string>();
+        }
+
+        if (nodeType == "flow.branch")
+        {
+            return new[] { "condition", "condition_key" };
+        }
+
+        if (nodeType == "debug.log")
+        {
+            return new[] { "message" };
+        }
+
+        if (nodeType == "event.page")
+        {
+            return new[] { "page_id", "title", "description", "is_start", "option_order" };
+        }
+
+        if (nodeType == "event.option")
+        {
+            return new[]
+            {
+                "page_id",
+                "option_id",
+                "title",
+                "description",
+                "next_page_id",
+                "encounter_id",
+                "resume_page_id",
+                "is_proceed",
+                "save_choice_to_history",
+                "reward_kind",
+                "reward_amount",
+                "reward_count",
+                "reward_target",
+                "reward_props",
+                "reward_power_id",
+                "card_id",
+                "relic_id",
+                "potion_id"
+            };
+        }
+
+        if (nodeType == "event.goto_page")
+        {
+            return new[] { "next_page_id" };
+        }
+
+        if (nodeType == "event.start_combat")
+        {
+            return new[] { "encounter_id", "resume_page_id" };
+        }
+
+        if (nodeType == "event.reward")
+        {
+            return new[] { "reward_kind", "reward_amount", "reward_count", "reward_target", "reward_props", "reward_power_id", "card_id", "relic_id", "potion_id" };
+        }
+
+        if (nodeType == "reward.offer_custom")
+        {
+            return new[] { "reward_kind", "reward_count", "amount", "card_id", "relic_id", "potion_id" };
+        }
+
+        if (nodeType == "card.select_cards")
+        {
+            return new[] { "state_key", "selection_mode", "source_pile", "count", "prompt_kind", "allow_cancel", "enchantment_id" };
+        }
+
+        if (dynamicAmount == null)
+        {
+            return properties.Keys.ToList();
+        }
+
+        var allowed = new List<string> { "dynamic_source_kind" };
+        switch (dynamicAmount.SourceKind)
+        {
+            case DynamicValueSourceKind.Literal:
+                allowed.Add(dynamicPropertyKey!);
+                break;
+            case DynamicValueSourceKind.DynamicVar:
+                allowed.Add("dynamic_var_name");
+                allowed.Add("base_override_mode");
+                allowed.Add("base_override_value");
+                break;
+            case DynamicValueSourceKind.FormulaRef:
+                allowed.Add("dynamic_var_name");
+                allowed.Add("formula_ref");
+                allowed.Add("base_override_mode");
+                allowed.Add("base_override_value");
+                allowed.Add("extra_override_mode");
+                allowed.Add("extra_override_value");
+                allowed.Add("preview_multiplier_key");
+                break;
+        }
+
+        foreach (var key in properties.Keys)
+        {
+            if (key == dynamicPropertyKey ||
+                key is "target" or "props" or "power_id" or "keyword" or "card_id" or "replacement_card_id" or "relic_id" or "replacement_relic_id" or "potion_id" or "monster_id" or "orb_id" or "enchantment_id" or "target_pile" or "source_pile" or "position" or "count" or "card_state_key" or "selection_mode" or "prompt_kind" or "allow_cancel" or "auto_play_type" or "skip_x_capture" or "skip_card_pile_visuals" or "gold_loss_type" or "card_preview_style" or "target_type_scope" or "card_type_scope" or "exact_energy_cost" or "include_x_cost" or "result_key" or "operator")
+            {
+                if (!allowed.Contains(key, StringComparer.Ordinal))
+                {
+                    allowed.Add(key);
+                }
+            }
+        }
+
+        return allowed;
     }
 
     private string BuildSelectedNodeInspectorSummaryText(BehaviorGraphDefinition graph, BehaviorGraphNodeDefinition? node)
@@ -634,7 +771,34 @@ public sealed partial class NModStudioProjectWindow
             return dynamicSummary;
         }
 
+        var internalStateSummary = BuildSelectedInternalStateNodeSummaryText(node);
+        if (!string.IsNullOrWhiteSpace(internalStateSummary))
+        {
+            return internalStateSummary;
+        }
+
         return BuildSelectedEventNodeSummaryText(graph, node);
+    }
+
+    private bool ShouldShowPreviewContextForSelectedNode(BehaviorGraphNodeDefinition? node)
+    {
+        if (node == null)
+        {
+            return false;
+        }
+
+        if (_currentKind is ModStudioEntityKind.Event)
+        {
+            return false;
+        }
+
+        var normalizedNodeType = (node.NodeType ?? string.Empty).Trim().ToLowerInvariant();
+        if (normalizedNodeType is "flow.entry" or "flow.exit" or "event.page" or "event.option" or "event.goto_page" or "event.proceed" or "event.start_combat" or "event.reward")
+        {
+            return false;
+        }
+
+        return GetPrimaryDynamicPropertyKey(node) != null;
     }
 
     private string BuildSelectedEventNodeSummaryText(BehaviorGraphDefinition graph, BehaviorGraphNodeDefinition? node)
@@ -661,25 +825,139 @@ public sealed partial class NModStudioProjectWindow
                 return string.Join(System.Environment.NewLine, new[]
                 {
                     Dual("该节点负责跳转到另一页。", "This node routes the event to another page."),
-                    $"{Dual("下一页", "Next Page")}: {FormatOptional(node.Properties.TryGetValue("next_page_id", out var nextPageId) ? nextPageId : string.Empty)}"
+                    $"{Dual("下一页", "Next Page")}: {FormatOptional(ModStudioFieldDisplayNames.FormatPropertyValue("next_page_id", node.Properties.TryGetValue("next_page_id", out var nextPageId) ? nextPageId : string.Empty))}"
                 });
             case "event.start_combat":
                 return string.Join(System.Environment.NewLine, new[]
                 {
                     Dual("该节点负责从事件进入战斗。", "This node starts combat from the event."),
-                    $"{Dual("遭遇", "Encounter")}: {FormatOptional(node.Properties.TryGetValue("encounter_id", out var encounterId) ? encounterId : string.Empty)}",
-                    $"{Dual("返回页", "Resume Page")}: {FormatOptional(node.Properties.TryGetValue("resume_page_id", out var resumePageId) ? resumePageId : string.Empty)}"
+                    $"{Dual("遭遇", "Encounter")}: {FormatOptional(FormatEncounterId(node.Properties.TryGetValue("encounter_id", out var encounterId) ? encounterId : string.Empty))}",
+                    $"{Dual("返回页", "Resume Page")}: {FormatOptional(ModStudioFieldDisplayNames.FormatPropertyValue("resume_page_id", node.Properties.TryGetValue("resume_page_id", out var resumePageId) ? resumePageId : string.Empty))}"
                 });
             case "event.page":
                 return string.Join(System.Environment.NewLine, new[]
                 {
                     Dual("该节点定义事件页面的文本和选项顺序。", "This node defines the event page text and option order."),
                     $"{Dual("页面 ID", "Page Id")}: {FormatOptional(node.Properties.TryGetValue("page_id", out var pageId) ? pageId : string.Empty)}",
-                    $"{Dual("起始页", "Start Page")}: {FormatOptional(node.Properties.TryGetValue("is_start", out var isStart) ? isStart : string.Empty)}"
+                    $"{Dual("起始页", "Start Page")}: {FormatOptional(ModStudioFieldDisplayNames.FormatPropertyValue("is_start", node.Properties.TryGetValue("is_start", out var isStart) ? isStart : string.Empty))}"
                 });
             default:
                 return string.Empty;
         }
+    }
+
+    private string BuildSelectedInternalStateNodeSummaryText(BehaviorGraphNodeDefinition? node)
+    {
+        if (node == null)
+        {
+            return string.Empty;
+        }
+
+        var nodeType = (node.NodeType ?? string.Empty).Trim().ToLowerInvariant();
+        return nodeType switch
+        {
+            "value.compare" => BuildCompareNodeSummary(node),
+            "flow.branch" => BuildBranchNodeSummary(node),
+            "value.set" => BuildSetValueNodeSummary(node),
+            "value.add" => BuildAddValueNodeSummary(node),
+            "value.multiply" => BuildMultiplyValueNodeSummary(node),
+            "enchantment.set_status" => BuildEnchantmentStatusNodeSummary(node),
+            _ => string.Empty
+        };
+    }
+
+    private static string BuildCompareNodeSummary(BehaviorGraphNodeDefinition node)
+    {
+        var left = ModStudioFieldDisplayNames.FormatGraphPropertyValue("left", node.Properties.TryGetValue("left", out var leftValue) ? leftValue : string.Empty);
+        var comparisonOperator = ModStudioFieldDisplayNames.FormatGraphPropertyValue("operator", node.Properties.TryGetValue("operator", out var operatorValue) ? operatorValue : "eq");
+        var right = ModStudioFieldDisplayNames.FormatGraphPropertyValue("right", node.Properties.TryGetValue("right", out var rightValue) ? rightValue : string.Empty);
+        var resultKey = ModStudioFieldDisplayNames.FormatGraphPropertyValue("result_key", node.Properties.TryGetValue("result_key", out var resultKeyValue) ? resultKeyValue : "last_compare");
+        return string.Join(System.Environment.NewLine, new[]
+        {
+            Dual("这个节点不会额外输出一根“比较结果线”，而是把布尔结果写进图状态。", "This node does not emit a separate data wire. It stores the boolean comparison result in graph state."),
+            $"{Dual("比较", "Comparison")}: {left} {comparisonOperator} {right}",
+            $"{Dual("结果键", "Result Key")}: {resultKey}",
+            Dual("后面的 branch 节点通常会在 condition_key 里读取这个结果键。", "A later branch node usually reads this result through condition_key.")
+        });
+    }
+
+    private static string BuildBranchNodeSummary(BehaviorGraphNodeDefinition node)
+    {
+        if (node.Properties.TryGetValue("condition", out var condition) && !string.IsNullOrWhiteSpace(condition))
+        {
+            return string.Join(System.Environment.NewLine, new[]
+            {
+                Dual("这个节点直接计算条件表达式，再决定走 True 还是 False。", "This node evaluates a condition expression directly, then chooses the True or False output."),
+                $"{Dual("条件", "Condition")}: {ModStudioFieldDisplayNames.FormatGraphPropertyValue("condition", condition)}",
+                Dual("condition 可以直接写固定值，也可以写 $state.xxx、$target 这类引用。", "condition can use a literal value or a reference such as $state.xxx or $target.")
+            });
+        }
+
+        var conditionKey = ModStudioFieldDisplayNames.FormatGraphPropertyValue("condition_key", node.Properties.TryGetValue("condition_key", out var conditionKeyValue) ? conditionKeyValue : string.Empty);
+        return string.Join(System.Environment.NewLine, new[]
+        {
+            Dual("这个节点会从图状态里读取一个布尔键，再决定走 True 还是 False。", "This node reads a boolean key from graph state, then chooses the True or False output."),
+            $"{Dual("条件键", "Condition Key")}: {FormatOptional(conditionKey)}",
+            Dual("常见模式是上游 compare 把结果写进 result_key，这里再通过 condition_key 读取它。", "A common pattern is that an upstream compare writes result_key, then this branch reads it through condition_key.")
+        });
+    }
+
+    private static string BuildSetValueNodeSummary(BehaviorGraphNodeDefinition node)
+    {
+        var key = node.Properties.TryGetValue("key", out var keyValue) ? keyValue?.Trim() : string.Empty;
+        var formattedKey = ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", key);
+        var formattedValue = ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", node.Properties.TryGetValue("value", out var value) ? value : string.Empty);
+        var lines = new List<string>
+        {
+            Dual("这个节点把值写进图状态，不会再额外生成一根数据输出线。", "This node writes into graph state instead of creating a separate data output wire."),
+            $"{Dual("写入", "Write")}: {formattedKey} = {formattedValue}"
+        };
+
+        if (string.Equals(key, "hook_result", StringComparison.OrdinalIgnoreCase))
+        {
+            lines.Add(Dual("这个键通常会作为当前原版 hook 的返回值。", "This key usually becomes the return value for the current native hook."));
+        }
+        else if (string.Equals(key, "Status", StringComparison.OrdinalIgnoreCase))
+        {
+            lines.Add(Dual("这个键通常映射原版对象的 Status 字段。新建附魔图时，更推荐直接使用 enchantment.set_status 节点。", "This key usually mirrors the native Status field. For new enchantment graphs, prefer the dedicated enchantment.set_status node."));
+        }
+
+        return string.Join(System.Environment.NewLine, lines);
+    }
+
+    private static string BuildAddValueNodeSummary(BehaviorGraphNodeDefinition node)
+    {
+        var key = ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", node.Properties.TryGetValue("key", out var keyValue) ? keyValue : string.Empty);
+        var delta = ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", node.Properties.TryGetValue("delta", out var deltaValue) ? deltaValue : string.Empty);
+        return string.Join(System.Environment.NewLine, new[]
+        {
+            Dual("这个节点会读取当前状态值，在原值基础上增加一个数。", "This node reads the current state value and adds a numeric delta on top of it."),
+            $"{Dual("目标键", "Target Key")}: {key}",
+            $"{Dual("增量", "Delta")}: {delta}"
+        });
+    }
+
+    private static string BuildMultiplyValueNodeSummary(BehaviorGraphNodeDefinition node)
+    {
+        var key = ModStudioFieldDisplayNames.FormatGraphPropertyValue("key", node.Properties.TryGetValue("key", out var keyValue) ? keyValue : string.Empty);
+        var factor = ModStudioFieldDisplayNames.FormatGraphPropertyValue("value", node.Properties.TryGetValue("factor", out var factorValue) ? factorValue : string.Empty);
+        return string.Join(System.Environment.NewLine, new[]
+        {
+            Dual("这个节点会读取当前状态值，再乘上一个倍率。", "This node reads the current state value and multiplies it by a factor."),
+            $"{Dual("目标键", "Target Key")}: {key}",
+            $"{Dual("倍率", "Factor")}: {factor}"
+        });
+    }
+
+    private static string BuildEnchantmentStatusNodeSummary(BehaviorGraphNodeDefinition node)
+    {
+        var status = ModStudioFieldDisplayNames.FormatGraphPropertyValue("status", node.Properties.TryGetValue("status", out var statusValue) ? statusValue : "Disabled");
+        return string.Join(System.Environment.NewLine, new[]
+        {
+            Dual("这个节点会直接修改当前附魔对象的状态。", "This node directly changes the current enchantment status."),
+            $"{Dual("状态", "Status")}: {status}",
+            Dual("相比把字符串写进 State.Status，这个专用节点更容易理解，也更适合手工搭图。", "Compared with writing a raw string into State.Status, this dedicated node is easier to understand and better for manual authoring.")
+        });
     }
 
     private string BuildEventOptionSummary(BehaviorGraphDefinition graph, BehaviorGraphNodeDefinition node)
@@ -688,6 +966,7 @@ public sealed partial class NModStudioProjectWindow
         var title = properties.TryGetValue("title", out var titleValue) ? titleValue : string.Empty;
         var pageId = properties.TryGetValue("page_id", out var pageIdValue) ? pageIdValue : string.Empty;
         var optionId = properties.TryGetValue("option_id", out var optionIdValue) ? optionIdValue : string.Empty;
+        var saveChoiceToHistory = properties.TryGetValue("save_choice_to_history", out var saveChoiceValue) ? saveChoiceValue : string.Empty;
         var effectiveChoice = ResolveEffectiveEventChoice(graph, node);
 
         var lines = new List<string>
@@ -695,7 +974,8 @@ public sealed partial class NModStudioProjectWindow
             Dual("说明：标题和描述只是事件里显示给玩家看的文本，不会自动改变真正执行的奖励。", "Tip: title and description are only the text shown to the player. They do not automatically change the actual reward."),
             $"{Dual("显示文本", "Display Text")}: {FormatOptional(title)}",
             $"{Dual("页面 ID", "Page Id")}: {FormatOptional(pageId)}",
-            $"{Dual("选项 ID", "Option Id")}: {FormatOptional(optionId)}"
+            $"{Dual("选项 ID", "Option Id")}: {FormatOptional(optionId)}",
+            $"{Dual("写入历史", "Save To History")}: {FormatOptional(ModStudioFieldDisplayNames.FormatPropertyValue("save_choice_to_history", saveChoiceToHistory))}"
         };
 
         if (effectiveChoice != null)
@@ -720,6 +1000,10 @@ public sealed partial class NModStudioProjectWindow
         var rewardTarget = properties.TryGetValue("reward_target", out var rewardTargetValue) ? rewardTargetValue : string.Empty;
         var rewardProps = properties.TryGetValue("reward_props", out var rewardPropsValue) ? rewardPropsValue : string.Empty;
         var rewardPowerId = properties.TryGetValue("reward_power_id", out var rewardPowerIdValue) ? rewardPowerIdValue : string.Empty;
+        var rewardCount = properties.TryGetValue("reward_count", out var rewardCountValue) ? rewardCountValue : string.Empty;
+        var rewardCardId = properties.TryGetValue("card_id", out var rewardCardIdValue) ? rewardCardIdValue : string.Empty;
+        var rewardRelicId = properties.TryGetValue("relic_id", out var rewardRelicIdValue) ? rewardRelicIdValue : string.Empty;
+        var rewardPotionId = properties.TryGetValue("potion_id", out var rewardPotionIdValue) ? rewardPotionIdValue : string.Empty;
 
         var lines = new List<string>
         {
@@ -740,7 +1024,27 @@ public sealed partial class NModStudioProjectWindow
 
         if (!string.IsNullOrWhiteSpace(rewardPowerId))
         {
-            lines.Add($"{Dual("能力", "Power")}: {rewardPowerId}");
+            lines.Add($"{Dual("能力", "Power")}: {FormatPowerId(rewardPowerId)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(rewardCount))
+        {
+            lines.Add($"{Dual("数量", "Count")}: {rewardCount}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(rewardCardId))
+        {
+            lines.Add($"{Dual("卡牌", "Card")}: {FormatCardId(rewardCardId)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(rewardRelicId))
+        {
+            lines.Add($"{Dual("遗物", "Relic")}: {FormatRelicId(rewardRelicId)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(rewardPotionId))
+        {
+            lines.Add($"{Dual("药水", "Potion")}: {FormatPotionId(rewardPotionId)}");
         }
 
         return string.Join(System.Environment.NewLine, lines);
@@ -753,8 +1057,7 @@ public sealed partial class NModStudioProjectWindow
             return null;
         }
 
-        var compiler = new EventGraphCompiler();
-        var validation = compiler.Compile(graph);
+        var validation = GetOrCompileEventGraph(graph);
         var pageId = node.Properties.TryGetValue("page_id", out var explicitPageId) ? explicitPageId?.Trim() : string.Empty;
         var optionId = node.Properties.TryGetValue("option_id", out var explicitOptionId) ? explicitOptionId?.Trim() : string.Empty;
         return validation.Choices.FirstOrDefault(choice =>
@@ -791,6 +1094,26 @@ public sealed partial class NModStudioProjectWindow
             parts.Add($"[{choice.RewardPowerId}]");
         }
 
+        if (!string.IsNullOrWhiteSpace(choice.RewardCount))
+        {
+            parts.Add($"x{choice.RewardCount}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(choice.RewardCardId))
+        {
+            parts.Add($"card:{choice.RewardCardId}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(choice.RewardRelicId))
+        {
+            parts.Add($"relic:{choice.RewardRelicId}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(choice.RewardPotionId))
+        {
+            parts.Add($"potion:{choice.RewardPotionId}");
+        }
+
         return string.Join(" | ", parts);
     }
 
@@ -822,6 +1145,61 @@ public sealed partial class NModStudioProjectWindow
     private static string FormatOptional(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? Dual("未设置", "Unset") : value!;
+    }
+
+    private static string FormatCardId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var card = ModelDb.AllCards.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, value, StringComparison.Ordinal));
+        return card == null ? value : $"{card.Title} [{value}]";
+    }
+
+    private static string FormatRelicId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var relic = ModelDb.AllRelics.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, value, StringComparison.Ordinal));
+        return relic == null ? value : $"{SafeLocalized(relic.Title)} [{value}]";
+    }
+
+    private static string FormatPotionId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var potion = ModelDb.AllPotions.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, value, StringComparison.Ordinal));
+        return potion == null ? value : $"{SafeLocalized(potion.Title)} [{value}]";
+    }
+
+    private static string FormatPowerId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var power = ModelDb.AllPowers.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, value, StringComparison.OrdinalIgnoreCase));
+        return power == null ? value : $"{SafeLocalized(power.Title)} [{value}]";
+    }
+
+    private static string FormatEncounterId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var encounter = ModelDb.AllEncounters.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, value, StringComparison.OrdinalIgnoreCase));
+        return encounter == null ? value : $"{SafeLocalized(encounter.Title)} [{value}]";
     }
 
     private string BuildSelectedNodeDynamicSummaryText(BehaviorGraphNodeDefinition? node)
@@ -1303,7 +1681,7 @@ public sealed partial class NModStudioProjectWindow
             "starting_deck_ids" => FormatCardIdList(value),
             "starting_relic_ids" => FormatRelicIdList(value),
             "starting_potion_ids" => FormatPotionIdList(value),
-            _ => ModStudioFieldDisplayNames.FormatValue(value)
+            _ => ModStudioFieldDisplayNames.FormatPropertyValue(key, value)
         };
     }
 
@@ -1349,6 +1727,21 @@ public sealed partial class NModStudioProjectWindow
             .ToList();
 
         return values.Count == 0 ? string.Empty : string.Join(", ", values);
+    }
+
+    private static List<string> ParseCsvValues(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return new List<string>();
+        }
+
+        return value
+            .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(entry => entry.Trim())
+            .Where(entry => !string.IsNullOrWhiteSpace(entry))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
     }
 
     private static string SafeLocalized(MegaCrit.Sts2.Core.Localization.LocString? locString)
@@ -1546,6 +1939,9 @@ public sealed partial class NModStudioProjectWindow
         EnsureGraphBehaviorEnabledForEdits();
         MarkGraphDirty();
         RefreshDerivedGraphText(graph, updateBasicPreview: true);
+        _cachedCompiledEventGraph = null;
+        _cachedCompiledEventResult = null;
+        _detailPanel?.InvalidatePropertyEditors();
         _detailPanel?.SetGraphInfo(BuildGraphOverviewText(graph, GetEnvelope(_currentKind, _currentEntityId)));
         UpdateSelectedNodeDetails(graph, _centerEditor?.GraphEditor.CanvasView.SelectedNodeId);
     }
@@ -1594,6 +1990,97 @@ public sealed partial class NModStudioProjectWindow
         _centerEditor?.GraphEditor.CanvasView.UpdateNodePresentation(node);
         RefreshCurrentGraphInfo();
         MarkGraphDirty();
+    }
+
+    private void OnEventOptionAddRequested(string pageId)
+    {
+        var graph = _centerEditor?.GraphEditor.CanvasView.BoundGraph;
+        if (graph == null || string.IsNullOrWhiteSpace(pageId))
+        {
+            return;
+        }
+
+        var pageNode = graph.Nodes.FirstOrDefault(node =>
+            string.Equals(node.NodeType, "event.page", StringComparison.OrdinalIgnoreCase) &&
+            node.Properties.TryGetValue("page_id", out var candidatePageId) &&
+            string.Equals(candidatePageId, pageId, StringComparison.Ordinal));
+        if (pageNode == null)
+        {
+            return;
+        }
+
+        EnsureGraphBehaviorEnabledForEdits();
+
+        var index = 1;
+        string optionId;
+        do
+        {
+            optionId = $"OPTION_{index:000}";
+            index++;
+        }
+        while (graph.Nodes.Any(node =>
+            string.Equals(node.NodeType, "event.option", StringComparison.OrdinalIgnoreCase) &&
+            node.Properties.TryGetValue("option_id", out var existingOptionId) &&
+            string.Equals(existingOptionId, optionId, StringComparison.Ordinal)));
+
+        var nodeId = $"event_option_{pageId.ToLowerInvariant()}_{optionId.ToLowerInvariant()}";
+        graph.Nodes.Add(new BehaviorGraphNodeDefinition
+        {
+            NodeId = nodeId,
+            NodeType = "event.option",
+            DisplayName = "Event Option",
+            Description = string.Empty,
+            Properties = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["page_id"] = pageId,
+                ["option_id"] = optionId,
+                ["title"] = optionId,
+                ["description"] = string.Empty,
+                ["next_page_id"] = string.Empty,
+                ["encounter_id"] = string.Empty,
+                ["resume_page_id"] = string.Empty,
+                ["is_proceed"] = false.ToString(),
+                ["save_choice_to_history"] = true.ToString()
+            }
+        });
+
+        var optionOrder = ParseCsvValues(pageNode.Properties.TryGetValue("option_order", out var rawOptionOrder) ? rawOptionOrder : string.Empty);
+        if (!optionOrder.Contains(optionId, StringComparer.Ordinal))
+        {
+            optionOrder.Add(optionId);
+        }
+
+        pageNode.Properties["option_order"] = string.Join(",", optionOrder);
+
+        if (!graph.Connections.Any(connection =>
+            string.Equals(connection.FromNodeId, pageNode.NodeId, StringComparison.Ordinal) &&
+            string.Equals(connection.ToNodeId, nodeId, StringComparison.Ordinal)))
+        {
+            graph.Connections.Add(new BehaviorGraphConnectionDefinition
+            {
+                FromNodeId = pageNode.NodeId,
+                FromPortId = "next",
+                ToNodeId = nodeId,
+                ToPortId = "in"
+            });
+        }
+
+        _centerEditor?.GraphEditor.CanvasView.RebuildCanvas();
+        OnGraphChanged(graph);
+        UpdateSelectedNodeDetails(graph, pageNode.NodeId);
+    }
+
+    private EventGraphValidationResult GetOrCompileEventGraph(BehaviorGraphDefinition graph)
+    {
+        if (ReferenceEquals(_cachedCompiledEventGraph, graph) && _cachedCompiledEventResult != null)
+        {
+            return _cachedCompiledEventResult;
+        }
+
+        var compiler = new EventGraphCompiler();
+        _cachedCompiledEventGraph = graph;
+        _cachedCompiledEventResult = compiler.Compile(graph);
+        return _cachedCompiledEventResult;
     }
 
     private bool ApplyDynamicNodePropertyChange(BehaviorGraphNodeDefinition node, string propertyKey, string propertyValue)

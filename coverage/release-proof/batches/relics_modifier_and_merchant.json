@@ -1,0 +1,11 @@
+{
+  "BatchId": "relics_modifier_and_merchant",
+  "EntityKind": "Relic",
+  "Title": "Stage 13 session proof",
+  "Scenario": 3,
+  "TimeoutSeconds": 30,
+  "ExpectedMarkers": [
+    "[ModStudio.SessionProof] Applied package order:",
+    "[ModStudio.SessionProof] Conflict Card:COOLHEADED winner=stage13_session_b@1.0.0"
+  ]
+}

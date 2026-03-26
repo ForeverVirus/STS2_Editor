@@ -26,6 +26,10 @@ public sealed class GraphDescriptionGenerator
     [
         "flow.sequence",
         "flow.branch",
+        "value.set",
+        "value.add",
+        "value.multiply",
+        "value.compare",
         "combat.damage",
         "combat.gain_block",
         "combat.heal",
@@ -39,6 +43,14 @@ public sealed class GraphDescriptionGenerator
         "combat.remove_card",
         "combat.transform_card",
         "combat.repeat",
+        "card.remove_keyword",
+        "card.select_cards",
+        "card.discard_and_draw",
+        "card.apply_keyword",
+        "card.set_cost_delta",
+        "card.set_cost_absolute",
+        "card.set_cost_this_combat",
+        "card.add_cost_until_played",
         "card.upgrade",
         "card.downgrade",
         "card.enchant",
@@ -60,9 +72,21 @@ public sealed class GraphDescriptionGenerator
         "creature.stun",
         "orb.channel",
         "orb.passive",
+        "orb.add_slots",
+        "orb.remove_slots",
+        "orb.evoke_next",
         "power.remove",
         "power.modify_amount",
         "cardpile.shuffle",
+        "modifier.damage_additive",
+        "modifier.damage_multiplicative",
+        "modifier.block_additive",
+        "modifier.block_multiplicative",
+        "modifier.play_count",
+        "modifier.hand_draw",
+        "modifier.x_value",
+        "modifier.max_energy",
+        "enchantment.set_status",
         "debug.log",
         "event.page",
         "event.option",
@@ -70,7 +94,17 @@ public sealed class GraphDescriptionGenerator
         "event.proceed",
         "event.start_combat",
         "event.reward",
-        "reward.offer_custom"
+        "reward.offer_custom",
+        "reward.card_options_upgrade",
+        "reward.card_options_enchant",
+        "reward.mark_card_rewards_rerollable",
+        "map.replace_generated",
+        "map.remove_unknown_room_type",
+        "player.add_pet",
+        "player.end_turn",
+        "potion.procure",
+        "relic.obtain",
+        "relic.replace"
     ];
 
     public IReadOnlyList<string> SupportedNodeKinds => SupportedNodeTypes;
@@ -169,6 +203,7 @@ public sealed class GraphDescriptionGenerator
         return kind switch
         {
             "flow.branch" => Dual("根据条件进入不同分支。", "Branch based on a condition."),
+            "value.set" or "value.add" or "value.multiply" or "value.compare" => string.Empty,
             "combat.damage" => DescribeDamage(node, sourceModel, previewContext),
             "combat.gain_block" => DescribeAmountNode(node, "amount", "获得", "点格挡", "Gain", "block", sourceModel, previewContext),
             "combat.heal" => DescribeAmountNode(node, "amount", "恢复", "点生命", "Heal", "HP", sourceModel, previewContext),
@@ -182,6 +217,14 @@ public sealed class GraphDescriptionGenerator
             "combat.remove_card" => Dual("移除选中的卡牌。", "Remove the selected cards."),
             "combat.transform_card" => DescribeTransformCard(node),
             "combat.repeat" => DescribeStandaloneRepeat(node, sourceModel, previewContext),
+            "card.remove_keyword" => DescribeRemoveKeyword(node),
+            "card.select_cards" => Dual("选择卡牌。", "Select card(s)."),
+            "card.discard_and_draw" => Dual("弃牌后抽牌。", "Discard and then draw cards."),
+            "card.apply_keyword" => DescribeApplyKeyword(node),
+            "card.set_cost_delta" => Dual("调整卡牌费用。", "Adjust card cost."),
+            "card.set_cost_absolute" => Dual("设置卡牌费用。", "Set card cost."),
+            "card.set_cost_this_combat" => Dual("在本场战斗中设置卡牌费用。", "Set card cost for this combat."),
+            "card.add_cost_until_played" => Dual("在打出前增加卡牌费用。", "Increase card cost until played."),
             "card.upgrade" => Dual("升级选中的卡牌。", "Upgrade the selected card(s)."),
             "card.downgrade" => Dual("降级选中的卡牌。", "Downgrade the selected card(s)."),
             "card.enchant" => DescribeEnchant(node, sourceModel, previewContext),
@@ -203,9 +246,21 @@ public sealed class GraphDescriptionGenerator
             "creature.stun" => Dual("击晕目标。", "Stun the target."),
             "orb.passive" => Dual("触发一个充能球的被动效果。", "Trigger an orb passive."),
             "orb.channel" => DescribeChannelOrb(node),
+            "orb.add_slots" => DescribeSimpleAmount(node, "amount", "获得", "个充能球槽位", "Gain", "orb slots", sourceModel, previewContext),
+            "orb.remove_slots" => DescribeSimpleAmount(node, "amount", "失去", "个充能球槽位", "Lose", "orb slots", sourceModel, previewContext),
+            "orb.evoke_next" => Dual("激发下一个充能球。", "Evoke the next orb."),
             "power.remove" => DescribePowerRemove(node),
             "power.modify_amount" => DescribePowerModifyAmount(node, sourceModel, previewContext),
             "cardpile.shuffle" => Dual("洗牌。", "Shuffle the card pile."),
+            "modifier.damage_additive" => Dual("提供伤害加成。", "Provide additive damage modifier."),
+            "modifier.damage_multiplicative" => Dual("提供伤害倍率。", "Provide multiplicative damage modifier."),
+            "modifier.block_additive" => Dual("提供格挡加成。", "Provide additive block modifier."),
+            "modifier.block_multiplicative" => Dual("提供格挡倍率。", "Provide multiplicative block modifier."),
+            "modifier.play_count" => Dual("修改打出次数。", "Modify play count."),
+            "modifier.hand_draw" => Dual("修改抽牌数量。", "Modify hand draw."),
+            "modifier.x_value" => Dual("修改 X 数值。", "Modify X value."),
+            "modifier.max_energy" => Dual("修改最大能量。", "Modify max energy."),
+            "enchantment.set_status" => Dual("设置附魔状态。", "Set enchantment status."),
             "event.page" => DescribeEventPage(node),
             "event.option" => DescribeEventOption(node),
             "event.goto_page" => DescribeEventGoto(node),
@@ -213,6 +268,16 @@ public sealed class GraphDescriptionGenerator
             "event.start_combat" => DescribeEventStartCombat(node),
             "event.reward" => DescribeEventReward(node, sourceModel, previewContext),
             "reward.offer_custom" => DescribeOfferCustomReward(node, sourceModel, previewContext),
+            "reward.card_options_upgrade" => Dual("升级卡牌奖励选项。", "Upgrade card reward options."),
+            "reward.card_options_enchant" => Dual("附魔卡牌奖励选项。", "Enchant card reward options."),
+            "reward.mark_card_rewards_rerollable" => Dual("将卡牌奖励标记为可重掷。", "Mark card rewards as rerollable."),
+            "map.replace_generated" => Dual("替换生成的地图。", "Replace the generated map."),
+            "map.remove_unknown_room_type" => Dual("从未知地图点移除一种房间类型。", "Remove a room type from unknown map points."),
+            "player.add_pet" => Dual("召唤宠物。", "Add a pet."),
+            "player.end_turn" => Dual("结束回合。", "End the turn."),
+            "potion.procure" => Dual("获得药水。", "Procure a potion."),
+            "relic.obtain" => Dual("获得遗物。", "Obtain a relic."),
+            "relic.replace" => Dual("替换遗物。", "Replace a relic."),
             "debug.log" => DescribeLog(node),
             _ => MarkUnsupported(node, result)
         };
@@ -347,6 +412,18 @@ public sealed class GraphDescriptionGenerator
         var preview = _previewService.Evaluate(node, "amount", sourceModel, previewContext, 1m);
         var enchantmentId = GraphDescriptionSupport.GetProperty(node, "enchantment_id", "enchantment");
         return Dual($"为卡牌施加{enchantmentId} x{preview.PreviewText}。", $"Enchant the selected card(s) with {enchantmentId} x{preview.PreviewText}.");
+    }
+
+    private string DescribeRemoveKeyword(BehaviorGraphNodeDefinition node)
+    {
+        var keyword = GraphDescriptionSupport.GetProperty(node, "keyword", "keyword");
+        return Dual($"移除选中卡牌上的关键词 {keyword}。", $"Remove keyword {keyword} from the selected card(s).");
+    }
+
+    private string DescribeApplyKeyword(BehaviorGraphNodeDefinition node)
+    {
+        var keyword = GraphDescriptionSupport.GetProperty(node, "keyword", "keyword");
+        return Dual($"为选中卡牌施加关键词 {keyword}。", $"Apply keyword {keyword} to the selected card(s).");
     }
 
     private string DescribeAutoPlay(BehaviorGraphNodeDefinition node)

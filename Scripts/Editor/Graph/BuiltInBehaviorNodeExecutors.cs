@@ -3,14 +3,18 @@ using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Enchantments;
 using MegaCrit.Sts2.Core.Entities.Gold;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Logging;
+using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Factories;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Rewards;
+using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.ValueProps;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 
@@ -29,6 +33,7 @@ internal static class BuiltInBehaviorNodeExecutors
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("flow.random_choice", (_, _) => Task.CompletedTask));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("value.set", ExecuteSetAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("value.add", ExecuteAddAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("value.multiply", ExecuteMultiplyAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("value.compare", ExecuteCompareAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("debug.log", ExecuteLogAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.select_cards", ExecuteSelectCardsAsync));
@@ -51,6 +56,7 @@ internal static class BuiltInBehaviorNodeExecutors
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("combat.transform_card", ExecuteTransformCardAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.discard_and_draw", ExecuteDiscardAndDrawAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.apply_keyword", ExecuteApplyCardKeywordAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.remove_keyword", ExecuteRemoveCardKeywordAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.upgrade", ExecuteUpgradeCardAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.downgrade", ExecuteDowngradeCardAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.enchant", ExecuteEnchantCardAsync));
@@ -84,6 +90,19 @@ internal static class BuiltInBehaviorNodeExecutors
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("power.remove", ExecuteRemovePowerAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("power.modify_amount", ExecuteModifyPowerAmountAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("cardpile.shuffle", ExecuteShuffleCardPileAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("modifier.damage_additive", ExecuteModifierDamageAdditiveAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("modifier.damage_multiplicative", ExecuteModifierDamageMultiplicativeAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("modifier.block_additive", ExecuteModifierBlockAdditiveAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("modifier.block_multiplicative", ExecuteModifierBlockMultiplicativeAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("modifier.play_count", ExecuteModifierPlayCountAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("modifier.hand_draw", ExecuteModifierHandDrawAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("modifier.x_value", ExecuteModifierXValueAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("modifier.max_energy", ExecuteModifierMaxEnergyAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("enchantment.set_status", ExecuteEnchantmentSetStatusAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.set_cost_delta", ExecuteCardSetCostDeltaAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.set_cost_absolute", ExecuteCardSetCostAbsoluteAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.set_cost_this_combat", ExecuteCardSetCostThisCombatAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("card.add_cost_until_played", ExecuteCardAddCostUntilPlayedAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("event.page", ExecuteEventPageAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("event.option", ExecuteEventOptionAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("event.goto_page", ExecuteEventGotoPageAsync));
@@ -91,6 +110,11 @@ internal static class BuiltInBehaviorNodeExecutors
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("event.start_combat", ExecuteEventStartCombatAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("event.reward", ExecuteEventRewardAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("reward.offer_custom", ExecuteOfferCustomRewardAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("reward.mark_card_rewards_rerollable", ExecuteMarkCardRewardsRerollableAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("reward.card_options_upgrade", ExecuteCardRewardOptionsUpgradeAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("reward.card_options_enchant", ExecuteCardRewardOptionsEnchantAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("map.replace_generated", ExecuteReplaceGeneratedMapAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("map.remove_unknown_room_type", ExecuteRemoveUnknownRoomTypeAsync));
     }
 
     private static Task ExecuteSetAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
@@ -118,6 +142,22 @@ internal static class BuiltInBehaviorNodeExecutors
             ? ConvertToDecimal(existing)
             : 0m;
         context[key] = current + delta;
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteMultiplyAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var key = GetProperty(node, "key");
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return Task.CompletedTask;
+        }
+
+        var factor = context.ResolveDecimal(GetProperty(node, "factor"), 1m);
+        var current = context.TryGetState<object>(key, out var existing)
+            ? ConvertToDecimal(existing)
+            : 0m;
+        context[key] = current * factor;
         return Task.CompletedTask;
     }
 
@@ -334,7 +374,7 @@ internal static class BuiltInBehaviorNodeExecutors
             return;
         }
 
-        var canonicalPower = ModelDb.AllPowers.FirstOrDefault(power => string.Equals(power.Id.Entry, powerId, StringComparison.Ordinal));
+        var canonicalPower = ResolvePowerTemplate(powerId);
         if (canonicalPower == null)
         {
             Log.Warn($"Mod Studio graph '{context.Graph?.GraphId}' could not resolve power '{powerId}'.");
@@ -793,6 +833,23 @@ internal static class BuiltInBehaviorNodeExecutors
         return Task.CompletedTask;
     }
 
+    private static Task ExecuteRemoveCardKeywordAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var keywordText = GetProperty(node, "keyword");
+        if (!Enum.TryParse<CardKeyword>(keywordText, ignoreCase: true, out var keyword))
+        {
+            return Task.CompletedTask;
+        }
+
+        var cards = ResolveCards(node, context);
+        foreach (var card in cards)
+        {
+            CardCmd.RemoveKeyword(card, keyword);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private static async Task ExecuteAutoPlayFromDrawPileAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
     {
         if (context.Owner == null || context.ChoiceContext == null)
@@ -1005,7 +1062,11 @@ internal static class BuiltInBehaviorNodeExecutors
             return;
         }
 
-        var canonicalMonster = ModelDb.Monsters.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, monsterId, StringComparison.OrdinalIgnoreCase));
+        var canonicalMonster = ModelDb.Monsters.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, monsterId, StringComparison.OrdinalIgnoreCase))
+            ?? ModelDb.Monsters.FirstOrDefault(candidate => string.Equals(candidate.GetType().Name, monsterId, StringComparison.OrdinalIgnoreCase))
+            ?? ModelDb.Monsters.FirstOrDefault(candidate =>
+                string.Equals(NormalizeLookupKey(candidate.Id.Entry), NormalizeLookupKey(monsterId), StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(NormalizeLookupKey(candidate.GetType().Name), NormalizeLookupKey(monsterId), StringComparison.OrdinalIgnoreCase));
         if (canonicalMonster == null)
         {
             Log.Warn($"Mod Studio graph '{context.Graph?.GraphId}' could not resolve monster '{monsterId}' for player.add_pet.");
@@ -1271,6 +1332,151 @@ internal static class BuiltInBehaviorNodeExecutors
         await CardPileCmd.Shuffle(context.ChoiceContext, context.Owner);
     }
 
+    private static Task ExecuteModifierDamageAdditiveAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        context["modifier_result"] = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteModifierDamageMultiplicativeAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        context["modifier_result"] = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 1m);
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteModifierBlockAdditiveAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        context["modifier_result"] = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteModifierBlockMultiplicativeAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        context["modifier_result"] = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 1m);
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteModifierPlayCountAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var basePlayCount = context.TryGetState<object>("play_count_base", out var rawBase)
+            ? ConvertToDecimal(rawBase)
+            : 1m;
+        var delta = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        var mode = GetProperty(node, "mode", "delta").Trim().ToLowerInvariant();
+        context["modifier_result"] = mode switch
+        {
+            "absolute" => delta,
+            _ => basePlayCount + delta
+        };
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteModifierHandDrawAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var baseHandDraw = context.TryGetState<object>("hand_draw_base", out var rawBase)
+            ? ConvertToDecimal(rawBase)
+            : 0m;
+        var delta = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        var mode = GetProperty(node, "mode", "delta").Trim().ToLowerInvariant();
+        context["modifier_result"] = mode switch
+        {
+            "absolute" => delta,
+            _ => baseHandDraw + delta
+        };
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteModifierXValueAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var baseXValue = context.TryGetState<object>("x_value_base", out var rawBase)
+            ? ConvertToDecimal(rawBase)
+            : 0m;
+        var delta = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        var mode = GetProperty(node, "mode", "delta").Trim().ToLowerInvariant();
+        context["modifier_result"] = mode switch
+        {
+            "absolute" => delta,
+            _ => baseXValue + delta
+        };
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteModifierMaxEnergyAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var baseMaxEnergy = context.TryGetState<object>("max_energy_base", out var rawBase)
+            ? ConvertToDecimal(rawBase)
+            : 0m;
+        var delta = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        var mode = GetProperty(node, "mode", "delta").Trim().ToLowerInvariant();
+        context["modifier_result"] = mode switch
+        {
+            "absolute" => delta,
+            _ => baseMaxEnergy + delta
+        };
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteEnchantmentSetStatusAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.Enchantment == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var statusText = GetProperty(node, "status", "Disabled");
+        if (!Enum.TryParse<EnchantmentStatus>(statusText, ignoreCase: true, out var status))
+        {
+            status = EnchantmentStatus.Disabled;
+        }
+
+        context.Enchantment.Status = status;
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteCardSetCostDeltaAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        foreach (var card in ResolveCards(node, context))
+        {
+            var amount = (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+            card.EnergyCost.UpgradeBy(amount);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteCardSetCostAbsoluteAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        foreach (var card in ResolveCards(node, context))
+        {
+            var amount = (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+            card.EnergyCost.SetCustomBaseCost(amount);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteCardSetCostThisCombatAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        foreach (var card in ResolveCards(node, context))
+        {
+            var amount = (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+            card.EnergyCost.SetThisCombat(amount);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteCardAddCostUntilPlayedAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        foreach (var card in ResolveCards(node, context))
+        {
+            var amount = (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, -1m);
+            card.EnergyCost.AddUntilPlayed(amount);
+        }
+
+        return Task.CompletedTask;
+    }
+
     private static Task ExecuteEventPageAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
     {
         context["event.page_id"] = GetProperty(node, "page_id");
@@ -1339,12 +1545,23 @@ internal static class BuiltInBehaviorNodeExecutors
         var rewardKind = GetProperty(node, "reward_kind", "custom").Trim().ToLowerInvariant();
         var rewardCount = Math.Max(1, (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "reward_count", context, 1m));
         var amount = Math.Max(0, (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m));
+        var cardCount = Math.Max(1, (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "card_count", context, 3m));
         var rewards = new List<Reward>();
         switch (rewardKind)
         {
             case "gold":
                 rewards.Add(new GoldReward(amount, context.Owner));
                 break;
+            case "card_reward":
+            case "card":
+            {
+                var roomTypeText = GetProperty(node, "reward_room_type", RoomType.Monster.ToString());
+                var roomType = Enum.TryParse<RoomType>(roomTypeText, ignoreCase: true, out var parsedRoomType)
+                    ? parsedRoomType
+                    : RoomType.Monster;
+                rewards.Add(new CardReward(CardCreationOptions.ForRoom(context.Owner, roomType), cardCount, context.Owner));
+                break;
+            }
             case "relic":
             {
                 var relicId = GetProperty(node, "relic_id");
@@ -1389,7 +1606,173 @@ internal static class BuiltInBehaviorNodeExecutors
             expanded.AddRange(rewards);
         }
 
+        if (context.TryGetState<object>("reward_list", out var rewardListState) &&
+            rewardListState is ICollection<Reward> rewardList)
+        {
+            foreach (var reward in expanded)
+            {
+                rewardList.Add(reward);
+            }
+
+            context["reward_modified"] = true;
+            return;
+        }
+
         await RewardsCmd.OfferCustom(context.Owner, expanded);
+    }
+
+    private static Task ExecuteMarkCardRewardsRerollableAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        _ = node;
+        if (!context.TryGetState<object>("reward_list", out var rewardListState) ||
+            rewardListState is not IEnumerable<Reward> rewardList)
+        {
+            return Task.CompletedTask;
+        }
+
+        var changed = false;
+        foreach (var cardReward in rewardList.OfType<CardReward>())
+        {
+            if (cardReward.CanReroll)
+            {
+                continue;
+            }
+
+            cardReward.CanReroll = true;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            context["reward_modified"] = true;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteReplaceGeneratedMapAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.RunState == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var mapKind = GetProperty(node, "map_kind").Trim().ToLowerInvariant();
+        context["generated_map_result"] = mapKind switch
+        {
+            "golden_path" => new GoldenPathActMap(context.RunState),
+            _ => context["generated_map_result"]
+        };
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteRemoveUnknownRoomTypeAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (!context.TryGetState<object>("unknown_room_types", out var rawValue) ||
+            rawValue is not HashSet<RoomType> roomTypes)
+        {
+            return Task.CompletedTask;
+        }
+
+        var roomTypeText = GetProperty(node, "room_type", RoomType.Monster.ToString());
+        if (!Enum.TryParse<RoomType>(roomTypeText, ignoreCase: true, out var roomType))
+        {
+            return Task.CompletedTask;
+        }
+
+        roomTypes.Remove(roomType);
+        context["unknown_room_types_result"] = roomTypes;
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteCardRewardOptionsUpgradeAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.Owner == null ||
+            context.SourceModel is not RelicModel modifyingRelic ||
+            !TryGetCardRewardOptions(context, out var cardRewards))
+        {
+            return Task.CompletedTask;
+        }
+
+        if (GetBoolProperty(node, "require_hook_upgrades_enabled", false) &&
+            TryGetCardRewardCreationOptions(context, out var creationOptions) &&
+            creationOptions.Flags.HasFlag(CardCreationFlags.NoHookUpgrades))
+        {
+            return Task.CompletedTask;
+        }
+
+        var scope = GetProperty(node, "card_type_scope", "any");
+        var changed = false;
+        foreach (var option in cardRewards)
+        {
+            var card = option.Card;
+            if (!MatchesCardTypeScope(card, scope) || !card.IsUpgradable)
+            {
+                continue;
+            }
+
+            var clone = context.Owner.RunState.CloneCard(card);
+            CardCmd.Upgrade(clone, CardPreviewStyle.None);
+            option.ModifyCard(clone, modifyingRelic);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            context["card_reward_options_modified"] = true;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteCardRewardOptionsEnchantAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.Owner == null ||
+            context.SourceModel is not RelicModel modifyingRelic ||
+            !TryGetCardRewardOptions(context, out var cardRewards))
+        {
+            return Task.CompletedTask;
+        }
+
+        var enchantmentId = GetProperty(node, "enchantment_id");
+        if (string.IsNullOrWhiteSpace(enchantmentId))
+        {
+            return Task.CompletedTask;
+        }
+
+        var canonicalEnchantment = ResolveEnchantmentTemplate(enchantmentId);
+        if (canonicalEnchantment == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var amount = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 1m);
+        var selection = GetProperty(node, "selection", "all").Trim().ToLowerInvariant();
+        var validOptions = cardRewards.Where(option => canonicalEnchantment.CanEnchant(option.Card)).ToList();
+        if (validOptions.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        IEnumerable<CardCreationResult> selectedOptions = selection == "random_one"
+            ? validOptions.Take(1)
+            : validOptions;
+
+        var changed = false;
+        foreach (var option in selectedOptions)
+        {
+            var clone = context.Owner.RunState.CloneCard(option.Card);
+            CardCmd.Enchant(canonicalEnchantment.ToMutable(), clone, amount);
+            option.ModifyCard(clone, modifyingRelic);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            context["card_reward_options_modified"] = true;
+        }
+
+        return Task.CompletedTask;
     }
 
     private static string GetProperty(BehaviorGraphNodeDefinition node, string key, string defaultValue = "")
@@ -1400,6 +1783,68 @@ internal static class BuiltInBehaviorNodeExecutors
     private static bool GetBoolProperty(BehaviorGraphNodeDefinition node, string key, bool defaultValue = false)
     {
         return bool.TryParse(GetProperty(node, key, defaultValue.ToString()), out var result) ? result : defaultValue;
+    }
+
+    private static bool TryGetCardRewardOptions(BehaviorGraphExecutionContext context, out List<CardCreationResult> cardRewards)
+    {
+        if (context.TryGetState<object>("card_reward_options", out var rawValue) &&
+            rawValue is List<CardCreationResult> typed)
+        {
+            cardRewards = typed;
+            return true;
+        }
+
+        cardRewards = new List<CardCreationResult>();
+        return false;
+    }
+
+    private static bool TryGetCardRewardCreationOptions(BehaviorGraphExecutionContext context, out CardCreationOptions creationOptions)
+    {
+        if (context.TryGetState<object>("card_reward_creation_options", out var rawValue) &&
+            rawValue is CardCreationOptions typed)
+        {
+            creationOptions = typed;
+            return true;
+        }
+
+        creationOptions = null!;
+        return false;
+    }
+
+    private static EnchantmentModel? ResolveEnchantmentTemplate(string enchantmentId)
+    {
+        var canonical = ModelDb.DebugEnchantments.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, enchantmentId, StringComparison.OrdinalIgnoreCase));
+        if (canonical != null)
+        {
+            return canonical;
+        }
+
+        return ModelDb.DebugEnchantments.FirstOrDefault(candidate => string.Equals(candidate.GetType().Name, enchantmentId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static PowerModel? ResolvePowerTemplate(string powerId)
+    {
+        var canonical = ModelDb.AllPowers.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, powerId, StringComparison.OrdinalIgnoreCase));
+        if (canonical != null)
+        {
+            return canonical;
+        }
+
+        canonical = ModelDb.AllPowers.FirstOrDefault(candidate => string.Equals(candidate.GetType().Name, powerId, StringComparison.OrdinalIgnoreCase));
+        if (canonical != null)
+        {
+            return canonical;
+        }
+
+        var normalized = NormalizeLookupKey(powerId);
+        return ModelDb.AllPowers.FirstOrDefault(candidate =>
+            string.Equals(NormalizeLookupKey(candidate.Id.Entry), normalized, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(NormalizeLookupKey(candidate.GetType().Name), normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeLookupKey(string rawValue)
+    {
+        return new string((rawValue ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
     }
 
     private static PileType ParsePileType(string rawValue, PileType defaultValue)

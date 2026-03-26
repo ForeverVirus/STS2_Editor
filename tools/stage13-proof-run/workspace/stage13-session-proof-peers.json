@@ -4,12 +4,8 @@
       "peerId": "peer-ab",
       "packages": [
         {
-          "packageKey": "stage06_gameplay_proof@1.0.0",
-          "checksum": "d6d8af7a365d640baf7962166382e45eb0cfcce4309629d189be43bcfded5b06"
-        },
-        {
-          "packageKey": "stage09_custom_content_proof@1.0.0",
-          "checksum": "1b45131605c0e9e09e0fc46136596100e74285b24df20eac2e48324f32695838"
+          "packageKey": "775d4c2863504afebb8959a948422717@1.0.0",
+          "checksum": "d1df3c7bac6c838fa9cf32b2559735862af94b998e548fcbe7741bd80cf79495"
         },
         {
           "packageKey": "stage10_external_asset_proof@1.0.0",
@@ -18,6 +14,14 @@
         {
           "packageKey": "stage12_event_template_proof@1.0.0",
           "checksum": "f1fac3a5d44677ddb57c51220544a3f2fdf1425f7ab72971bad039c3cb6368a6"
+        },
+        {
+          "packageKey": "stage06_gameplay_proof@1.0.0",
+          "checksum": "f36ac134e605659c7c55ef9c8a2df35768786bde5876bf549449aa27103ece53"
+        },
+        {
+          "packageKey": "stage09_custom_content_proof@1.0.0",
+          "checksum": "21a8be16901450f3775a824394266097c4020af84c756117755309978c27bb3e"
         },
         {
           "packageKey": "stage13_session_a@1.0.0",

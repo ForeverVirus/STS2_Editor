@@ -2,12 +2,17 @@ using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Commands.Builders;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Enchantments;
 using MegaCrit.Sts2.Core.Entities.Gold;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Rooms;
+using MegaCrit.Sts2.Core.ValueProps;
 using STS2_Editor.Scripts.Editor.Core.Models;
 
 namespace STS2_Editor.Scripts.Editor.Graph;
@@ -96,6 +101,7 @@ public sealed class NativeBehaviorGraphAutoImporter
             ModStudioEntityKind.Card => TryCreateCardGraph(entityId, result),
             ModStudioEntityKind.Potion => TryCreatePotionGraph(entityId, result),
             ModStudioEntityKind.Relic => TryCreateRelicGraph(entityId, result),
+            ModStudioEntityKind.Enchantment => TryCreateEnchantmentGraph(entityId, result),
             _ => SetUnsupported(result, $"Native auto-import is not implemented for {kind} in Phase 1.")
         };
     }
@@ -113,25 +119,82 @@ public sealed class NativeBehaviorGraphAutoImporter
             return true;
         }
 
-        var method = card.GetType().GetMethod(
-            "OnPlay",
-            BindingFlags.Instance | BindingFlags.NonPublic,
-            binder: null,
-            types: [typeof(PlayerChoiceContext), typeof(CardPlay)],
-            modifiers: null);
-        if (method == null)
+        var title = ResolveModelTitle(card);
+        var translatedGraphs = new List<(string TriggerId, BehaviorGraphDefinition Graph)>();
+        var methodCandidates = new (string MethodName, BindingFlags BindingFlags, Type[] Args, string TriggerId, Type? SkipDeclaringType)[]
         {
-            return SetUnsupported(result, $"Card '{entityId}' does not expose an overrideable OnPlay method.");
+            ("OnPlay", BindingFlags.Instance | BindingFlags.NonPublic, [typeof(PlayerChoiceContext), typeof(CardPlay)], "card.on_play", typeof(CardModel)),
+            ("OnTurnEndInHand", BindingFlags.Instance | BindingFlags.Public, [typeof(PlayerChoiceContext)], "card.on_turn_end_in_hand", typeof(CardModel)),
+            ("AfterCardDrawn", BindingFlags.Instance | BindingFlags.Public, [typeof(PlayerChoiceContext), typeof(CardModel), typeof(bool)], "after_card_drawn", typeof(AbstractModel)),
+            ("BeforeTurnEnd", BindingFlags.Instance | BindingFlags.Public, [typeof(PlayerChoiceContext), typeof(CombatSide)], "before_turn_end", typeof(AbstractModel)),
+            ("AfterCombatEnd", BindingFlags.Instance | BindingFlags.Public, [typeof(MegaCrit.Sts2.Core.Rooms.CombatRoom)], "after_combat_end", typeof(AbstractModel)),
+            ("TryModifyRestSiteOptions", BindingFlags.Instance | BindingFlags.Public, [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(ICollection<MegaCrit.Sts2.Core.Entities.RestSite.RestSiteOption>)], "modify_rest_site_options", typeof(AbstractModel)),
+            ("ModifyGeneratedMap", BindingFlags.Instance | BindingFlags.Public, [typeof(MegaCrit.Sts2.Core.Runs.IRunState), typeof(MegaCrit.Sts2.Core.Map.ActMap), typeof(int)], "modify_generated_map", typeof(AbstractModel)),
+            ("ModifyGeneratedMapLate", BindingFlags.Instance | BindingFlags.Public, [typeof(MegaCrit.Sts2.Core.Runs.IRunState), typeof(MegaCrit.Sts2.Core.Map.ActMap), typeof(int)], "modify_generated_map_late", typeof(AbstractModel)),
+            ("AfterMapGenerated", BindingFlags.Instance | BindingFlags.Public, [typeof(MegaCrit.Sts2.Core.Map.ActMap), typeof(int)], "after_map_generated", typeof(AbstractModel)),
+            ("BeforeCardRemoved", BindingFlags.Instance | BindingFlags.Public, [typeof(CardModel)], "before_card_removed", typeof(AbstractModel)),
+            ("OnChosen", BindingFlags.Instance | BindingFlags.Public, Type.EmptyTypes, "card.on_chosen", null)
+        };
+
+        foreach (var candidate in methodCandidates)
+        {
+            var method = card.GetType().GetMethod(
+                candidate.MethodName,
+                candidate.BindingFlags,
+                binder: null,
+                types: candidate.Args,
+                modifiers: null);
+            if (method == null)
+            {
+                continue;
+            }
+
+            if (candidate.SkipDeclaringType != null && method.DeclaringType == candidate.SkipDeclaringType)
+            {
+                continue;
+            }
+
+            var steps = ExtractStepsFromMethod(
+                card,
+                method,
+                candidate.TriggerId,
+                ResolveDefaultTargetSelector(card.TargetType),
+                ResolveDefaultSelfSelector(card.TargetType),
+                result);
+            if (steps.Count == 0)
+            {
+                continue;
+            }
+
+            var graph = TranslateTriggerGraph(ModStudioEntityKind.Card, entityId, title, steps, candidate.TriggerId, result);
+            if (graph != null)
+            {
+                translatedGraphs.Add((candidate.TriggerId, graph));
+            }
         }
 
-        var steps = ExtractStepsFromMethod(
-            card,
-            method,
-            "card.on_play",
-            ResolveDefaultTargetSelector(card.TargetType),
-            ResolveDefaultSelfSelector(card.TargetType),
-            result);
-        return FinalizeTranslation(ModStudioEntityKind.Card, entityId, ResolveModelTitle(card), steps, "card.on_play", result);
+        if (translatedGraphs.Count == 0)
+        {
+            return SetUnsupported(result, $"Card '{entityId}' does not currently map to a supported graph trigger.");
+        }
+
+        result.Graph = MergeTriggerGraphs(
+            $"native_auto_card_{entityId.ToLowerInvariant()}",
+            ModStudioEntityKind.Card,
+            string.IsNullOrWhiteSpace(title) ? entityId : $"{title} Native Import",
+            translatedGraphs);
+        result.IsSupported = true;
+        result.IsPartial = result.UnsupportedCalls.Count > 0 || result.Warnings.Count > 0;
+        result.Summary = string.Join(
+            Environment.NewLine,
+            new[]
+            {
+                $"Native import: {(result.IsPartial ? "partial" : "supported")}",
+                $"Triggers: {string.Join(", ", translatedGraphs.Select(item => item.TriggerId))}",
+                $"Unsupported calls: {(result.UnsupportedCalls.Count == 0 ? "-" : string.Join(", ", result.UnsupportedCalls.Distinct(StringComparer.OrdinalIgnoreCase)))}",
+                $"Warnings: {(result.Warnings.Count == 0 ? "-" : string.Join(" | ", result.Warnings.Distinct(StringComparer.OrdinalIgnoreCase)))}"
+            });
+        return true;
     }
 
     private bool TryCreateCardSpecificGraph(CardModel card, NativeBehaviorGraphAutoImportResult result)
@@ -478,9 +541,82 @@ public sealed class NativeBehaviorGraphAutoImporter
 
         var hookCandidates = new (string MethodName, Type[] Args, string TriggerId)[]
         {
+            ("AfterObtained", Type.EmptyTypes, "relic.after_obtained"),
+            ("AfterActEntered", Type.EmptyTypes, "relic.after_act_entered"),
+            ("AfterBlockCleared", [typeof(Creature)], "relic.after_block_cleared"),
+            ("AfterCardEnteredCombat", [typeof(CardModel)], "relic.after_card_entered_combat"),
+            ("AfterCardDiscarded", [typeof(PlayerChoiceContext), typeof(CardModel)], "relic.after_card_discarded"),
+            ("AfterDamageGiven", [typeof(PlayerChoiceContext), typeof(Creature), typeof(DamageResult), typeof(ValueProp), typeof(Creature), typeof(CardModel)], "relic.after_damage_given"),
+            ("AfterDeath", [typeof(PlayerChoiceContext), typeof(Creature), typeof(bool), typeof(float)], "relic.after_death"),
+            ("AfterGoldGained", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_gold_gained"),
+            ("AfterHandEmptied", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_hand_emptied"),
+            ("AfterDiedToDoom", [typeof(PlayerChoiceContext), typeof(IReadOnlyList<Creature>)], "relic.after_died_to_doom"),
+            ("AfterCurrentHpChanged", [typeof(Creature), typeof(decimal)], "relic.after_current_hp_changed"),
+            ("AfterOrbChanneled", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(OrbModel)], "relic.after_orb_channeled"),
+            ("AfterPotionDiscarded", [typeof(PotionModel)], "relic.after_potion_discarded"),
+            ("AfterPotionProcured", [typeof(PotionModel)], "relic.after_potion_procured"),
+            ("AfterPreventingBlockClear", [typeof(AbstractModel), typeof(Creature)], "relic.after_preventing_block_clear"),
+            ("AfterPreventingDeath", [typeof(Creature)], "relic.after_preventing_death"),
+            ("AfterRestSiteHeal", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(bool)], "relic.after_rest_site_heal"),
+            ("AfterShuffle", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_shuffle"),
+            ("AfterStarsSpent", [typeof(int), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_stars_spent"),
+            ("TryModifyRewards", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(List<MegaCrit.Sts2.Core.Rewards.Reward>), typeof(AbstractRoom)], "relic.modify_rewards"),
+            ("TryModifyRewardsLate", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(List<MegaCrit.Sts2.Core.Rewards.Reward>), typeof(AbstractRoom)], "relic.modify_rewards_late"),
+            ("TryModifyRestSiteHealRewards", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(List<MegaCrit.Sts2.Core.Rewards.Reward>), typeof(bool)], "relic.modify_rest_site_heal_rewards"),
+            ("TryModifyCardRewardOptions", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(List<CardCreationResult>), typeof(MegaCrit.Sts2.Core.Runs.CardCreationOptions)], "relic.modify_card_reward_options"),
+            ("TryModifyCardRewardOptionsLate", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(List<CardCreationResult>), typeof(MegaCrit.Sts2.Core.Runs.CardCreationOptions)], "relic.modify_card_reward_options_late"),
+            ("ModifyDamageAdditive", [typeof(Creature), typeof(decimal), typeof(ValueProp), typeof(Creature), typeof(CardModel)], "relic.modify_damage_additive"),
+            ("ModifyDamageMultiplicative", [typeof(Creature), typeof(decimal), typeof(ValueProp), typeof(Creature), typeof(CardModel)], "relic.modify_damage_multiplicative"),
+            ("ModifyBlockMultiplicative", [typeof(Creature), typeof(decimal), typeof(ValueProp), typeof(CardModel), typeof(CardPlay)], "relic.modify_block_multiplicative"),
+            ("ModifyHpLostBeforeOsty", [typeof(Creature), typeof(decimal), typeof(ValueProp), typeof(Creature), typeof(CardModel)], "relic.modify_hp_lost_before_osty"),
+            ("ModifyHpLostAfterOsty", [typeof(Creature), typeof(decimal), typeof(ValueProp), typeof(Creature), typeof(CardModel)], "relic.modify_hp_lost_after_osty"),
+            ("ModifyHandDraw", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(decimal)], "relic.modify_hand_draw"),
+            ("ModifyHandDrawLate", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(decimal)], "relic.modify_hand_draw_late"),
+            ("ModifyMaxEnergy", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(decimal)], "relic.modify_max_energy"),
+            ("ModifyMerchantPrice", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(MegaCrit.Sts2.Core.Entities.Merchant.MerchantEntry), typeof(decimal)], "relic.modify_merchant_price"),
+            ("ModifyUnknownMapPointRoomTypes", [typeof(IReadOnlySet<RoomType>)], "relic.modify_unknown_map_point_room_types"),
+            ("ModifyXValue", [typeof(CardModel), typeof(int)], "relic.modify_x_value"),
+            ("ShouldDisableRemainingRestSiteOptions", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.should_disable_remaining_rest_site_options"),
+            ("ShouldFlush", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.should_flush"),
+            ("ShouldForcePotionReward", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(RoomType)], "relic.should_force_potion_reward"),
+            ("ShouldGainGold", [typeof(decimal), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.should_gain_gold"),
+            ("ShouldPlayerResetEnergy", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.should_player_reset_energy"),
+            ("ShouldProcurePotion", [typeof(PotionModel), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.should_procure_potion"),
+            ("ShouldRefillMerchantEntry", [typeof(MegaCrit.Sts2.Core.Entities.Merchant.MerchantEntry), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.should_refill_merchant_entry"),
+            ("ModifyGeneratedMap", [typeof(MegaCrit.Sts2.Core.Runs.IRunState), typeof(MegaCrit.Sts2.Core.Map.ActMap), typeof(int)], "relic.modify_generated_map"),
+            ("ModifyGeneratedMapLate", [typeof(MegaCrit.Sts2.Core.Runs.IRunState), typeof(MegaCrit.Sts2.Core.Map.ActMap), typeof(int)], "relic.modify_generated_map_late"),
+            ("BeforeCombatStart", Type.EmptyTypes, "relic.before_combat_start"),
+            ("BeforeCombatStartLate", Type.EmptyTypes, "relic.before_combat_start_late"),
+            ("BeforeAttack", [typeof(AttackCommand)], "relic.before_attack"),
+            ("AfterAttack", [typeof(AttackCommand)], "relic.after_attack"),
             ("BeforeCardPlayed", [typeof(CardPlay)], "relic.before_card_played"),
             ("AfterCardPlayed", [typeof(PlayerChoiceContext), typeof(CardPlay)], "relic.after_card_played"),
             ("AfterCardPlayedLate", [typeof(PlayerChoiceContext), typeof(CardPlay)], "relic.after_card_played_late"),
+            ("AfterCardExhausted", [typeof(PlayerChoiceContext), typeof(CardModel), typeof(bool)], "relic.after_card_exhausted"),
+            ("AfterDamageReceived", [typeof(PlayerChoiceContext), typeof(Creature), typeof(DamageResult), typeof(ValueProp), typeof(Creature), typeof(CardModel)], "relic.after_damage_received"),
+            ("AfterDamageReceivedLate", [typeof(PlayerChoiceContext), typeof(Creature), typeof(DamageResult), typeof(ValueProp), typeof(Creature), typeof(CardModel)], "relic.after_damage_received_late"),
+            ("AfterRoomEntered", [typeof(AbstractRoom)], "relic.after_room_entered"),
+            ("BeforeHandDraw", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(PlayerChoiceContext), typeof(CombatState)], "relic.before_hand_draw"),
+            ("BeforeHandDrawLate", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player), typeof(PlayerChoiceContext), typeof(CombatState)], "relic.before_hand_draw_late"),
+            ("BeforePlayPhaseStart", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.before_play_phase_start"),
+            ("BeforeSideTurnStart", [typeof(PlayerChoiceContext), typeof(CombatSide), typeof(CombatState)], "relic.before_side_turn_start"),
+            ("BeforeTurnEndVeryEarly", [typeof(PlayerChoiceContext), typeof(CombatSide)], "relic.before_turn_end_very_early"),
+            ("BeforeTurnEndEarly", [typeof(PlayerChoiceContext), typeof(CombatSide)], "relic.before_turn_end_early"),
+            ("BeforeTurnEnd", [typeof(PlayerChoiceContext), typeof(CombatSide)], "relic.before_turn_end"),
+            ("AfterCardDrawn", [typeof(PlayerChoiceContext), typeof(CardModel), typeof(bool)], "relic.after_card_drawn"),
+            ("AfterPlayerTurnStart", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_player_turn_start"),
+            ("AfterPlayerTurnStartEarly", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_player_turn_start_early"),
+            ("AfterPlayerTurnStartLate", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_player_turn_start_late"),
+            ("AfterEnergyReset", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_energy_reset"),
+            ("AfterEnergyResetLate", [typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "relic.after_energy_reset_late"),
+            ("AfterSideTurnStart", [typeof(CombatSide), typeof(CombatState)], "relic.after_side_turn_start"),
+            ("AfterTurnEnd", [typeof(PlayerChoiceContext), typeof(CombatSide)], "relic.after_turn_end"),
+            ("AfterTurnEndLate", [typeof(PlayerChoiceContext), typeof(CombatSide)], "relic.after_turn_end_late"),
+            ("AfterCardChangedPiles", [typeof(CardModel), typeof(PileType), typeof(AbstractModel)], "relic.after_card_changed_piles"),
+            ("AfterCardChangedPilesLate", [typeof(CardModel), typeof(PileType), typeof(AbstractModel)], "relic.after_card_changed_piles_late"),
+            ("AfterCombatEnd", [typeof(MegaCrit.Sts2.Core.Rooms.CombatRoom)], "relic.after_combat_end"),
+            ("AfterCombatVictoryEarly", [typeof(MegaCrit.Sts2.Core.Rooms.CombatRoom)], "relic.after_combat_victory_early"),
+            ("AfterCombatVictory", [typeof(MegaCrit.Sts2.Core.Rooms.CombatRoom)], "relic.after_combat_victory"),
             ("BeforePotionUsed", [typeof(PotionModel), typeof(Creature)], "relic.before_potion_used"),
             ("AfterPotionUsed", [typeof(PotionModel), typeof(Creature)], "relic.after_potion_used")
         };
@@ -493,7 +629,8 @@ public sealed class NativeBehaviorGraphAutoImporter
                 continue;
             }
 
-            var steps = ExtractStepsFromMethod(relic, method, candidate.TriggerId, "current_target", "self", result);
+            var steps = TryBuildSyntheticRelicSteps(relic, method, candidate.TriggerId, result)
+                ?? ExtractStepsFromMethod(relic, method, candidate.TriggerId, "current_target", "self", result);
             if (steps.Count == 0)
             {
                 continue;
@@ -505,6 +642,95 @@ public sealed class NativeBehaviorGraphAutoImporter
         return SetUnsupported(result, $"Relic '{entityId}' does not currently map to a supported graph hook trigger.");
     }
 
+    private bool TryCreateEnchantmentGraph(string entityId, NativeBehaviorGraphAutoImportResult result)
+    {
+        var enchantment = ResolveEnchantmentModel(entityId);
+        if (enchantment == null)
+        {
+            return SetUnsupported(result, $"Could not resolve runtime enchantment '{entityId}'.");
+        }
+
+        var title = ResolveModelTitle(enchantment);
+        var translatedGraphs = new List<(string TriggerId, BehaviorGraphDefinition Graph)>();
+
+        var methodCandidates = new (string MethodName, Type[] Args, string TriggerId)[]
+        {
+            ("OnPlay", [typeof(PlayerChoiceContext), typeof(CardPlay)], "enchantment.on_play"),
+            ("OnEnchant", Type.EmptyTypes, "enchantment.on_enchant"),
+            ("AfterCardPlayed", [typeof(PlayerChoiceContext), typeof(CardPlay)], "enchantment.after_card_played"),
+            ("AfterCardDrawn", [typeof(PlayerChoiceContext), typeof(CardModel), typeof(bool)], "enchantment.after_card_drawn"),
+            ("AfterPlayerTurnStart", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "enchantment.after_player_turn_start"),
+            ("BeforeFlush", [typeof(PlayerChoiceContext), typeof(MegaCrit.Sts2.Core.Entities.Players.Player)], "enchantment.before_flush"),
+            ("EnchantDamageAdditive", [typeof(decimal), typeof(ValueProp)], "enchantment.modify_damage_additive"),
+            ("EnchantDamageMultiplicative", [typeof(decimal), typeof(ValueProp)], "enchantment.modify_damage_multiplicative"),
+            ("EnchantBlockAdditive", [typeof(decimal), typeof(ValueProp)], "enchantment.modify_block_additive"),
+            ("EnchantBlockMultiplicative", [typeof(decimal), typeof(ValueProp)], "enchantment.modify_block_multiplicative"),
+            ("EnchantPlayCount", [typeof(int)], "enchantment.modify_play_count")
+        };
+
+        foreach (var candidate in methodCandidates)
+        {
+            var method = enchantment.GetType().GetMethod(
+                candidate.MethodName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: candidate.Args,
+                modifiers: null);
+            if (method == null)
+            {
+                continue;
+            }
+
+            var declaringType = candidate.MethodName == "OnEnchant" ? typeof(EnchantmentModel) : typeof(AbstractModel);
+            if (method.DeclaringType == declaringType)
+            {
+                continue;
+            }
+
+            var steps = TryBuildSyntheticEnchantmentSteps(enchantment, method, candidate.TriggerId, result)
+                ?? ExtractStepsFromMethod(
+                    enchantment,
+                    method,
+                    candidate.TriggerId,
+                    "current_target",
+                    "self",
+                    result);
+            if (steps.Count == 0)
+            {
+                continue;
+            }
+
+            var graph = TranslateTriggerGraph(ModStudioEntityKind.Enchantment, entityId, title, steps, candidate.TriggerId, result);
+            if (graph != null)
+            {
+                translatedGraphs.Add((candidate.TriggerId, graph));
+            }
+        }
+
+        if (translatedGraphs.Count == 0)
+        {
+            return SetUnsupported(result, $"Enchantment '{entityId}' does not currently map to a supported graph trigger.");
+        }
+
+        result.Graph = MergeTriggerGraphs(
+            $"native_auto_enchantment_{entityId.ToLowerInvariant()}",
+            ModStudioEntityKind.Enchantment,
+            string.IsNullOrWhiteSpace(title) ? entityId : $"{title} Native Import",
+            translatedGraphs);
+        result.IsSupported = true;
+        result.IsPartial = result.UnsupportedCalls.Count > 0 || result.Warnings.Count > 0;
+        result.Summary = string.Join(
+            Environment.NewLine,
+            new[]
+            {
+                $"Native import: {(result.IsPartial ? "partial" : "supported")}",
+                $"Triggers: {string.Join(", ", translatedGraphs.Select(item => item.TriggerId))}",
+                $"Unsupported calls: {(result.UnsupportedCalls.Count == 0 ? "-" : string.Join(", ", result.UnsupportedCalls.Distinct(StringComparer.OrdinalIgnoreCase)))}",
+                $"Warnings: {(result.Warnings.Count == 0 ? "-" : string.Join(" | ", result.Warnings.Distinct(StringComparer.OrdinalIgnoreCase)))}"
+            });
+        return true;
+    }
+
     private static string ResolveModelTitle(AbstractModel model)
     {
         try
@@ -514,6 +740,7 @@ public sealed class NativeBehaviorGraphAutoImporter
                 CardModel card => string.IsNullOrWhiteSpace(card.Title) ? card.Id.Entry : card.Title,
                 PotionModel potion => string.IsNullOrWhiteSpace(potion.Title.GetRawText()) ? potion.Id.Entry : potion.Title.GetRawText(),
                 RelicModel relic => string.IsNullOrWhiteSpace(relic.Title.GetRawText()) ? relic.Id.Entry : relic.Title.GetRawText(),
+                EnchantmentModel enchantment => NativeLocalizationTableFallback.TryGetText(enchantment.Title) is var enchantmentTitle && !string.IsNullOrWhiteSpace(enchantmentTitle) ? enchantmentTitle : enchantment.Id.Entry,
                 _ => model.Id.Entry
             };
         }
@@ -556,6 +783,18 @@ public sealed class NativeBehaviorGraphAutoImporter
         catch
         {
             return CreateModelByTypeName<RelicModel>(entityId);
+        }
+    }
+
+    private static EnchantmentModel? ResolveEnchantmentModel(string entityId)
+    {
+        try
+        {
+            return ModelDb.DebugEnchantments.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, entityId, StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return CreateModelByTypeName<EnchantmentModel>(entityId);
         }
     }
 
@@ -622,6 +861,105 @@ public sealed class NativeBehaviorGraphAutoImporter
         return result.IsSupported;
     }
 
+    private BehaviorGraphDefinition? TranslateTriggerGraph(
+        ModStudioEntityKind kind,
+        string entityId,
+        string title,
+        IReadOnlyList<NativeBehaviorStep> steps,
+        string triggerId,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (steps.Count == 0)
+        {
+            return null;
+        }
+
+        var source = new NativeBehaviorGraphSource
+        {
+            EntityKind = kind,
+            GraphId = $"native_auto_{kind.ToString().ToLowerInvariant()}_{entityId.ToLowerInvariant()}_{triggerId.Replace('.', '_')}",
+            Name = string.IsNullOrWhiteSpace(title) ? entityId : $"{title} Native Import",
+            Description = string.Empty,
+            TriggerId = triggerId,
+            Steps = steps.ToList()
+        };
+
+        var translation = _translator.Translate(source);
+        result.Warnings.AddRange(translation.Warnings);
+        return translation.AppliedStepKinds.Count > 0 ? translation.Graph : null;
+    }
+
+    private static BehaviorGraphDefinition MergeTriggerGraphs(
+        string graphId,
+        ModStudioEntityKind kind,
+        string name,
+        IReadOnlyList<(string TriggerId, BehaviorGraphDefinition Graph)> translatedGraphs)
+    {
+        var merged = new BehaviorGraphDefinition
+        {
+            GraphId = graphId,
+            Name = name,
+            EntityKind = kind,
+            Description = string.Empty,
+            EntryNodeId = translatedGraphs[0].Graph.EntryNodeId,
+            Metadata = new Dictionary<string, string>(StringComparer.Ordinal)
+        };
+
+        for (var index = 0; index < translatedGraphs.Count; index++)
+        {
+            var (triggerId, graph) = translatedGraphs[index];
+            var suffix = $"__{index}";
+            var nodeIdMap = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var node in graph.Nodes)
+            {
+                var mappedNodeId = node.NodeId + suffix;
+                nodeIdMap[node.NodeId] = mappedNodeId;
+                merged.Nodes.Add(new BehaviorGraphNodeDefinition
+                {
+                    NodeId = mappedNodeId,
+                    NodeType = node.NodeType,
+                    DisplayName = node.DisplayName,
+                    Description = node.Description,
+                    Properties = new Dictionary<string, string>(node.Properties, StringComparer.Ordinal),
+                    DynamicValues = node.DynamicValues.ToDictionary(pair => pair.Key, pair => pair.Value.Clone(), StringComparer.Ordinal)
+                });
+            }
+
+            foreach (var connection in graph.Connections)
+            {
+                if (!nodeIdMap.TryGetValue(connection.FromNodeId, out var mappedFrom) ||
+                    !nodeIdMap.TryGetValue(connection.ToNodeId, out var mappedTo))
+                {
+                    continue;
+                }
+
+                merged.Connections.Add(new BehaviorGraphConnectionDefinition
+                {
+                    FromNodeId = mappedFrom,
+                    FromPortId = connection.FromPortId,
+                    ToNodeId = mappedTo,
+                    ToPortId = connection.ToPortId
+                });
+            }
+
+            if (index == 0 && nodeIdMap.TryGetValue(graph.EntryNodeId, out var mappedEntry))
+            {
+                merged.EntryNodeId = mappedEntry;
+            }
+
+            if (nodeIdMap.TryGetValue(graph.EntryNodeId, out var entryNodeId))
+            {
+                merged.Metadata[$"trigger.{triggerId}"] = entryNodeId;
+                if (index == 0)
+                {
+                    merged.Metadata["trigger.default"] = entryNodeId;
+                }
+            }
+        }
+
+        return merged;
+    }
+
     private List<NativeBehaviorStep> ExtractStepsFromMethod(
         AbstractModel model,
         MethodInfo method,
@@ -653,7 +991,7 @@ public sealed class NativeBehaviorGraphAutoImporter
                 pendingAttack = null;
             }
 
-            if (TryTranslateRecognizedCall(model, calledMethod, defaultTargetSelector, defaultSelfSelector, pendingCreatedCardId, result, out var step, out var callLabel))
+            if (TryTranslateRecognizedCall(model, calledMethod, callSite.Int32ArgumentHint, defaultTargetSelector, defaultSelfSelector, pendingCreatedCardId, result, out var step, out var callLabel))
             {
                 if (string.Equals(step.Kind, "combat.create_card", StringComparison.OrdinalIgnoreCase) &&
                     (!step.Parameters.TryGetValue("card_id", out var createCardId) || string.IsNullOrWhiteSpace(createCardId)))
@@ -885,6 +1223,7 @@ public sealed class NativeBehaviorGraphAutoImporter
     private bool TryTranslateRecognizedCall(
         AbstractModel model,
         MethodBase method,
+        int? int32ArgumentHint,
         string defaultTargetSelector,
         string defaultSelfSelector,
         string? pendingCreatedCardId,
@@ -1254,6 +1593,103 @@ public sealed class NativeBehaviorGraphAutoImporter
                 Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     ["card_state_key"] = "selected_cards"
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "CardCmd" && string.Equals(method.Name, "RemoveKeyword", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "card.remove_keyword",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["card_state_key"] = "selected_cards",
+                    ["keyword"] = ResolveCardKeywordText(int32ArgumentHint)
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "CardModel" && string.Equals(method.Name, "AddKeyword", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "card.apply_keyword",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["card_state_key"] = "selected_cards",
+                    ["keyword"] = ResolveCardKeywordText(int32ArgumentHint)
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "CardEnergyCost" && string.Equals(method.Name, "UpgradeBy", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "card.set_cost_delta",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["card_state_key"] = "selected_cards",
+                    ["amount"] = (int32ArgumentHint ?? -1).ToString(CultureInfo.InvariantCulture)
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "CardEnergyCost" && string.Equals(method.Name, "SetCustomBaseCost", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "card.set_cost_absolute",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["card_state_key"] = "selected_cards",
+                    ["amount"] = (int32ArgumentHint ?? 0).ToString(CultureInfo.InvariantCulture)
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "CardEnergyCost" && string.Equals(method.Name, "SetThisCombat", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "card.set_cost_this_combat",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["card_state_key"] = "selected_cards",
+                    ["amount"] = (int32ArgumentHint ?? 0).ToString(CultureInfo.InvariantCulture)
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "CardEnergyCost" && string.Equals(method.Name, "AddUntilPlayed", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "card.add_cost_until_played",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["card_state_key"] = "selected_cards",
+                    ["amount"] = (int32ArgumentHint ?? -1).ToString(CultureInfo.InvariantCulture)
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "EnchantmentModel" && string.Equals(method.Name, "set_Status", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "enchantment.set_status",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["status"] = ResolveEnchantmentStatusText(int32ArgumentHint)
                 }
             };
             return true;
@@ -1753,7 +2189,12 @@ public sealed class NativeBehaviorGraphAutoImporter
         var methodName = method.Name;
 
         if ((typeName.Contains("DamageCmd", StringComparison.Ordinal) || typeName is "AttackCommand") &&
-            methodName is "FromCard" or "FromOsty" or "Targeting" or "TargetingAllOpponents" or "WithHitFx" or "WithHitCount" or "WithNoAttackerAnim" or "WithAttackerAnim" or "SpawningHitVfxOnEachCreature" or "Execute")
+            methodName is "FromCard" or "FromOsty" or "Targeting" or "TargetingAllOpponents" or "TargetingRandomOpponents" or "WithHitFx" or "WithHitCount" or "WithNoAttackerAnim" or "WithAttackerAnim" or "WithAttackerFx" or "SpawningHitVfxOnEachCreature" or "Execute" or "WithHitVfxNode" or "WithHitVfxSpawnedAtBase" or "BeforeDamage" or "OnlyPlayAnimOnce" or "CreateContextAsync" or "AddHit" or "DisposeAsync")
+        {
+            return true;
+        }
+
+        if (typeName is "AttackCommand" && methodName.StartsWith("get_", StringComparison.Ordinal))
         {
             return true;
         }
@@ -2004,7 +2445,7 @@ public sealed class NativeBehaviorGraphAutoImporter
     {
         amountVarName = string.Empty;
         amount = "1";
-        foreach (var candidate in new[] { "Power", "Amount", "Stacks" })
+        foreach (var candidate in new[] { "Power", "Amount", "Stacks", "Cards", "Repeat" })
         {
             if (!TryGetDynamicVar(model, candidate, out var dynamicVar))
             {
@@ -2084,6 +2525,26 @@ public sealed class NativeBehaviorGraphAutoImporter
         }
 
         return "1";
+    }
+
+    private static string ResolveCardKeywordText(int? int32ArgumentHint)
+    {
+        if (int32ArgumentHint.HasValue && Enum.IsDefined(typeof(CardKeyword), int32ArgumentHint.Value))
+        {
+            return ((CardKeyword)int32ArgumentHint.Value).ToString();
+        }
+
+        return string.Empty;
+    }
+
+    private static string ResolveEnchantmentStatusText(int? int32ArgumentHint)
+    {
+        if (int32ArgumentHint.HasValue && Enum.IsDefined(typeof(EnchantmentStatus), int32ArgumentHint.Value))
+        {
+            return ((EnchantmentStatus)int32ArgumentHint.Value).ToString();
+        }
+
+        return EnchantmentStatus.Disabled.ToString();
     }
 
     private static bool TryResolveCreatedCardIdFromCall(MethodBase method, out string cardId)
@@ -2241,12 +2702,2312 @@ public sealed class NativeBehaviorGraphAutoImporter
     {
         dynamicVar = null!;
         return model switch
+            {
+                CardModel card => card.DynamicVars.TryGetValue(varName, out dynamicVar!),
+                PotionModel potion => potion.DynamicVars.TryGetValue(varName, out dynamicVar!),
+                RelicModel relic => relic.DynamicVars.TryGetValue(varName, out dynamicVar!),
+                EnchantmentModel enchantment when string.Equals(varName, "Amount", StringComparison.OrdinalIgnoreCase) => TryCreateSyntheticEnchantmentAmountVar(enchantment, out dynamicVar!),
+                EnchantmentModel enchantment => enchantment.DynamicVars.TryGetValue(varName, out dynamicVar!),
+                _ => false
+            };
+    }
+
+    private static bool TryCreateSyntheticEnchantmentAmountVar(EnchantmentModel enchantment, out DynamicVar dynamicVar)
+    {
+        dynamicVar = new IntVar("Amount", enchantment.Amount);
+        return true;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticEnchantmentSteps(
+        EnchantmentModel enchantment,
+        MethodInfo method,
+        string triggerId,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        var methodName = method.Name;
+        Dictionary<string, string>? parameters = null;
+        string? kind = null;
+
+        switch (methodName)
         {
-            CardModel card => card.DynamicVars.TryGetValue(varName, out dynamicVar!),
-            PotionModel potion => potion.DynamicVars.TryGetValue(varName, out dynamicVar!),
-            RelicModel relic => relic.DynamicVars.TryGetValue(varName, out dynamicVar!),
+            case "EnchantDamageAdditive":
+                kind = "modifier.damage_additive";
+                parameters = BuildEnchantmentModifierParameters(enchantment, "Amount", "0");
+                break;
+            case "EnchantBlockAdditive":
+                kind = "modifier.block_additive";
+                parameters = BuildEnchantmentModifierParameters(enchantment, "Amount", "0");
+                break;
+            case "EnchantDamageMultiplicative":
+                kind = "modifier.damage_multiplicative";
+                parameters = string.Equals(enchantment.Id.Entry, "FAVORED", StringComparison.OrdinalIgnoreCase)
+                    ? new Dictionary<string, string>(StringComparer.Ordinal) { ["amount"] = "2" }
+                    : BuildEnchantmentModifierParameters(enchantment, "Amount", "1");
+                break;
+            case "EnchantBlockMultiplicative":
+                kind = "modifier.block_multiplicative";
+                parameters = BuildEnchantmentModifierParameters(enchantment, "Amount", "1");
+                break;
+            case "EnchantPlayCount":
+                kind = "modifier.play_count";
+                parameters = BuildEnchantmentModifierParameters(enchantment, "Times", "1");
+                parameters["mode"] = "delta";
+                break;
+        }
+
+        if (string.IsNullOrWhiteSpace(kind) || parameters == null)
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add($"{methodName} -> {kind}");
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = kind,
+                Parameters = parameters
+            }
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicSteps(
+        RelicModel relic,
+        MethodInfo method,
+        string triggerId,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        _ = triggerId;
+        Dictionary<string, string>? parameters = null;
+        string? kind = null;
+
+        switch (method.Name)
+        {
+            case "AfterObtained":
+                return TryBuildSyntheticRelicAfterObtainedSteps(relic, result);
+            case "AfterBlockCleared":
+                return TryBuildSyntheticRelicAfterBlockClearedSteps(relic, result);
+            case "AfterCardExhausted":
+                return TryBuildSyntheticRelicAfterCardExhaustedSteps(relic, result);
+            case "AfterCardEnteredCombat":
+                return TryBuildSyntheticRelicAfterCardEnteredCombatSteps(relic, result);
+            case "AfterCardDiscarded":
+                return TryBuildSyntheticRelicAfterCardDiscardedSteps(relic, result);
+            case "AfterDamageGiven":
+                return TryBuildSyntheticRelicAfterDamageGivenSteps(relic, result);
+            case "AfterDeath":
+                return TryBuildSyntheticRelicAfterDeathSteps(relic, result);
+            case "AfterDiedToDoom":
+                return TryBuildSyntheticRelicAfterDiedToDoomSteps(relic, result);
+            case "AfterCurrentHpChanged":
+                return TryBuildSyntheticRelicAfterCurrentHpChangedSteps(relic, result);
+            case "AfterHandEmptied":
+                return TryBuildSyntheticRelicAfterHandEmptiedSteps(relic, result);
+            case "AfterOrbChanneled":
+                return TryBuildSyntheticRelicAfterOrbChanneledSteps(relic, result);
+            case "AfterPotionDiscarded":
+                return TryBuildSyntheticRelicAfterPotionDiscardedSteps(relic, result);
+            case "AfterPotionProcured":
+                return TryBuildSyntheticRelicAfterPotionProcuredSteps(relic, result);
+            case "AfterPreventingBlockClear":
+                return TryBuildSyntheticRelicAfterPreventingBlockClearSteps(relic, result);
+            case "AfterPreventingDeath":
+                return TryBuildSyntheticRelicAfterPreventingDeathSteps(relic, result);
+            case "AfterRestSiteHeal":
+                return TryBuildSyntheticRelicAfterRestSiteHealSteps(relic, result);
+            case "AfterShuffle":
+                return TryBuildSyntheticRelicAfterShuffleSteps(relic, result);
+            case "AfterStarsSpent":
+                return TryBuildSyntheticRelicAfterStarsSpentSteps(relic, result);
+            case "BeforeTurnEnd":
+                return TryBuildSyntheticRelicBeforeTurnEndSteps(relic, result);
+            case "BeforeHandDraw":
+                return TryBuildSyntheticRelicBeforeHandDrawSteps(relic, result);
+            case "BeforeCombatStart":
+                return TryBuildSyntheticRelicBeforeCombatStartSteps(relic, result);
+            case "TryModifyCardRewardOptions":
+            case "TryModifyCardRewardOptionsLate":
+                return TryBuildSyntheticRelicCardRewardOptionSteps(relic, method.Name, result);
+            case "TryModifyRewards":
+                return TryBuildSyntheticRelicRewardSteps(relic, method.Name, result);
+            case "TryModifyRewardsLate":
+                return TryBuildSyntheticRelicRewardSteps(relic, method.Name, result);
+            case "TryModifyRestSiteHealRewards":
+                return TryBuildSyntheticRelicRewardSteps(relic, method.Name, result);
+            case "ModifyDamageAdditive":
+                return TryBuildSyntheticRelicDamageAdditiveSteps(relic, result);
+            case "ModifyDamageMultiplicative":
+                return TryBuildSyntheticRelicDamageMultiplicativeSteps(relic, result);
+            case "ModifyBlockMultiplicative":
+                return TryBuildSyntheticRelicBlockMultiplicativeSteps(relic, result);
+            case "ModifyHpLostBeforeOsty":
+                return TryBuildSyntheticRelicHpLostBeforeOstySteps(relic, result);
+            case "ModifyHpLostAfterOsty":
+                return TryBuildSyntheticRelicHpLostAfterOstySteps(relic, result);
+            case "ModifyMerchantPrice":
+                return TryBuildSyntheticRelicMerchantPriceSteps(relic, result);
+            case "ModifyUnknownMapPointRoomTypes":
+                return TryBuildSyntheticRelicUnknownRoomTypeSteps(relic, result);
+            case "ShouldDisableRemainingRestSiteOptions":
+                return TryBuildSyntheticRelicBoolSteps(relic, method.Name, result);
+            case "ShouldGainGold":
+                return TryBuildSyntheticRelicBoolSteps(relic, method.Name, result);
+            case "ShouldPlayerResetEnergy":
+                return TryBuildSyntheticRelicBoolSteps(relic, method.Name, result);
+            case "ShouldFlush":
+                return TryBuildSyntheticRelicBoolSteps(relic, method.Name, result);
+            case "ShouldForcePotionReward":
+                return TryBuildSyntheticRelicBoolSteps(relic, method.Name, result);
+            case "ShouldRefillMerchantEntry":
+                return TryBuildSyntheticRelicBoolSteps(relic, method.Name, result);
+            case "ShouldProcurePotion":
+                return TryBuildSyntheticRelicBoolSteps(relic, method.Name, result);
+            case "ModifyGeneratedMap":
+            case "ModifyGeneratedMapLate":
+                return TryBuildSyntheticRelicMapSteps(relic, method.Name, result);
+            case "ModifyHandDraw":
+            case "ModifyHandDrawLate":
+                kind = "modifier.hand_draw";
+                parameters = BuildRelicNumericModifierParameters(
+                    relic,
+                    preferredVarName: "Cards",
+                    fallbackLiteral: "0",
+                    isNegativeDelta: string.Equals(relic.Id.Entry, "BIG_MUSHROOM", StringComparison.OrdinalIgnoreCase));
+                parameters["mode"] = "delta";
+                break;
+            case "ModifyXValue":
+                kind = "modifier.x_value";
+                parameters = BuildRelicNumericModifierParameters(relic, preferredVarName: "Increase", fallbackLiteral: "0");
+                parameters["mode"] = "delta";
+                break;
+            case "ModifyMaxEnergy":
+                kind = "modifier.max_energy";
+                parameters = BuildRelicNumericModifierParameters(relic, preferredVarName: "Energy", fallbackLiteral: "0");
+                parameters["mode"] = "delta";
+                break;
+        }
+
+        if (string.IsNullOrWhiteSpace(kind) || parameters == null)
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add($"{method.Name} -> {kind}");
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = kind,
+                Parameters = parameters
+            }
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicRewardSteps(
+        RelicModel relic,
+        string methodName,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "BLACK_STAR" when methodName == "TryModifyRewards" => BuildRoomConditionalRewardSteps(
+                "Elite",
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["reward_kind"] = "relic",
+                    ["reward_count"] = "1"
+                }),
+            "PRAYER_WHEEL" when methodName == "TryModifyRewards" => BuildRoomConditionalRewardSteps(
+                "Monster",
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["reward_kind"] = "card_reward",
+                    ["card_count"] = "3",
+                    ["reward_room_type"] = "Monster"
+                }),
+            "WHITE_STAR" when methodName == "TryModifyRewards" => BuildRoomConditionalRewardSteps(
+                "Elite",
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["reward_kind"] = "card_reward",
+                    ["card_count"] = "3",
+                    ["reward_room_type"] = "Boss"
+                }),
+            "DREAM_CATCHER" when methodName == "TryModifyRestSiteHealRewards" =>
+            [
+                new NativeBehaviorStep
+                {
+                    Kind = "reward.offer_custom",
+                    Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["reward_kind"] = "card_reward",
+                        ["card_count"] = "3",
+                        ["reward_room_type"] = "Monster"
+                    }
+                }
+            ],
+            "TINY_MAILBOX" when methodName == "TryModifyRestSiteHealRewards" =>
+            [
+                new NativeBehaviorStep
+                {
+                    Kind = "reward.offer_custom",
+                    Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["reward_kind"] = "potion",
+                        ["reward_count"] = "1"
+                    }
+                }
+            ],
+            "DRIFTWOOD" when methodName == "TryModifyRewardsLate" =>
+            [
+                new NativeBehaviorStep
+                {
+                    Kind = "reward.mark_card_rewards_rerollable",
+                    Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                }
+            ],
+            "AMETHYST_AUBERGINE" when methodName == "TryModifyRewards" => BuildAmethystAubergineRewardSteps(relic),
+            "LAVA_ROCK" when methodName == "TryModifyRewards" => BuildLavaRockRewardSteps(relic),
+            "WONGOS_MYSTERY_TICKET" when methodName == "TryModifyRewards" => BuildWongosMysteryTicketRewardSteps(relic),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add($"{methodName} -> synthetic reward graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterObtainedSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "BELT_BUCKLE" => BuildBeltBuckleAfterObtainedSteps(relic),
+            "PAELS_GROWTH" => BuildDeckEnchantAfterObtainedSteps("CLONE", "4", selectAll: false),
+            "ROYAL_STAMP" => BuildDeckEnchantAfterObtainedSteps("ROYALLY_APPROVED", "1", selectAll: false),
+            "PAELS_CLAW" => BuildDeckEnchantAfterObtainedSteps("GOOPY", "1", selectAll: true),
+            "PAELS_LEGION" => BuildAddPetAfterObtainedSteps("PaelsLegion"),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("AfterObtained -> synthetic obtained graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterCardExhaustedSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "JOSS_PAPER")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterCardExhausted -> synthetic exhaust counter graph");
+        return
+        [
+            BuildCompareStep("$state.CardOwnerIsOwner", "eq", bool.TrueString, "joss_owner_card"),
+            BuildBranchStep(
+                "joss_owner_card",
+                new[]
+                {
+                    BuildCompareStep("$state.ExhaustedCausedByEthereal", "eq", bool.TrueString, "joss_ethereal_exhaust"),
+                    BuildBranchStep(
+                        "joss_ethereal_exhaust",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "value.add",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["key"] = "EtherealCount",
+                                    ["delta"] = "1"
+                                }
+                            }
+                        },
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "value.add",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["key"] = "CardsExhausted",
+                                    ["delta"] = "1"
+                                }
+                            },
+                            BuildCompareStep("$state.CardsExhausted", "gte", "$state.ExhaustAmount", "joss_threshold_met"),
+                            BuildBranchStep(
+                                "joss_threshold_met",
+                                new[]
+                                {
+                                    new NativeBehaviorStep
+                                    {
+                                        Kind = "combat.draw_cards",
+                                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                        {
+                                            ["amount"] = "1"
+                                        }
+                                    },
+                                    new NativeBehaviorStep
+                                    {
+                                        Kind = "value.set",
+                                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                        {
+                                            ["key"] = "CardsExhausted",
+                                            ["value"] = "0"
+                                        }
+                                    }
+                                })
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterBlockClearedSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "CAPTAINS_WHEEL" => BuildRoundConditionalRelicSteps(
+                roundNumber: 3,
+                BuildRelicAmountAction(relic, "combat.gain_block", "Block", "18", "self")),
+            "HORN_CLEAT" => BuildRoundConditionalRelicSteps(
+                roundNumber: 2,
+                BuildRelicAmountAction(relic, "combat.gain_block", "Block", "14", "self")),
+            "SPARKLING_ROUGE" => BuildRoundConditionalRelicSteps(
+                roundNumber: 3,
+                BuildSparklingRougePowerSteps(relic).ToArray()),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("AfterBlockCleared -> synthetic round conditional graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterCardEnteredCombatSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "REGALITE")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterCardEnteredCombat -> synthetic colorless card graph");
+        return
+        [
+            BuildCompareStep("$state.EnteredCardOwnerIsOwner", "eq", bool.TrueString, "entered_card_owned"),
+            BuildBranchStep(
+                "entered_card_owned",
+                new[]
+                {
+                    BuildCompareStep("$state.EnteredCardIsColorless", "eq", bool.TrueString, "entered_card_colorless"),
+                    BuildBranchStep(
+                        "entered_card_colorless",
+                        new[]
+                        {
+                            BuildRelicAmountAction(relic, "combat.gain_block", "Block", "2", "self")
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterDamageGivenSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "HAND_DRILL")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterDamageGiven -> synthetic block-break graph");
+        return
+        [
+            BuildCompareStep("$state.DealerIsOwnerOrPetOwner", "eq", bool.TrueString, "dealer_matches"),
+            BuildBranchStep(
+                "dealer_matches",
+                new[]
+                {
+                    BuildCompareStep("$state.TargetIsPlayer", "eq", bool.FalseString, "target_is_enemy"),
+                    BuildBranchStep(
+                        "target_is_enemy",
+                        new[]
+                        {
+                            BuildCompareStep("$state.BlockWasBroken", "eq", bool.TrueString, "block_broken"),
+                            BuildBranchStep(
+                                "block_broken",
+                                new[]
+                                {
+                                    BuildRelicPowerAction(relic, "Vulnerable", "2", "current_target")
+                                })
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterDeathSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "GREMLIN_HORN")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterDeath -> synthetic enemy death graph");
+        return
+        [
+            BuildCompareStep("$state.DeathTargetIsEnemy", "eq", bool.TrueString, "enemy_died"),
+            BuildBranchStep(
+                "enemy_died",
+                new[]
+                {
+                    BuildRelicAmountAction(relic, "player.gain_energy", "Energy", "1", "self"),
+                    new NativeBehaviorStep
+                    {
+                        Kind = "combat.draw_cards",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["amount"] = "1"
+                        }
+                    }
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterPreventingBlockClearSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "STURDY_CLAMP")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterPreventingBlockClear -> synthetic retained block graph");
+        return
+        [
+            BuildCompareStep("$state.PreventerIsSelf", "eq", bool.TrueString, "preventer_matches"),
+            BuildBranchStep(
+                "preventer_matches",
+                new[]
+                {
+                    BuildCompareStep("$state.CurrentBlock", "gt", "10", "block_above_cap"),
+                    BuildBranchStep(
+                        "block_above_cap",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "combat.lose_block",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["amount"] = "$state.BlockAboveCap",
+                                    ["target"] = "self",
+                                    ["props"] = "none"
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterCurrentHpChangedSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "RED_SKULL")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterCurrentHpChanged -> synthetic hp-threshold power graph");
+        return
+        [
+            BuildCompareStep("$state.IsInCombat", "eq", bool.TrueString, "red_skull_in_combat"),
+            BuildBranchStep(
+                "red_skull_in_combat",
+                new[]
+                {
+                    BuildCompareStep("$state.CurrentHpAboveThreshold", "eq", bool.TrueString, "red_skull_above_threshold"),
+                    BuildBranchStep(
+                        "red_skull_above_threshold",
+                        new[]
+                        {
+                            BuildCompareStep("$state.StrengthApplied", "eq", bool.TrueString, "red_skull_remove_strength"),
+                            BuildBranchStep(
+                                "red_skull_remove_strength",
+                                new[]
+                                {
+                                    BuildRelicPowerAction(relic, "Strength", "-3", "self"),
+                                    new NativeBehaviorStep
+                                    {
+                                        Kind = "value.set",
+                                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                        {
+                                            ["key"] = "StrengthApplied",
+                                            ["value"] = bool.FalseString
+                                        }
+                                    }
+                                })
+                        },
+                        new[]
+                        {
+                            BuildCompareStep("$state.StrengthApplied", "eq", bool.FalseString, "red_skull_add_strength"),
+                            BuildBranchStep(
+                                "red_skull_add_strength",
+                                new[]
+                                {
+                                    BuildRelicPowerAction(relic, "Strength", "3", "self"),
+                                    new NativeBehaviorStep
+                                    {
+                                        Kind = "value.set",
+                                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                        {
+                                            ["key"] = "StrengthApplied",
+                                            ["value"] = bool.TrueString
+                                        }
+                                    }
+                                })
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterOrbChanneledSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "METRONOME")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterOrbChanneled -> synthetic orb counter graph");
+        return
+        [
+            BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "metronome_owner_orb"),
+            BuildBranchStep(
+                "metronome_owner_orb",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "value.add",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["key"] = "OrbsChanneled",
+                            ["delta"] = "1"
+                        }
+                    },
+                    BuildCompareStep("$state.OrbsChanneled", "eq", "$state.OrbCount", "metronome_threshold"),
+                    BuildBranchStep(
+                        "metronome_threshold",
+                        new[]
+                        {
+                            BuildRelicAmountAction(relic, "combat.damage", "Damage", "30", "all_enemies")
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterPotionProcuredSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "BELT_BUCKLE")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterPotionProcured -> synthetic dexterity removal graph");
+        return
+        [
+            BuildCompareStep("$state.IsInCombat", "eq", bool.TrueString, "belt_buckle_in_combat"),
+            BuildBranchStep(
+                "belt_buckle_in_combat",
+                new[]
+                {
+                    BuildCompareStep("$state.DexterityApplied", "eq", bool.TrueString, "belt_buckle_remove"),
+                    BuildBranchStep(
+                        "belt_buckle_remove",
+                        new[]
+                        {
+                            BuildRelicPowerAction(relic, "Dexterity", "-2", "self"),
+                            new NativeBehaviorStep
+                            {
+                                Kind = "value.set",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["key"] = "DexterityApplied",
+                                    ["value"] = bool.FalseString
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterPotionDiscardedSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "BELT_BUCKLE")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterPotionDiscarded -> synthetic dexterity apply graph");
+        return
+        [
+            BuildCompareStep("$state.IsInCombat", "eq", bool.TrueString, "belt_buckle_in_combat"),
+            BuildBranchStep(
+                "belt_buckle_in_combat",
+                new[]
+                {
+                    BuildCompareStep("$state.OwnerPotionCount", "eq", "0", "belt_buckle_no_potions"),
+                    BuildBranchStep(
+                        "belt_buckle_no_potions",
+                        new[]
+                        {
+                            BuildCompareStep("$state.DexterityApplied", "eq", bool.FalseString, "belt_buckle_apply"),
+                            BuildBranchStep(
+                                "belt_buckle_apply",
+                                new[]
+                                {
+                                    BuildRelicPowerAction(relic, "Dexterity", "2", "self"),
+                                    new NativeBehaviorStep
+                                    {
+                                        Kind = "value.set",
+                                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                        {
+                                            ["key"] = "DexterityApplied",
+                                            ["value"] = bool.TrueString
+                                        }
+                                    }
+                                })
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterPreventingDeathSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "LIZARD_TAIL")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterPreventingDeath -> synthetic revive heal graph");
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "value.set",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["key"] = "WasUsed",
+                    ["value"] = bool.TrueString
+                }
+            },
+            new NativeBehaviorStep
+            {
+                Kind = "combat.heal",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["target"] = "self",
+                    ["amount"] = "$state.ReviveHealAmount"
+                }
+            }
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterStarsSpentSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "MINI_REGENT")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterStarsSpent -> synthetic once-per-turn power graph");
+        return
+        [
+            BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "owner_spent_stars"),
+            BuildBranchStep(
+                "owner_spent_stars",
+                new[]
+                {
+                    BuildCompareStep("$state.UsedThisTurn", "eq", bool.FalseString, "mini_regent_ready"),
+                    BuildBranchStep(
+                        "mini_regent_ready",
+                        new[]
+                        {
+                            BuildRelicPowerAction(relic, "Strength", "1", "self")
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicBeforeHandDrawSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "NINJA_SCROLL")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("BeforeHandDraw -> synthetic first-turn shiv graph");
+        return
+        [
+            BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "owner_draw_phase"),
+            BuildBranchStep(
+                "owner_draw_phase",
+                new[]
+                {
+                    BuildCompareStep("$state.CombatRound", "lte", "1", "first_round_draw"),
+                    BuildBranchStep(
+                        "first_round_draw",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "combat.create_card",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["card_id"] = "SHIV",
+                                    ["count"] = "3",
+                                    ["target_pile"] = "Hand"
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicBeforeCombatStartSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "BOUND_PHYLACTERY" => BuildBoundPhylacteryBeforeCombatStartSteps(relic),
+            "FAKE_SNECKO_EYE" => BuildFakeSneckoEyeBeforeCombatStartSteps(),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("BeforeCombatStart -> synthetic combat-start graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterDiedToDoomSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "BOOK_REPAIR_KNIFE")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterDiedToDoom -> combat.heal(state)");
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "combat.heal",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["target"] = "self",
+                    ["amount"] = "$state.DoomHealAmount"
+                }
+            }
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterRestSiteHealSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry == "STONE_HUMIDIFIER")
+        {
+            result.RecognizedCalls.Add("AfterRestSiteHeal -> player.gain_max_hp");
+            return
+            [
+                BuildRelicAmountAction(relic, "player.gain_max_hp", "MaxHp", "5", "self")
+            ];
+        }
+
+        if (relic.Id.Entry != "REGAL_PILLOW")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterRestSiteHeal -> value.set(Status)");
+        return
+        [
+            BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "rest_heal_owner"),
+            BuildBranchStep(
+                "rest_heal_owner",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "value.set",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["key"] = "Status",
+                            ["value"] = "Normal"
+                        }
+                    }
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicBeforeTurnEndSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "CLOAK_CLASP" => BuildCloakClaspBeforeTurnEndSteps(),
+            "DIAMOND_DIADEM" => BuildDiamondDiademBeforeTurnEndSteps(),
+            "FAKE_ORICHALCUM" => BuildOrichalcumBeforeTurnEndSteps(relic, "3"),
+            "ORICHALCUM" => BuildOrichalcumBeforeTurnEndSteps(relic, "6"),
+            "RIPPLE_BASIN" => BuildRippleBasinBeforeTurnEndSteps(relic),
+            "SCREAMING_FLAGON" => BuildScreamingFlagonBeforeTurnEndSteps(relic),
+            "STONE_CALENDAR" => BuildStoneCalendarBeforeTurnEndSteps(relic),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("BeforeTurnEnd -> synthetic end-turn graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterCardDiscardedSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "TINGSHA" => BuildTingshaAfterDiscardSteps(relic),
+            "TOUGH_BANDAGES" => BuildToughBandagesAfterDiscardSteps(relic),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("AfterCardDiscarded -> synthetic discard graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterShuffleSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "PENDULUM" => BuildPendulumAfterShuffleSteps(),
+            "THE_ABACUS" => BuildTheAbacusAfterShuffleSteps(relic),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("AfterShuffle -> synthetic shuffle graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicAfterHandEmptiedSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "UNCEASING_TOP")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("AfterHandEmptied -> synthetic draw graph");
+        return
+        [
+            BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "owner_hand_emptied"),
+            BuildBranchStep(
+                "owner_hand_emptied",
+                new[]
+                {
+                    BuildCompareStep("$state.IsPlayPhase", "eq", bool.TrueString, "play_phase_active"),
+                    BuildBranchStep(
+                        "play_phase_active",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "combat.draw_cards",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["amount"] = "1"
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicCardRewardOptionSteps(
+        RelicModel relic,
+        string methodName,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "FROZEN_EGG" when methodName == "TryModifyCardRewardOptionsLate" => BuildCardRewardUpgradeSteps("power", requireHookUpgradesEnabled: true),
+            "MOLTEN_EGG" when methodName == "TryModifyCardRewardOptionsLate" => BuildCardRewardUpgradeSteps("attack", requireHookUpgradesEnabled: true),
+            "TOXIC_EGG" when methodName == "TryModifyCardRewardOptionsLate" => BuildCardRewardUpgradeSteps("skill", requireHookUpgradesEnabled: true),
+            "GLITTER" when methodName == "TryModifyCardRewardOptionsLate" => BuildCardRewardEnchantSteps(relic, "GLAM", "1", selection: "all"),
+            "FRESNEL_LENS" when methodName == "TryModifyCardRewardOptionsLate" => BuildCardRewardEnchantSteps(relic, "NIMBLE", "NimbleAmount", selection: "all"),
+            "WING_CHARM" when methodName == "TryModifyCardRewardOptionsLate" => BuildCardRewardEnchantSteps(relic, "SWIFT", "SwiftAmount", selection: "random_one"),
+            "SILVER_CRUCIBLE" when methodName == "TryModifyCardRewardOptionsLate" => BuildSilverCrucibleRewardSteps(),
+            "LAVA_LAMP" when methodName == "TryModifyCardRewardOptionsLate" => BuildLavaLampRewardSteps(),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add($"{methodName} -> synthetic card reward option graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicDamageAdditiveSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "STRIKE_DUMMY" => BuildStrikeDummyDamageAdditiveSteps(relic, fallbackAmount: "3", requireUpgraded: false),
+            "FAKE_STRIKE_DUMMY" => BuildStrikeDummyDamageAdditiveSteps(relic, fallbackAmount: "1", requireUpgraded: false),
+            "MINIATURE_CANNON" => BuildStrikeDummyDamageAdditiveSteps(relic, fallbackAmount: "3", requireUpgraded: true),
+            "MYSTIC_LIGHTER" => BuildMysticLighterDamageAdditiveSteps(relic),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("ModifyDamageAdditive -> synthetic damage additive graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicDamageMultiplicativeSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "PEN_NIB" => BuildPenNibDamageMultiplicativeSteps(),
+            "UNDYING_SIGIL" => BuildUndyingSigilDamageMultiplicativeSteps(relic),
+            "VITRUVIAN_MINION" => BuildVitruvianMinionDamageMultiplicativeSteps(),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("ModifyDamageMultiplicative -> synthetic damage multiplier graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicBlockMultiplicativeSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "VITRUVIAN_MINION")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("ModifyBlockMultiplicative -> synthetic block multiplier graph");
+        return
+        [
+            BuildCompareStep("$state.CardOwnerIsOwner", "eq", bool.TrueString, "minion_owner_card"),
+            BuildBranchStep(
+                "minion_owner_card",
+                new[]
+                {
+                    BuildCompareStep("$state.CardHasMinionTag", "eq", bool.TrueString, "minion_tag"),
+                    BuildBranchStep(
+                        "minion_tag",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "modifier.block_multiplicative",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["amount"] = "2"
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicHpLostBeforeOstySteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "THE_BOOT")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("ModifyHpLostBeforeOsty -> synthetic hp-loss-before graph");
+        return
+        [
+            BuildCompareStep("$state.DealerIsOwnerCreature", "eq", bool.TrueString, "boot_owner_dealer"),
+            BuildBranchStep(
+                "boot_owner_dealer",
+                new[]
+                {
+                    BuildCompareStep("$state.DamagePropsPoweredAttack", "eq", bool.TrueString, "boot_powered_attack"),
+                    BuildBranchStep(
+                        "boot_powered_attack",
+                        new[]
+                        {
+                            BuildCompareStep("$state.modifier_base", "gte", "1", "boot_positive_damage"),
+                            BuildBranchStep(
+                                "boot_positive_damage",
+                                new[]
+                                {
+                                    BuildCompareStep("$state.modifier_base", "lt", "$state.DamageMinimum", "boot_under_minimum"),
+                                    BuildBranchStep(
+                                        "boot_under_minimum",
+                                        new[]
+                                        {
+                                            new NativeBehaviorStep
+                                            {
+                                                Kind = "value.set",
+                                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                                {
+                                                    ["key"] = "modifier_result",
+                                                    ["value"] = "$state.DamageMinimum"
+                                                }
+                                            }
+                                        })
+                                })
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicHpLostAfterOstySteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "TUNGSTEN_ROD" => BuildTungstenRodHpLostAfterSteps(relic),
+            "BEATING_REMNANT" => BuildBeatingRemnantHpLostAfterSteps(),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("ModifyHpLostAfterOsty -> synthetic hp-loss-after graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicMerchantPriceSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        List<NativeBehaviorStep>? steps = relic.Id.Entry switch
+        {
+            "MEMBERSHIP_CARD" => BuildMerchantPriceSteps("0.5", requireLocalOwner: true),
+            _ => null
+        };
+
+        if (steps != null)
+        {
+            result.RecognizedCalls.Add("ModifyMerchantPrice -> synthetic merchant price graph");
+        }
+
+        return steps;
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicUnknownRoomTypeSteps(
+        RelicModel relic,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "JUZU_BRACELET")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add("ModifyUnknownMapPointRoomTypes -> synthetic room-type filter graph");
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "map.remove_unknown_room_type",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["room_type"] = RoomType.Monster.ToString()
+                }
+            }
+        ];
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicBoolSteps(
+        RelicModel relic,
+        string methodName,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        var shouldBlock = relic.Id.Entry switch
+        {
+            "ECTOPLASM" when methodName == "ShouldGainGold" => true,
+            "ICE_CREAM" when methodName == "ShouldPlayerResetEnergy" => true,
+            "RUNIC_PYRAMID" when methodName == "ShouldFlush" => true,
+            "RINGING_TRIANGLE" when methodName == "ShouldFlush" => true,
+            "SOZU" when methodName == "ShouldProcurePotion" => true,
+            "WHITE_BEAST_STATUE" when methodName == "ShouldForcePotionReward" => true,
+            "THE_COURIER" when methodName == "ShouldRefillMerchantEntry" => true,
+            "MINIATURE_TENT" when methodName == "ShouldDisableRemainingRestSiteOptions" => true,
             _ => false
         };
+
+        if (!shouldBlock)
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add($"{methodName} -> value.set(hook_result)");
+        return methodName switch
+        {
+            "ShouldPlayerResetEnergy" => BuildOwnerBoolResultSteps(bool.FalseString),
+            "ShouldFlush" when relic.Id.Entry == "RUNIC_PYRAMID" => BuildOwnerBoolResultSteps(bool.FalseString),
+            "ShouldFlush" when relic.Id.Entry == "RINGING_TRIANGLE" => BuildRingingTriangleShouldFlushSteps(),
+            "ShouldRefillMerchantEntry" => BuildOwnerBoolResultSteps(bool.TrueString),
+            "ShouldForcePotionReward" => BuildOwnerCombatRoomBoolResultSteps(),
+            "ShouldDisableRemainingRestSiteOptions" => BuildOwnerBoolResultSteps(bool.FalseString),
+            _ =>
+            [
+                new NativeBehaviorStep
+                {
+                    Kind = "value.set",
+                    Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["key"] = "hook_result",
+                        ["value"] = bool.FalseString
+                    }
+                }
+            ]
+        };
+    }
+
+    private List<NativeBehaviorStep>? TryBuildSyntheticRelicMapSteps(
+        RelicModel relic,
+        string methodName,
+        NativeBehaviorGraphAutoImportResult result)
+    {
+        if (relic.Id.Entry != "GOLDEN_COMPASS" || methodName != "ModifyGeneratedMap")
+        {
+            return null;
+        }
+
+        result.RecognizedCalls.Add($"{methodName} -> map.replace_generated");
+        return
+        [
+            BuildCompareStep("$state.GoldenPathAct", "eq", "$state.ActIndex", "golden_path_enabled"),
+            BuildBranchStep(
+                "golden_path_enabled",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "map.replace_generated",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["map_kind"] = "golden_path"
+                        }
+                    }
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildRoomConditionalRewardSteps(string roomType, Dictionary<string, string> rewardParameters)
+    {
+        return
+        [
+            BuildCompareStep("$state.RoomType", "eq", roomType, "room_matches"),
+            BuildBranchStep(
+                "room_matches",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "reward.offer_custom",
+                        Parameters = rewardParameters
+                    }
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildAmethystAubergineRewardSteps(RelicModel relic)
+    {
+        var rewardParameters = BuildRelicDynamicValueParameters(relic, "amount", "Gold", "10");
+        rewardParameters["reward_kind"] = "gold";
+        rewardParameters["reward_count"] = "1";
+
+        var rewardStep = new NativeBehaviorStep
+        {
+            Kind = "reward.offer_custom",
+            Parameters = rewardParameters
+        };
+
+        return
+        [
+            BuildCompareStep("$state.RoomIsCombat", "eq", bool.TrueString, "room_is_combat"),
+            BuildBranchStep(
+                "room_is_combat",
+                new[]
+                {
+                    BuildCompareStep("$state.RoomType", "eq", "Boss", "room_is_boss"),
+                    BuildBranchStep(
+                        "room_is_boss",
+                        new[]
+                        {
+                            BuildCompareStep("$state.IsFinalAct", "eq", bool.TrueString, "is_final_boss_act"),
+                            BuildBranchStep("is_final_boss_act", Array.Empty<NativeBehaviorStep>(), new[] { rewardStep })
+                        },
+                        new[] { rewardStep })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildLavaRockRewardSteps(RelicModel relic)
+    {
+        var rewardParameters = BuildRelicDynamicValueParameters(relic, "reward_count", "Relics", "2");
+        rewardParameters["reward_kind"] = "relic";
+
+        return
+        [
+            BuildCompareStep("$state.RoomType", "eq", "Boss", "room_is_boss"),
+            BuildBranchStep(
+                "room_is_boss",
+                new[]
+                {
+                    BuildCompareStep("$state.CurrentActIndex", "eq", "0", "first_act"),
+                    BuildBranchStep(
+                        "first_act",
+                        new[]
+                        {
+                            BuildCompareStep("$state.HasTriggered", "eq", bool.FalseString, "lava_rock_ready"),
+                            BuildBranchStep(
+                                "lava_rock_ready",
+                                new[]
+                                {
+                                    new NativeBehaviorStep
+                                    {
+                                        Kind = "reward.offer_custom",
+                                        Parameters = rewardParameters
+                                    }
+                                })
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildWongosMysteryTicketRewardSteps(RelicModel relic)
+    {
+        var rewardParameters = BuildRelicDynamicValueParameters(relic, "reward_count", "Repeat", "3");
+        rewardParameters["reward_kind"] = "relic";
+
+        return
+        [
+            BuildCompareStep("$state.RoomIsCombat", "eq", bool.TrueString, "room_is_combat"),
+            BuildBranchStep(
+                "room_is_combat",
+                new[]
+                {
+                    BuildCompareStep("$state.GaveRelic", "eq", bool.FalseString, "ticket_unused"),
+                    BuildBranchStep(
+                        "ticket_unused",
+                        new[]
+                        {
+                            BuildCompareStep("$state.RemainingCombats", "lte", "0", "ticket_ready"),
+                            BuildBranchStep(
+                                "ticket_ready",
+                                new[]
+                                {
+                                    new NativeBehaviorStep
+                                    {
+                                        Kind = "reward.offer_custom",
+                                        Parameters = rewardParameters
+                                    }
+                                })
+                        })
+                })
+        ];
+    }
+
+    private static NativeBehaviorStep BuildCompareStep(string left, string comparisonOperator, string right, string resultKey)
+    {
+        return new NativeBehaviorStep
+        {
+            Kind = "value.compare",
+            Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["left"] = left,
+                ["right"] = right,
+                ["operator"] = comparisonOperator,
+                ["result_key"] = resultKey
+            }
+        };
+    }
+
+    private static NativeBehaviorStep BuildBranchStep(
+        string conditionKey,
+        IReadOnlyList<NativeBehaviorStep> trueBranch,
+        IReadOnlyList<NativeBehaviorStep>? falseBranch = null)
+    {
+        return new NativeBehaviorStep
+        {
+            Kind = "flow.branch",
+            Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["condition_key"] = conditionKey
+            },
+            TrueBranch = trueBranch.ToList(),
+            FalseBranch = falseBranch?.ToList() ?? new List<NativeBehaviorStep>()
+        };
+    }
+
+    private Dictionary<string, string> BuildRelicDynamicValueParameters(
+        RelicModel relic,
+        string propertyKey,
+        string preferredVarName,
+        string fallbackLiteral)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [propertyKey] = fallbackLiteral
+        };
+
+        if (TryGetDynamicVar(relic, preferredVarName, out _))
+        {
+            PopulateDynamicValueParameters(parameters, propertyKey, relic, preferredVarName, ResolveDynamicAmount(relic, preferredVarName, fallbackLiteral));
+        }
+        else if (TryGetDynamicVar(relic, "Amount", out _))
+        {
+            PopulateDynamicValueParameters(parameters, propertyKey, relic, "Amount", ResolveDynamicAmount(relic, "Amount", fallbackLiteral));
+        }
+
+        return parameters;
+    }
+
+    private static List<NativeBehaviorStep> BuildCardRewardUpgradeSteps(string cardTypeScope, bool requireHookUpgradesEnabled)
+    {
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "reward.card_options_upgrade",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["card_type_scope"] = cardTypeScope,
+                    ["require_hook_upgrades_enabled"] = requireHookUpgradesEnabled.ToString()
+                }
+            }
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildCardRewardEnchantSteps(
+        RelicModel relic,
+        string enchantmentId,
+        string amountVarOrLiteral,
+        string selection)
+    {
+        var parameters = char.IsLetter(amountVarOrLiteral[0])
+            ? BuildRelicDynamicValueParameters(relic, "amount", amountVarOrLiteral, "1")
+            : new Dictionary<string, string>(StringComparer.Ordinal) { ["amount"] = amountVarOrLiteral };
+        parameters["enchantment_id"] = enchantmentId;
+        parameters["selection"] = selection;
+
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "reward.card_options_enchant",
+                Parameters = parameters
+            }
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildSilverCrucibleRewardSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.TimesUsed", "lt", "$state.Cards", "silver_crucible_has_uses"),
+            BuildBranchStep(
+                "silver_crucible_has_uses",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "reward.card_options_upgrade",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["card_type_scope"] = "any",
+                            ["require_hook_upgrades_enabled"] = bool.FalseString
+                        }
+                    }
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildLavaLampRewardSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.CurrentRoomIsCombat", "eq", bool.TrueString, "lava_lamp_in_combat_room"),
+            BuildBranchStep(
+                "lava_lamp_in_combat_room",
+                new[]
+                {
+                    BuildCompareStep("$state.TookDamageThisCombat", "eq", bool.FalseString, "lava_lamp_safe_combat"),
+                    BuildBranchStep(
+                        "lava_lamp_safe_combat",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "reward.card_options_upgrade",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["card_type_scope"] = "any",
+                                    ["require_hook_upgrades_enabled"] = bool.FalseString
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildCloakClaspBeforeTurnEndSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.IsOwnerTurnSide", "eq", bool.TrueString, "owner_turn_end"),
+            BuildBranchStep(
+                "owner_turn_end",
+                new[]
+                {
+                    BuildCompareStep("$state.HandCount", "gt", "0", "hand_not_empty"),
+                    BuildBranchStep(
+                        "hand_not_empty",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "combat.gain_block",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["amount"] = "$state.HandCount",
+                                    ["target"] = "self",
+                                    ["props"] = "Unpowered"
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildDiamondDiademBeforeTurnEndSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.IsOwnerTurnSide", "eq", bool.TrueString, "owner_turn_end"),
+            BuildBranchStep(
+                "owner_turn_end",
+                new[]
+                {
+                    BuildCompareStep("$state.DisplayAmount", "lte", "$state.CardThreshold", "diamond_diadem_ready"),
+                    BuildBranchStep(
+                        "diamond_diadem_ready",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "combat.apply_power",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["power_id"] = "DiamondDiademPower",
+                                    ["amount"] = "1",
+                                    ["target"] = "self"
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildOrichalcumBeforeTurnEndSteps(RelicModel relic, string fallbackAmount)
+    {
+        return
+        [
+            BuildCompareStep("$state.ShouldTrigger", "eq", bool.TrueString, "orichalcum_should_trigger"),
+            BuildBranchStep(
+                "orichalcum_should_trigger",
+                new[]
+                {
+                    BuildRelicAmountAction(relic, "combat.gain_block", "Block", fallbackAmount, "self")
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildRippleBasinBeforeTurnEndSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.IsOwnerTurnSide", "eq", bool.TrueString, "owner_turn_end"),
+            BuildBranchStep(
+                "owner_turn_end",
+                new[]
+                {
+                    BuildCompareStep("$state.PlayedAttackThisTurn", "eq", bool.FalseString, "no_attack_played"),
+                    BuildBranchStep(
+                        "no_attack_played",
+                        new[]
+                        {
+                            BuildRelicAmountAction(relic, "combat.gain_block", "Block", "4", "self")
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildScreamingFlagonBeforeTurnEndSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.TurnSide", "eq", "Player", "player_turn_end"),
+            BuildBranchStep(
+                "player_turn_end",
+                new[]
+                {
+                    BuildCompareStep("$state.HandCount", "eq", "0", "hand_empty"),
+                    BuildBranchStep(
+                        "hand_empty",
+                        new[]
+                        {
+                            BuildRelicAmountAction(relic, "combat.damage", "Damage", "20", "all_enemies")
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildStoneCalendarBeforeTurnEndSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.IsOwnerTurnSide", "eq", bool.TrueString, "owner_turn_end"),
+            BuildBranchStep(
+                "owner_turn_end",
+                new[]
+                {
+                    BuildCompareStep("$state.CombatRound", "eq", "$state.DamageTurn", "stone_calendar_ready"),
+                    BuildBranchStep(
+                        "stone_calendar_ready",
+                        new[]
+                        {
+                            BuildRelicAmountAction(relic, "combat.damage", "Damage", "52", "all_enemies")
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildTingshaAfterDiscardSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.DiscardingOwnerIsOwner", "eq", bool.TrueString, "owner_discarded"),
+            BuildBranchStep(
+                "owner_discarded",
+                new[]
+                {
+                    BuildCompareStep("$state.IsOwnerCurrentSide", "eq", bool.TrueString, "owner_side_active"),
+                    BuildBranchStep(
+                        "owner_side_active",
+                        new[]
+                        {
+                            BuildRelicAmountAction(relic, "combat.damage", "Damage", "3", "current_target")
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildToughBandagesAfterDiscardSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.DiscardingOwnerIsOwner", "eq", bool.TrueString, "owner_discarded"),
+            BuildBranchStep(
+                "owner_discarded",
+                new[]
+                {
+                    BuildCompareStep("$state.IsOwnerCurrentSide", "eq", bool.TrueString, "owner_side_active"),
+                    BuildBranchStep(
+                        "owner_side_active",
+                        new[]
+                        {
+                            BuildRelicAmountAction(relic, "combat.gain_block", "Block", "3", "self")
+                        })
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildPendulumAfterShuffleSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "owner_shuffled"),
+            BuildBranchStep(
+                "owner_shuffled",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "combat.draw_cards",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["amount"] = "1"
+                        }
+                    }
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildOwnerBoolResultSteps(string boolLiteral)
+    {
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "value.set",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["key"] = "hook_result",
+                    ["value"] = boolLiteral
+                }
+            }
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildOwnerCombatRoomBoolResultSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.CurrentRoomIsCombat", "eq", bool.TrueString, "combat_room"),
+            BuildBranchStep(
+                "combat_room",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "value.set",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["key"] = "hook_result",
+                            ["value"] = bool.TrueString
+                        }
+                    }
+                },
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "value.set",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["key"] = "hook_result",
+                            ["value"] = bool.FalseString
+                        }
+                    }
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildStrikeDummyDamageAdditiveSteps(RelicModel relic, string fallbackAmount, bool requireUpgraded)
+    {
+        var amountStep = BuildRelicAmountAction(relic, "modifier.damage_additive", "ExtraDamage", fallbackAmount, "self");
+        return
+        [
+            BuildCompareStep("$state.DamagePropsPoweredAttack", "eq", bool.TrueString, "powered_attack"),
+            BuildBranchStep(
+                "powered_attack",
+                new[]
+                {
+                    BuildCompareStep("$state.CardHasStrike", "eq", bool.TrueString, "strike_card"),
+                    BuildBranchStep(
+                        "strike_card",
+                        requireUpgraded
+                            ? new[]
+                            {
+                                BuildCompareStep("$state.CardIsUpgraded", "eq", bool.TrueString, "upgraded_card"),
+                                BuildBranchStep(
+                                    "upgraded_card",
+                                    new[]
+                                    {
+                                        BuildCompareStep("$state.DealerIsOwnerOrCardOwner", "eq", bool.TrueString, "owner_source"),
+                                        BuildBranchStep("owner_source", new[] { amountStep })
+                                    })
+                            }
+                            : new[]
+                            {
+                                BuildCompareStep("$state.DealerIsOwnerOrCardOwner", "eq", bool.TrueString, "owner_source"),
+                                BuildBranchStep("owner_source", new[] { amountStep })
+                            })
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildPenNibDamageMultiplicativeSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.DamagePropsPoweredAttack", "eq", bool.TrueString, "pen_nib_attack"),
+            BuildBranchStep(
+                "pen_nib_attack",
+                new[]
+                {
+                    BuildCompareStep("$state.DealerIsOwnerOrOsty", "eq", bool.TrueString, "pen_nib_owner"),
+                    BuildBranchStep(
+                        "pen_nib_owner",
+                        new[]
+                        {
+                            BuildCompareStep("$state.ShouldDoubleDamage", "eq", bool.TrueString, "pen_nib_double"),
+                            BuildBranchStep(
+                                "pen_nib_double",
+                                new[]
+                                {
+                                    new NativeBehaviorStep
+                                    {
+                                        Kind = "modifier.damage_multiplicative",
+                                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                        {
+                                            ["amount"] = "2"
+                                        }
+                                    }
+                                })
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildUndyingSigilDamageMultiplicativeSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.DealerExists", "eq", bool.TrueString, "sigil_dealer_exists"),
+            BuildBranchStep(
+                "sigil_dealer_exists",
+                new[]
+                {
+                    BuildCompareStep("$state.DamagePropsPoweredAttack", "eq", bool.TrueString, "sigil_attack"),
+                    BuildBranchStep(
+                        "sigil_attack",
+                        new[]
+                        {
+                            BuildCompareStep("$state.TargetIsOwner", "eq", bool.TrueString, "sigil_owner_target"),
+                            BuildBranchStep(
+                                "sigil_owner_target",
+                                new[]
+                                {
+                                    BuildCompareStep("$state.DealerIsOwnerCreature", "eq", bool.FalseString, "sigil_not_self"),
+                                    BuildBranchStep(
+                                        "sigil_not_self",
+                                        new[]
+                                        {
+                                            BuildCompareStep("$state.DealerCurrentHpAtOrBelowDoom", "eq", bool.TrueString, "sigil_doom_threshold"),
+                                            BuildBranchStep(
+                                                "sigil_doom_threshold",
+                                                new[]
+                                                {
+                                                    BuildRelicAmountAction(relic, "modifier.damage_multiplicative", "DamageDecrease", "0.5", "self")
+                                                })
+                                        })
+                                })
+                        })
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildVitruvianMinionDamageMultiplicativeSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.CardOwnerIsOwner", "eq", bool.TrueString, "minion_owner_card"),
+            BuildBranchStep(
+                "minion_owner_card",
+                new[]
+                {
+                    BuildCompareStep("$state.CardHasMinionTag", "eq", bool.TrueString, "minion_tag"),
+                    BuildBranchStep(
+                        "minion_tag",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "modifier.damage_multiplicative",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["amount"] = "2"
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildMysticLighterDamageAdditiveSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.DamagePropsPoweredAttack", "eq", bool.TrueString, "powered_attack"),
+            BuildBranchStep(
+                "powered_attack",
+                new[]
+                {
+                    BuildCompareStep("$state.CardHasEnchantment", "eq", bool.TrueString, "enchanted_card"),
+                    BuildBranchStep(
+                        "enchanted_card",
+                        new[]
+                        {
+                            BuildCompareStep("$state.CardOwnerIsOwner", "eq", bool.TrueString, "owner_card"),
+                            BuildBranchStep("owner_card", new[] { BuildRelicAmountAction(relic, "modifier.damage_additive", "Damage", "9", "self") })
+                        })
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildTungstenRodHpLostAfterSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.TargetIsOwner", "eq", bool.TrueString, "tungsten_target_owner"),
+            BuildBranchStep(
+                "tungsten_target_owner",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "value.set",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["key"] = "modifier_result",
+                            ["value"] = "$state.modifier_base"
+                        }
+                    },
+                    new NativeBehaviorStep
+                    {
+                        Kind = "value.add",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["key"] = "modifier_result",
+                            ["delta"] = "$state.HpLossReductionNegated"
+                        }
+                    }
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildBeatingRemnantHpLostAfterSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.TargetIsOwner", "eq", bool.TrueString, "beating_target_owner"),
+            BuildBranchStep(
+                "beating_target_owner",
+                new[]
+                {
+                    BuildCompareStep("$state.modifier_base", "gt", "$state.RemainingMaxHpLoss", "beating_cap_hit"),
+                    BuildBranchStep(
+                        "beating_cap_hit",
+                        new[]
+                        {
+                            new NativeBehaviorStep
+                            {
+                                Kind = "value.set",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["key"] = "modifier_result",
+                                    ["value"] = "$state.RemainingMaxHpLoss"
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildMerchantPriceSteps(string factor, bool requireLocalOwner)
+    {
+        var trueBranch = new List<NativeBehaviorStep>
+        {
+            new NativeBehaviorStep
+            {
+                Kind = "value.set",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["key"] = "modifier_result",
+                    ["value"] = "$state.modifier_base"
+                }
+            },
+            new NativeBehaviorStep
+            {
+                Kind = "value.multiply",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["key"] = "modifier_result",
+                    ["factor"] = factor
+                }
+            }
+        };
+
+        if (!requireLocalOwner)
+        {
+            return
+            [
+                BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "owner_merchant_price"),
+                BuildBranchStep("owner_merchant_price", trueBranch)
+            ];
+        }
+
+        return
+        [
+            BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "owner_merchant_price"),
+            BuildBranchStep(
+                "owner_merchant_price",
+                new[]
+                {
+                    BuildCompareStep("$state.IsLocalOwner", "eq", bool.TrueString, "local_owner_merchant"),
+                    BuildBranchStep("local_owner_merchant", trueBranch)
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildRingingTriangleShouldFlushSteps()
+    {
+        return
+        [
+            BuildCompareStep("$state.CombatRound", "gt", "1", "round_above_one"),
+            BuildBranchStep(
+                "round_above_one",
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "value.set",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["key"] = "hook_result",
+                            ["value"] = bool.TrueString
+                        }
+                    }
+                },
+                new[]
+                {
+                    new NativeBehaviorStep
+                    {
+                        Kind = "value.set",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["key"] = "hook_result",
+                            ["value"] = bool.FalseString
+                        }
+                    }
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildBeltBuckleAfterObtainedSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.IsInCombat", "eq", bool.TrueString, "belt_buckle_in_combat"),
+            BuildBranchStep(
+                "belt_buckle_in_combat",
+                new[]
+                {
+                    BuildCompareStep("$state.OwnerPotionCount", "eq", "0", "belt_buckle_no_potions"),
+                    BuildBranchStep(
+                        "belt_buckle_no_potions",
+                        new[]
+                        {
+                            BuildRelicPowerAction(relic, "Dexterity", "2", "self"),
+                            new NativeBehaviorStep
+                            {
+                                Kind = "value.set",
+                                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["key"] = "DexterityApplied",
+                                    ["value"] = bool.TrueString
+                                }
+                            }
+                        })
+                })
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildDeckEnchantAfterObtainedSteps(string enchantmentId, string amount, bool selectAll)
+    {
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "card.select_cards",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["state_key"] = "selected_cards",
+                    ["selection_mode"] = "simple_grid",
+                    ["source_pile"] = PileType.Deck.ToString(),
+                    ["count"] = selectAll ? "99" : "1",
+                    ["prompt_kind"] = "enchant",
+                    ["allow_cancel"] = bool.FalseString
+                }
+            },
+            new NativeBehaviorStep
+            {
+                Kind = "card.enchant",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["card_state_key"] = "selected_cards",
+                    ["enchantment_id"] = enchantmentId,
+                    ["amount"] = amount
+                }
+            }
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildAddPetAfterObtainedSteps(string monsterId)
+    {
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "player.add_pet",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["monster_id"] = monsterId
+                }
+            }
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildTheAbacusAfterShuffleSteps(RelicModel relic)
+    {
+        return
+        [
+            BuildCompareStep("$state.HookPlayerIsOwner", "eq", bool.TrueString, "owner_shuffled"),
+            BuildBranchStep(
+                "owner_shuffled",
+                new[]
+                {
+                    BuildRelicAmountAction(relic, "combat.gain_block", "Block", "6", "self")
+                })
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildBoundPhylacteryBeforeCombatStartSteps(RelicModel relic)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["monster_id"] = "Osty"
+        };
+
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "player.add_pet",
+                Parameters = parameters
+            }
+        ];
+    }
+
+    private static List<NativeBehaviorStep> BuildFakeSneckoEyeBeforeCombatStartSteps()
+    {
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "combat.apply_power",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["power_id"] = "ConfusedPower",
+                    ["amount"] = "1",
+                    ["target"] = "self"
+                }
+            }
+        ];
+    }
+
+    private List<NativeBehaviorStep> BuildRoundConditionalRelicSteps(int roundNumber, params NativeBehaviorStep[] trueBranchSteps)
+    {
+        return
+        [
+            BuildCompareStep("$state.CombatRound", "eq", roundNumber.ToString(CultureInfo.InvariantCulture), "round_matches"),
+            BuildBranchStep("round_matches", trueBranchSteps)
+        ];
+    }
+
+    private NativeBehaviorStep BuildRelicAmountAction(
+        RelicModel relic,
+        string kind,
+        string preferredVarName,
+        string fallbackLiteral,
+        string target)
+    {
+        var parameters = BuildRelicDynamicValueParameters(relic, "amount", preferredVarName, fallbackLiteral);
+        parameters["target"] = target;
+        return new NativeBehaviorStep
+        {
+            Kind = kind,
+            Parameters = parameters
+        };
+    }
+
+    private NativeBehaviorStep BuildRelicPowerAction(
+        RelicModel relic,
+        string powerTypeName,
+        string fallbackAmount,
+        string target)
+    {
+        var parameters = BuildRelicDynamicValueParameters(relic, "amount", powerTypeName, fallbackAmount);
+        parameters["power_id"] = powerTypeName;
+        parameters["target"] = target;
+        return new NativeBehaviorStep
+        {
+            Kind = "combat.apply_power",
+            Parameters = parameters
+        };
+    }
+
+    private List<NativeBehaviorStep> BuildSparklingRougePowerSteps(RelicModel relic)
+    {
+        var strengthParameters = BuildRelicDynamicValueParameters(relic, "amount", "Strength", "1");
+        strengthParameters["power_id"] = "STRENGTH";
+        strengthParameters["target"] = "self";
+
+        var dexterityParameters = BuildRelicDynamicValueParameters(relic, "amount", "Dexterity", "1");
+        dexterityParameters["power_id"] = "DEXTERITY";
+        dexterityParameters["target"] = "self";
+
+        return
+        [
+            new NativeBehaviorStep
+            {
+                Kind = "combat.apply_power",
+                Parameters = strengthParameters
+            },
+            new NativeBehaviorStep
+            {
+                Kind = "combat.apply_power",
+                Parameters = dexterityParameters
+            }
+        ];
+    }
+
+    private Dictionary<string, string> BuildEnchantmentModifierParameters(EnchantmentModel enchantment, string preferredVarName, string fallbackLiteral)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["amount"] = fallbackLiteral
+        };
+
+        if (TryGetDynamicVar(enchantment, preferredVarName, out _))
+        {
+            PopulateDynamicValueParameters(parameters, "amount", enchantment, preferredVarName, ResolveDynamicAmount(enchantment, preferredVarName, fallbackLiteral));
+            return parameters;
+        }
+
+        if (!string.Equals(preferredVarName, "Amount", StringComparison.OrdinalIgnoreCase) &&
+            TryGetDynamicVar(enchantment, "Amount", out _))
+        {
+            PopulateDynamicValueParameters(parameters, "amount", enchantment, "Amount", ResolveDynamicAmount(enchantment, "Amount", fallbackLiteral));
+        }
+
+        return parameters;
+    }
+
+    private Dictionary<string, string> BuildRelicNumericModifierParameters(
+        RelicModel relic,
+        string preferredVarName,
+        string fallbackLiteral,
+        bool isNegativeDelta = false)
+    {
+        var parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["amount"] = isNegativeDelta && !fallbackLiteral.StartsWith("-", StringComparison.Ordinal) ? "-" + fallbackLiteral : fallbackLiteral
+        };
+
+        if (TryGetDynamicVar(relic, preferredVarName, out _))
+        {
+            PopulateDynamicValueParameters(parameters, "amount", relic, preferredVarName, ResolveDynamicAmount(relic, preferredVarName, fallbackLiteral));
+        }
+        else if (TryGetDynamicVar(relic, "Amount", out _))
+        {
+            PopulateDynamicValueParameters(parameters, "amount", relic, "Amount", ResolveDynamicAmount(relic, "Amount", fallbackLiteral));
+        }
+
+        if (isNegativeDelta)
+        {
+            if (parameters.TryGetValue("amount_var_name", out var varName) && !string.IsNullOrWhiteSpace(varName))
+            {
+                parameters["amount_template"] = $"-{{{varName}:diff()}}";
+            }
+            else if (parameters.TryGetValue("amount", out var literalAmount) && !literalAmount.StartsWith("-", StringComparison.Ordinal))
+            {
+                parameters["amount"] = "-" + literalAmount;
+            }
+        }
+
+        return parameters;
     }
 
     private static bool TryResolveEnchantmentId(AbstractModel model, out string enchantmentId)

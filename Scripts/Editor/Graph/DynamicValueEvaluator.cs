@@ -303,8 +303,17 @@ public static class DynamicValueEvaluator
             CardModel card => card.DynamicVars.TryGetValue(varName, out dynamicVar!),
             PotionModel potion => potion.DynamicVars.TryGetValue(varName, out dynamicVar!),
             RelicModel relic => relic.DynamicVars.TryGetValue(varName, out dynamicVar!),
+            EnchantmentModel enchantment when string.Equals(varName, "Amount", StringComparison.OrdinalIgnoreCase) =>
+                TryCreateSyntheticEnchantmentAmountVar(enchantment, out dynamicVar!),
+            EnchantmentModel enchantment => enchantment.DynamicVars.TryGetValue(varName, out dynamicVar!),
             _ => false
         };
+    }
+
+    private static bool TryCreateSyntheticEnchantmentAmountVar(EnchantmentModel enchantment, out DynamicVar dynamicVar)
+    {
+        dynamicVar = new IntVar("Amount", enchantment.Amount);
+        return true;
     }
 
     private static decimal ApplyOverride(decimal originalValue, DynamicValueOverrideMode mode, string rawOverride)

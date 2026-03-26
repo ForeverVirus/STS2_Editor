@@ -8,7 +8,7 @@ Copied package to editor exports: C:\Users\Administrator\AppData\Roaming\SlayThe
 Installed package: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\stage06_gameplay_proof@1.0.0
 Session file: C:\Users\Administrator\AppData\Roaming\SlayTheSpire2\sts2_editor\packages\installed\session.json
 Package key: stage06_gameplay_proof@1.0.0
-Checksum: d6d8af7a365d640baf7962166382e45eb0cfcce4309629d189be43bcfded5b06
+Checksum: f36ac134e605659c7c55ef9c8a2df35768786bde5876bf549449aa27103ece53
 Expected autoslay evidence:
   - AutoSlay log contains 'Using potion: BLOCK_POTION'
   - AutoSlay log contains 'Playing NEUTRALIZE'

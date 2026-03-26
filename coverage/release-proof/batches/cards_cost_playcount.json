@@ -1,0 +1,10 @@
+{
+  "BatchId": "cards_cost_playcount",
+  "EntityKind": "Card",
+  "Title": "Stage 09 custom-content proof",
+  "Scenario": 1,
+  "TimeoutSeconds": 90,
+  "ExpectedMarkers": [
+    "[ModStudio.Graph] STAGE09_CARD_OK"
+  ]
+}
