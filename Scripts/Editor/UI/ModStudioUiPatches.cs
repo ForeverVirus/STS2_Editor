@@ -45,9 +45,7 @@ internal static class ModStudioUiPatches
             return;
         }
 
-        var templateLabel = compendiumButton.GetNodeOrNull<MegaCrit.Sts2.addons.mega_text.MegaLabel>("Label")
-            ?? quitButton.GetNodeOrNull<MegaCrit.Sts2.addons.mega_text.MegaLabel>("Label");
-        var modStudioButton = CreateMenuButton(templateLabel);
+        var modStudioButton = CreateMenuButton(compendiumButton, quitButton);
         modStudioButton.Name = MenuButtonName;
         modStudioButton.Connect(NClickableControl.SignalName.Released, Callable.From<NButton>(button => OpenModStudio(__instance, button)));
         modStudioButton.Connect(NClickableControl.SignalName.Focused, Callable.From<NClickableControl>(button => HandleFocus(__instance, button as NMainMenuTextButton)));
@@ -129,13 +127,27 @@ internal static class ModStudioUiPatches
         return false;
     }
 
-    private static NMainMenuTextButton CreateMenuButton(MegaCrit.Sts2.addons.mega_text.MegaLabel? templateLabel)
+    private static NMainMenuTextButton CreateMenuButton(NMainMenuTextButton primaryTemplate, NMainMenuTextButton fallbackTemplate)
     {
+        var duplicateFlags = (int)(Node.DuplicateFlags.Groups | Node.DuplicateFlags.Scripts | Node.DuplicateFlags.UseInstantiation);
+        if (primaryTemplate.Duplicate(duplicateFlags) is NMainMenuTextButton duplicated)
+        {
+            duplicated.FocusMode = Control.FocusModeEnum.All;
+            return duplicated;
+        }
+
+        var templateLabel = primaryTemplate.GetNodeOrNull<MegaCrit.Sts2.addons.mega_text.MegaLabel>("Label")
+            ?? fallbackTemplate.GetNodeOrNull<MegaCrit.Sts2.addons.mega_text.MegaLabel>("Label");
         var button = new NMainMenuTextButton
         {
             FocusMode = Control.FocusModeEnum.All,
-            CustomMinimumSize = new Vector2(200f, 50f),
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+            CustomMinimumSize = primaryTemplate.CustomMinimumSize,
+            SizeFlagsHorizontal = primaryTemplate.SizeFlagsHorizontal,
+            SizeFlagsVertical = primaryTemplate.SizeFlagsVertical,
+            Theme = primaryTemplate.Theme,
+            MouseFilter = primaryTemplate.MouseFilter,
+            Scale = primaryTemplate.Scale,
+            PivotOffset = primaryTemplate.PivotOffset
         };
 
         var label = new MegaCrit.Sts2.addons.mega_text.MegaLabel

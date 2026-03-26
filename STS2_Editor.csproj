@@ -40,6 +40,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <TargetPath>docs\preset_state_keys_guide.txt</TargetPath>
     </None>
+    <None Include="docs\editor_user_guide.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <TargetPath>docs\editor_user_guide.html</TargetPath>
+    </None>
   </ItemGroup>
 
   <Target Name="Copy Mod" AfterTargets="PostBuildEvent">
@@ -52,5 +56,9 @@
       SourceFiles="$(TargetDir)docs\preset_state_keys_guide.txt"
       DestinationFolder="$(Sts2Dir)\mods\$(MSBuildProjectName)\docs\"
       Condition="Exists('$(TargetDir)docs\preset_state_keys_guide.txt')" />
+    <Copy
+      SourceFiles="$(TargetDir)docs\editor_user_guide.html"
+      DestinationFolder="$(Sts2Dir)\mods\$(MSBuildProjectName)\docs\"
+      Condition="Exists('$(TargetDir)docs\editor_user_guide.html')" />
   </Target>
 </Project>

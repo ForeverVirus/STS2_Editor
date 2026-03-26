@@ -51,6 +51,8 @@ public static class ModStudioPaths
 
     public static string PresetStateKeysGuidePath => Path.Combine(InstalledModDocsPath, "preset_state_keys_guide.txt");
 
+    public static string UserGuidePath => Path.Combine(InstalledModDocsPath, ModStudioExternalLinks.UserGuideFileName);
+
     public static string PublishedPackagesRootPath => Path.Combine(InstalledModRootPath, "mods");
 
     public static string GetLegacyProjectDirectory(string projectId)

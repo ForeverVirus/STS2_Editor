@@ -1,4 +1,5 @@
 using Godot;
+using STS2_Editor.Scripts.Editor.Core.Utilities;
 
 namespace STS2_Editor.Scripts.Editor.UI;
 
@@ -8,6 +9,7 @@ internal sealed partial class ModStudioPackageMenuBar : PanelContainer
     private Label? _pathLabel;
     private Label? _stateLabel;
     private Button? _hotReloadButton;
+    private LinkButton? _authorLinkButton;
     private Button? _closeButton;
 
     public event Action? HotReloadRequested;
@@ -56,8 +58,18 @@ internal sealed partial class ModStudioPackageMenuBar : PanelContainer
         row.AddChild(_stateLabel);
 
         _hotReloadButton = ModStudioPackageUi.MakeButton("\u70ed\u91cd\u8f7d", "Hot Reload", () => HotReloadRequested?.Invoke());
+        _authorLinkButton = new LinkButton
+        {
+            Text = ModStudioPackageUi.T("作者：禽兽-云轩", "Author: 禽兽-云轩"),
+            FocusMode = Control.FocusModeEnum.All,
+            CustomMinimumSize = new Vector2(168f, 30f),
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin,
+            TooltipText = ModStudioExternalLinks.AuthorProfileUrl
+        };
+        _authorLinkButton.Pressed += () => OS.ShellOpen(ModStudioExternalLinks.AuthorProfileUrl);
         _closeButton = ModStudioPackageUi.MakeButton("\u9000\u51fa", "Exit", () => CloseRequested?.Invoke());
         row.AddChild(_hotReloadButton);
+        row.AddChild(_authorLinkButton);
         row.AddChild(_closeButton);
 
         RefreshLocalizedText();
@@ -94,6 +106,12 @@ internal sealed partial class ModStudioPackageMenuBar : PanelContainer
         if (_hotReloadButton != null)
         {
             _hotReloadButton.Text = ModStudioPackageUi.T("\u70ed\u91cd\u8f7d", "Hot Reload");
+        }
+
+        if (_authorLinkButton != null)
+        {
+            _authorLinkButton.Text = ModStudioPackageUi.T("作者：禽兽-云轩", "Author: 禽兽-云轩");
+            _authorLinkButton.TooltipText = ModStudioExternalLinks.AuthorProfileUrl;
         }
 
         if (_closeButton != null)

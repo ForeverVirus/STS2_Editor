@@ -23,6 +23,9 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
 
     private const int HelpPresetKeyGuideId = 40;
 
+    private const int AboutGithubId = 45;
+    private const int AboutUsageGuideId = 46;
+
     private const int AiAssistantId = 50;
     private const int AiSettingsId = 51;
 
@@ -31,7 +34,9 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
     private MenuButton? _modeButton;
     private MenuButton? _languageButton;
     private MenuButton? _helpButton;
+    private MenuButton? _aboutButton;
     private MenuButton? _aiButton;
+    private LinkButton? _authorLinkButton;
     private Button? _exitButton;
     private Label? _projectStateLabel;
 
@@ -117,6 +122,16 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
             });
         }
 
+        if (_aboutButton != null)
+        {
+            _aboutButton.Text = Dual("关于", "About");
+            SetMenuItems(_aboutButton, new[]
+            {
+                (AboutGithubId, Dual("github地址", "GitHub")),
+                (AboutUsageGuideId, Dual("使用说明", "User Guide"))
+            });
+        }
+
         if (AiEntryEnabled && _aiButton != null)
         {
             _aiButton.Text = "AI";
@@ -125,6 +140,12 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
                 (AiAssistantId, Dual("AI 助手", "AI Assistant")),
                 (AiSettingsId, Dual("AI 设置", "AI Settings"))
             });
+        }
+
+        if (_authorLinkButton != null)
+        {
+            _authorLinkButton.Text = Dual("作者：禽兽-云轩", "Author: 禽兽-云轩");
+            _authorLinkButton.TooltipText = ModStudioExternalLinks.AuthorProfileUrl;
         }
 
         if (_exitButton != null)
@@ -156,12 +177,22 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
         _modeButton = MakeMenuButton(Dual("模式", "Mode"));
         _languageButton = MakeMenuButton(Dual("语言", "Language"));
         _helpButton = MakeMenuButton(Dual("说明", "Help"));
+        _aboutButton = MakeMenuButton(Dual("关于", "About"));
         if (AiEntryEnabled)
         {
             _aiButton = MakeMenuButton("AI");
         }
         _projectStateLabel = MakeLabel(string.Empty, true);
         _projectStateLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        _authorLinkButton = new LinkButton
+        {
+            Text = Dual("作者：禽兽-云轩", "Author: 禽兽-云轩"),
+            FocusMode = Control.FocusModeEnum.All,
+            CustomMinimumSize = new Vector2(168f, 30f),
+            SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin,
+            TooltipText = ModStudioExternalLinks.AuthorProfileUrl
+        };
+        _authorLinkButton.Pressed += () => OS.ShellOpen(ModStudioExternalLinks.AuthorProfileUrl);
         _exitButton = MakeButton(Dual("退出", "Exit"), () => ExitRequested?.Invoke());
         _exitButton.CustomMinimumSize = new Vector2(100f, 30f);
 
@@ -170,11 +201,13 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
         row.AddChild(_modeButton);
         row.AddChild(_languageButton);
         row.AddChild(_helpButton);
+        row.AddChild(_aboutButton);
         if (_aiButton != null)
         {
             row.AddChild(_aiButton);
         }
         row.AddChild(_projectStateLabel);
+        row.AddChild(_authorLinkButton);
         row.AddChild(_exitButton);
 
         AttachMenuHandlers();
@@ -260,6 +293,22 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
             };
         }
 
+        if (_aboutButton?.GetPopup() is PopupMenu aboutPopup)
+        {
+            aboutPopup.IdPressed += id =>
+            {
+                switch (id)
+                {
+                    case AboutGithubId:
+                        OS.ShellOpen(ModStudioExternalLinks.RepositoryUrl);
+                        break;
+                    case AboutUsageGuideId:
+                        OpenUsageGuide();
+                        break;
+                }
+            };
+        }
+
         if (AiEntryEnabled && _aiButton?.GetPopup() is PopupMenu aiPopup)
         {
             aiPopup.IdPressed += id =>
@@ -297,5 +346,30 @@ internal sealed partial class ModStudioProjectMenuBar : PanelContainer
         {
             popup.AddItem(text, id);
         }
+    }
+
+    private static void OpenUsageGuide()
+    {
+        var guidePath = ResolveUsageGuidePath();
+        if (string.IsNullOrWhiteSpace(guidePath) || !File.Exists(guidePath))
+        {
+            OS.Alert(
+                Dual("未找到“使用说明”文件。请先重新编译并同步当前模组目录。", "The user guide file was not found. Rebuild and sync the current mod directory first."),
+                Dual("说明文件缺失", "Guide Missing"));
+            return;
+        }
+
+        OS.ShellOpen(guidePath);
+    }
+
+    private static string ResolveUsageGuidePath()
+    {
+        var candidates = new[]
+        {
+            ModStudioPaths.UserGuidePath,
+            Path.Combine(AppContext.BaseDirectory, "docs", ModStudioExternalLinks.UserGuideFileName)
+        };
+
+        return candidates.FirstOrDefault(File.Exists) ?? candidates[0];
     }
 }
