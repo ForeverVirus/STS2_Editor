@@ -888,7 +888,13 @@ internal static class BuiltInBehaviorNodeExecutors
             return;
         }
 
-        await OrbCmd.Channel(context.ChoiceContext ?? new ThrowingPlayerChoiceContext(), canonicalOrb.ToMutable(), context.Owner);
+        // HookPlayerChoiceContext can deadlock when orb channeling itself emits nested combat hooks.
+        // Native relic implementations use a blocking context for these hook-time orb actions.
+        var choiceContext = context.ChoiceContext is HookPlayerChoiceContext
+            ? new BlockingPlayerChoiceContext()
+            : context.ChoiceContext ?? new ThrowingPlayerChoiceContext();
+
+        await OrbCmd.Channel(choiceContext, canonicalOrb.ToMutable(), context.Owner);
     }
 
     private static async Task ExecuteOrbPassiveAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)

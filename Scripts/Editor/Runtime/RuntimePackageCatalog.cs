@@ -68,8 +68,13 @@ public sealed class RuntimePackageCatalog
             return false;
         }
 
+        var normalizedProject = _archiveService.NormalizeImportedProject(
+            manifest,
+            project,
+            ModStudioPaths.RuntimePackageCachePath);
+
         package.Manifest = manifest;
-        package.Project = project;
+        package.Project = normalizedProject;
         package.PackageFilePath = Path.GetFullPath(packagePath);
         package.PackageKey = manifest.PackageKey;
         package.PackageId = manifest.PackageId;
@@ -77,7 +82,7 @@ public sealed class RuntimePackageCatalog
         package.DisplayName = manifest.DisplayName;
         package.Checksum = NormalizeChecksum(manifest.Checksum, package.Manifest, package.Project);
         package.IsDirectoryArchive = false;
-        ExtractManagedAssets(packagePath, manifest, project);
+        ExtractManagedAssets(packagePath, manifest, normalizedProject);
         return true;
     }
 

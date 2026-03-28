@@ -1930,7 +1930,9 @@ internal static class RuntimeGraphDispatcher
             return mappedEntryNodeId;
         }
 
-        if (graph.Metadata.TryGetValue("trigger.default", out mappedEntryNodeId) && !string.IsNullOrWhiteSpace(mappedEntryNodeId))
+        if (allowDefaultFallback &&
+            graph.Metadata.TryGetValue("trigger.default", out mappedEntryNodeId) &&
+            !string.IsNullOrWhiteSpace(mappedEntryNodeId))
         {
             return mappedEntryNodeId;
         }

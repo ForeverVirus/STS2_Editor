@@ -1360,7 +1360,8 @@ internal static class RuntimeGraphPatches
             foreach (var model in combatState.IterateHookListeners())
             {
                 var hookContext = new HookPlayerChoiceContext(model, netId.Value, combatState, GameActionType.Combat);
-                await RuntimeGraphDispatcher.ExecuteBeforeSideTurnStartHookAsync(model, hookContext, side, combatState);
+                var task = RuntimeGraphDispatcher.ExecuteBeforeSideTurnStartHookAsync(model, hookContext, side, combatState);
+                await hookContext.AssignTaskAndWaitForPauseOrCompletion(task);
                 model.InvokeExecutionFinished();
             }
         }, "before-side-turn-start graph hook dispatch");
@@ -1382,7 +1383,8 @@ internal static class RuntimeGraphPatches
             foreach (var model in combatState.IterateHookListeners())
             {
                 var hookContext = new HookPlayerChoiceContext(model, netId.Value, combatState, GameActionType.Combat);
-                await RuntimeGraphDispatcher.ExecuteBeforePlayPhaseStartHookAsync(model, hookContext, player);
+                var task = RuntimeGraphDispatcher.ExecuteBeforePlayPhaseStartHookAsync(model, hookContext, player);
+                await hookContext.AssignTaskAndWaitForPauseOrCompletion(task);
                 model.InvokeExecutionFinished();
             }
         }, "before-play-phase-start graph hook dispatch");
