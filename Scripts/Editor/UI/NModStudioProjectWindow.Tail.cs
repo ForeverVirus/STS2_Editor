@@ -318,6 +318,70 @@ public sealed partial class NModStudioProjectWindow
         RefreshCurrentTabView(forceLoad: true);
     }
 
+    private void SaveMonsterAi()
+    {
+        if (_project == null || _currentItem == null || _centerEditor == null || _currentKind != ModStudioEntityKind.Monster)
+        {
+            return;
+        }
+
+        var envelope = GetOrCreateEnvelope(_currentKind, _currentItem.EntityId);
+        var definition = _centerEditor.MonsterAiEditor.GetMonsterAiDefinition();
+        definition.MonsterId = _currentItem.EntityId;
+        envelope.MonsterAi = definition;
+        _boundMonsterAiEntityId = _currentItem.EntityId;
+        if (_currentViewCache?.AutoMonsterGraphs != null)
+        {
+            foreach (var pair in _currentViewCache.AutoMonsterGraphs)
+            {
+                if (!_project.Graphs.ContainsKey(pair.Key))
+                {
+                    _project.Graphs[pair.Key] = CloneGraph(pair.Value);
+                }
+            }
+        }
+
+        _monsterAiDraftDirty = false;
+        MarkDirty();
+        RefreshCurrentEntityCache();
+        if (_currentViewCache != null)
+        {
+            UpdateCachedBrowserItem(_currentItem, _currentViewCache.MergedMetadata);
+        }
+        RefreshCurrentTabView(forceLoad: true);
+    }
+
+    private void RevertMonsterAi()
+    {
+        if (_currentItem == null || _currentKind != ModStudioEntityKind.Monster)
+        {
+            return;
+        }
+
+        _selectedMonsterMoveForGraph = null;
+        _monsterAiDraftDirty = false;
+        _boundMonsterAiEntityId = string.Empty;
+        RefreshCurrentTabView(forceLoad: true);
+    }
+
+    private void OnMonsterMoveGraphEditRequested(MonsterMoveDefinition move)
+    {
+        if (_project == null || _currentItem == null || _currentKind != ModStudioEntityKind.Monster)
+        {
+            return;
+        }
+
+        _selectedMonsterMoveForGraph = move;
+        EnsureMonsterMoveGraphExists(_currentItem, move);
+        if (_monsterAiDraftDirty)
+        {
+            SaveMonsterAi();
+        }
+
+        _centerEditor?.Tabs.SetCurrentTab(2);
+        RefreshCurrentTabView(forceLoad: true);
+    }
+
     private void RevertBasic()
     {
         if (_project == null || _currentItem == null)
@@ -427,6 +491,16 @@ public sealed partial class NModStudioProjectWindow
             return;
         }
 
+        if (_currentKind == ModStudioEntityKind.Monster && _selectedMonsterMoveForGraph != null)
+        {
+            EnsureMonsterMoveGraphExists(_currentItem, _selectedMonsterMoveForGraph);
+            if (_project != null && _project.Graphs.TryGetValue(_selectedMonsterMoveForGraph.GraphId, out var moveGraph))
+            {
+                BindDraftGraph(CloneGraph(moveGraph), BuildGraphOverviewText(moveGraph, GetEnvelope(_currentKind, _currentEntityId)), true);
+            }
+            return;
+        }
+
         var graphId = Guid.NewGuid().ToString("N");
         var graph = BehaviorGraphTemplateFactory.CreateDefaultScaffold(graphId, _currentKind, _currentItem.Title, _currentItem.Summary);
         BindDraftGraph(graph, BuildGraphOverviewText(graph, null), true);
@@ -496,7 +570,30 @@ public sealed partial class NModStudioProjectWindow
         }
 
         _centerEditor.GraphEditor.CanvasView.ExportLayout();
-        var previousGraphId = GetEnvelope(_currentKind, _currentItem.EntityId)?.GraphId;
+        if (_currentKind == ModStudioEntityKind.Monster && _selectedMonsterMoveForGraph != null)
+        {
+            var previousGraphId = _selectedMonsterMoveForGraph.GraphId;
+            graph.Description = detailPanel.GraphDescriptionEdit.Text ?? graph.Description;
+            graph.Name = detailPanel.GraphNameEdit.Text ?? graph.Name;
+            graph.GraphId = detailPanel.GraphIdEdit.Text ?? graph.GraphId;
+            graph.EntityKind = _currentKind;
+            _selectedMonsterMoveForGraph.GraphId = graph.GraphId;
+
+            if (!string.IsNullOrWhiteSpace(previousGraphId) &&
+                !string.Equals(previousGraphId, graph.GraphId, StringComparison.Ordinal))
+            {
+                _project.Graphs.Remove(previousGraphId);
+            }
+
+            _project.Graphs[graph.GraphId] = CloneGraph(graph);
+            _graphDraftDirty = false;
+            _monsterAiDraftDirty = true;
+            SaveMonsterAi();
+            RefreshCurrentTabView(forceLoad: true);
+            return;
+        }
+
+        var previousEnvelopeGraphId = GetEnvelope(_currentKind, _currentItem.EntityId)?.GraphId;
         graph.Description = detailPanel.GraphDescriptionEdit.Text ?? graph.Description;
         graph.Name = detailPanel.GraphNameEdit.Text ?? graph.Name;
         graph.GraphId = detailPanel.GraphIdEdit.Text ?? graph.GraphId;
@@ -510,10 +607,10 @@ public sealed partial class NModStudioProjectWindow
         var envelope = GetOrCreateEnvelope(_currentKind, _currentItem.EntityId);
         envelope.BehaviorSource = detailPanel.GraphEnabledCheck.ButtonPressed ? BehaviorSource.Graph : BehaviorSource.Native;
         envelope.GraphId = graph.GraphId;
-        if (!string.IsNullOrWhiteSpace(previousGraphId) &&
-            !string.Equals(previousGraphId, graph.GraphId, StringComparison.Ordinal))
+        if (!string.IsNullOrWhiteSpace(previousEnvelopeGraphId) &&
+            !string.Equals(previousEnvelopeGraphId, graph.GraphId, StringComparison.Ordinal))
         {
-            _project.Graphs.Remove(previousGraphId);
+            _project.Graphs.Remove(previousEnvelopeGraphId);
         }
         _project.Graphs[graph.GraphId] = CloneGraph(graph);
         ApplyGeneratedDescription(envelope, graph);
@@ -575,8 +672,48 @@ public sealed partial class NModStudioProjectWindow
         _detailPanel.SetGraphInfo(string.Join(System.Environment.NewLine, validation.Errors.DefaultIfEmpty(Dual("Graph 校验通过。", "Graph validation passed."))));
     }
 
+    private void EnsureMonsterMoveGraphExists(EntityBrowserItem item, MonsterMoveDefinition move)
+    {
+        if (_project == null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(move.GraphId))
+        {
+            move.GraphId = $"monster_{item.EntityId}_{(string.IsNullOrWhiteSpace(move.MoveId) ? Guid.NewGuid().ToString("N")[..8] : move.MoveId)}_{Guid.NewGuid():N}";
+        }
+
+        if (_project.Graphs.ContainsKey(move.GraphId))
+        {
+            return;
+        }
+
+        if (_currentViewCache?.AutoMonsterGraphs.TryGetValue(move.GraphId, out var importedGraph) == true)
+        {
+            _project.Graphs[move.GraphId] = CloneGraph(importedGraph);
+            _monsterAiDraftDirty = true;
+            MarkDirty();
+            return;
+        }
+
+        var graph = BehaviorGraphTemplateFactory.CreateDefaultScaffold(
+            move.GraphId,
+            ModStudioEntityKind.Monster,
+            string.IsNullOrWhiteSpace(move.DisplayName) ? item.Title : move.DisplayName,
+            item.Summary);
+        _project.Graphs[move.GraphId] = graph;
+        _monsterAiDraftDirty = true;
+        MarkDirty();
+    }
+
     private void OnGraphEnabledToggled(bool toggled)
     {
+        if (_currentKind == ModStudioEntityKind.Monster)
+        {
+            return;
+        }
+
         if (_suppressDirty)
         {
             return;
@@ -1897,8 +2034,9 @@ public sealed partial class NModStudioProjectWindow
     private void RefreshTabAvailability()
     {
         var supportsAssets = SupportsAssets(_currentKind);
-        var supportsGraph = SupportsGraph(_currentKind);
-        _centerEditor?.SetFeatureAvailability(supportsAssets, supportsGraph);
+        var showsMonsterAi = _currentKind == ModStudioEntityKind.Monster;
+        var supportsGraph = SupportsGraph(_currentKind) || showsMonsterAi;
+        _centerEditor?.SetFeatureAvailability(supportsAssets, supportsGraph, showsMonsterAi);
         _detailPanel?.SetFeatureAvailability(supportsAssets, supportsGraph);
     }
 
@@ -1988,6 +2126,17 @@ public sealed partial class NModStudioProjectWindow
         }
 
         _basicDraftDirty = true;
+        MarkDirty();
+    }
+
+    private void MarkMonsterAiDirty()
+    {
+        if (_suppressDirty)
+        {
+            return;
+        }
+
+        _monsterAiDraftDirty = true;
         MarkDirty();
     }
 
@@ -2339,6 +2488,7 @@ public sealed partial class NModStudioProjectWindow
         return kind switch
         {
             ModStudioEntityKind.Character => new[] { "title", "starting_hp", "starting_gold", "max_energy", "base_orb_slot_count", "starting_deck_ids", "starting_relic_ids", "starting_potion_ids" },
+            ModStudioEntityKind.Monster => new[] { "title", "min_initial_hp", "max_initial_hp" },
             ModStudioEntityKind.Card => new[] { "title", "description", "pool_id", "type", "rarity", "target_type", "energy_cost", "energy_cost_x", "canonical_star_cost", "star_cost_x", "can_be_generated_in_combat" },
             ModStudioEntityKind.Relic => new[] { "title", "description", "rarity", "pool_id" },
             ModStudioEntityKind.Potion => new[] { "title", "description", "rarity", "usage", "target_type", "pool_id", "can_be_generated_in_combat" },
@@ -2370,7 +2520,11 @@ public sealed partial class NModStudioProjectWindow
             return false;
         }
 
-        if (envelope.Metadata.Count > 0 || envelope.Assets.Count > 0 || !string.IsNullOrWhiteSpace(envelope.GraphId) || envelope.BehaviorSource == BehaviorSource.Graph)
+        if (envelope.Metadata.Count > 0 ||
+            envelope.Assets.Count > 0 ||
+            envelope.MonsterAi != null ||
+            !string.IsNullOrWhiteSpace(envelope.GraphId) ||
+            envelope.BehaviorSource == BehaviorSource.Graph)
         {
             return false;
         }

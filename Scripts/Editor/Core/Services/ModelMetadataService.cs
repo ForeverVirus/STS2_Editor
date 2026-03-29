@@ -72,6 +72,7 @@ public sealed partial class ModelMetadataService
             ModStudioEntityKind.Potion => BuildPotionMetadata(ModelDb.AllPotions.FirstOrDefault(potion => potion.Id.Entry == entityId)),
             ModStudioEntityKind.Event => BuildEventMetadata(ModelDb.AllEvents.FirstOrDefault(evt => evt.Id.Entry == entityId)),
             ModStudioEntityKind.Enchantment => BuildEnchantmentMetadata(ModelDb.DebugEnchantments.FirstOrDefault(enchantment => enchantment.Id.Entry == entityId)),
+            ModStudioEntityKind.Monster => BuildMonsterMetadata(ModelDb.Monsters.FirstOrDefault(monster => string.Equals(monster.Id.Entry, entityId, StringComparison.Ordinal))),
             _ => new Dictionary<string, string>(StringComparer.Ordinal)
         };
 
@@ -94,6 +95,7 @@ public sealed partial class ModelMetadataService
             ModStudioEntityKind.Potion => ModelDb.AllPotions.Any(potion => potion.Id.Entry == entityId),
             ModStudioEntityKind.Event => ModelDb.AllEvents.Any(evt => evt.Id.Entry == entityId),
             ModStudioEntityKind.Enchantment => ModelDb.DebugEnchantments.Any(enchantment => enchantment.Id.Entry == entityId),
+            ModStudioEntityKind.Monster => ModelDb.Monsters.Any(monster => string.Equals(monster.Id.Entry, entityId, StringComparison.Ordinal)),
             _ => false
         };
     }
@@ -138,6 +140,7 @@ public sealed partial class ModelMetadataService
             ModStudioEntityKind.Potion => ModelDb.AllPotions.OrderBy(potion => potion.Id.Entry).Select(BuildPotionItem).ToList(),
             ModStudioEntityKind.Event => ModelDb.AllEvents.OrderBy(evt => evt.Id.Entry).Select(BuildEventItem).ToList(),
             ModStudioEntityKind.Enchantment => ModelDb.DebugEnchantments.OrderBy(enchantment => enchantment.Id.Entry).Select(BuildEnchantmentItem).ToList(),
+            ModStudioEntityKind.Monster => ModelDb.Monsters.OrderBy(monster => monster.Id.Entry).Select(BuildMonsterItem).ToList(),
             _ => Array.Empty<EntityBrowserItem>()
         };
     }
@@ -324,6 +327,36 @@ public sealed partial class ModelMetadataService
             ["has_extra_card_text"] = enchantment.HasExtraCardText.ToString(),
             ["extra_card_text"] = enchantment.HasExtraCardText ? SafeLocText(enchantment.ExtraCardText) : string.Empty
         };
+
+    private static EntityBrowserItem BuildMonsterItem(MonsterModel monster) => new()
+    {
+        Kind = ModStudioEntityKind.Monster,
+        EntityId = monster.Id.Entry,
+        Title = SafeLocText(monster.Title),
+        Summary = $"HP {MonsterHpSummary(monster)}",
+        DetailText = string.Join(Environment.NewLine,
+            SourceOfTruth("MonsterModel"),
+            Detail("detail.id", monster.Id),
+            Detail("detail.title", SafeLocText(monster.Title)),
+            $"{ModStudioFieldDisplayNames.Get("min_initial_hp")}: {monster.MinInitialHp}",
+            $"{ModStudioFieldDisplayNames.Get("max_initial_hp")}: {monster.MaxInitialHp}")
+    };
+
+    private static IReadOnlyDictionary<string, string> BuildMonsterMetadata(MonsterModel? monster) => monster == null
+        ? new Dictionary<string, string>(StringComparer.Ordinal)
+        : new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["title"] = SafeLocText(monster.Title),
+            ["min_initial_hp"] = monster.MinInitialHp.ToString(),
+            ["max_initial_hp"] = monster.MaxInitialHp.ToString()
+        };
+
+    private static string MonsterHpSummary(MonsterModel monster)
+    {
+        return monster.MinInitialHp == monster.MaxInitialHp
+            ? monster.MinInitialHp.ToString()
+            : $"{monster.MinInitialHp}-{monster.MaxInitialHp}";
+    }
 
     public string GenerateProjectEntityId(EditorProject project, ModStudioEntityKind kind)
     {
@@ -644,4 +677,5 @@ public sealed partial class ModelMetadataService
         var values = ids.Where(id => !string.IsNullOrWhiteSpace(id)).ToList();
         return values.Count == 0 ? "-" : string.Join(", ", values);
     }
+
 }

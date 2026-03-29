@@ -39,6 +39,8 @@ internal sealed class NativeCallSite
     public required MethodBase Method { get; init; }
 
     public int? Int32ArgumentHint { get; init; }
+
+    public string? StringArgumentHint { get; init; }
 }
 
 internal sealed class PendingAttackBuilderState
@@ -104,6 +106,68 @@ public sealed class NativeBehaviorGraphAutoImporter
             ModStudioEntityKind.Enchantment => TryCreateEnchantmentGraph(entityId, result),
             _ => SetUnsupported(result, $"Native auto-import is not implemented for {kind} in Phase 1.")
         };
+    }
+
+    public bool TryCreateGraphFromMethod(
+        ModStudioEntityKind kind,
+        string entityId,
+        string title,
+        AbstractModel model,
+        MethodInfo method,
+        string triggerId,
+        string defaultTargetSelector,
+        string defaultSelfSelector,
+        out NativeBehaviorGraphAutoImportResult result)
+    {
+        result = new NativeBehaviorGraphAutoImportResult();
+        var steps = ExtractStepsFromMethod(model, method, triggerId, defaultTargetSelector, defaultSelfSelector, result);
+        if (steps.Count == 0)
+        {
+            if (result.UnsupportedCalls.Count == 0)
+            {
+                var fallbackGraph = BehaviorGraphTemplateFactory.CreateDefaultScaffold(
+                    $"native_auto_{entityId.ToLowerInvariant()}",
+                    kind,
+                    title,
+                    ResolveModelTitle(model),
+                    triggerId);
+                result.Graph = fallbackGraph;
+                result.IsSupported = true;
+                result.IsPartial = result.Warnings.Count > 0;
+                result.Summary = string.Join(
+                    Environment.NewLine,
+                    new[]
+                    {
+                        "Native import: cosmetic/no-op",
+                        $"Trigger: {triggerId}",
+                        $"Warnings: {(result.Warnings.Count == 0 ? "-" : string.Join(" | ", result.Warnings.Distinct(StringComparer.OrdinalIgnoreCase)))}"
+                    });
+                return true;
+            }
+
+            return SetUnsupported(result, $"No supported native steps were found for {method.DeclaringType?.Name}.{method.Name}.");
+        }
+
+        var graph = TranslateTriggerGraph(kind, entityId, title, steps, triggerId, result);
+        if (graph == null)
+        {
+            return SetUnsupported(result, $"Could not translate supported native steps for {method.DeclaringType?.Name}.{method.Name}.");
+        }
+
+        result.Graph = graph;
+        result.IsSupported = true;
+        result.IsPartial = result.UnsupportedCalls.Count > 0 || result.Warnings.Count > 0;
+        result.Summary = string.Join(
+            Environment.NewLine,
+            new[]
+            {
+                $"Native import: {(result.IsPartial ? "partial" : "supported")}",
+                $"Trigger: {triggerId}",
+                $"Applied steps: {(result.Graph.Nodes.Count == 0 ? "-" : string.Join(", ", result.Graph.Nodes.Select(node => node.NodeType).Where(nodeType => nodeType is not "flow.entry" and not "flow.exit").Distinct(StringComparer.OrdinalIgnoreCase)))}",
+                $"Unsupported calls: {(result.UnsupportedCalls.Count == 0 ? "-" : string.Join(", ", result.UnsupportedCalls.Distinct(StringComparer.OrdinalIgnoreCase)))}",
+                $"Warnings: {(result.Warnings.Count == 0 ? "-" : string.Join(" | ", result.Warnings.Distinct(StringComparer.OrdinalIgnoreCase)))}"
+            });
+        return true;
     }
 
     private bool TryCreateCardGraph(string entityId, NativeBehaviorGraphAutoImportResult result)
@@ -968,6 +1032,31 @@ public sealed class NativeBehaviorGraphAutoImporter
         string defaultSelfSelector,
         NativeBehaviorGraphAutoImportResult result)
     {
+        return ExtractStepsFromMethod(
+            model,
+            method,
+            triggerId,
+            defaultTargetSelector,
+            defaultSelfSelector,
+            result,
+            new HashSet<MethodInfo>());
+    }
+
+    private List<NativeBehaviorStep> ExtractStepsFromMethod(
+        AbstractModel model,
+        MethodInfo method,
+        string triggerId,
+        string defaultTargetSelector,
+        string defaultSelfSelector,
+        NativeBehaviorGraphAutoImportResult result,
+        ISet<MethodInfo> visitedMethods)
+    {
+        method = ResolveImplementationMethod(method);
+        if (!visitedMethods.Add(method))
+        {
+            return new List<NativeBehaviorStep>();
+        }
+
         var steps = new List<NativeBehaviorStep>();
         string? pendingCreatedCardId = null;
         PendingAttackBuilderState? pendingAttack = null;
@@ -991,7 +1080,7 @@ public sealed class NativeBehaviorGraphAutoImporter
                 pendingAttack = null;
             }
 
-            if (TryTranslateRecognizedCall(model, calledMethod, callSite.Int32ArgumentHint, defaultTargetSelector, defaultSelfSelector, pendingCreatedCardId, result, out var step, out var callLabel))
+            if (TryTranslateRecognizedCall(model, calledMethod, callSite.Int32ArgumentHint, callSite.StringArgumentHint, defaultTargetSelector, defaultSelfSelector, pendingCreatedCardId, result, out var step, out var callLabel))
             {
                 if (string.Equals(step.Kind, "combat.create_card", StringComparison.OrdinalIgnoreCase) &&
                     (!step.Parameters.TryGetValue("card_id", out var createCardId) || string.IsNullOrWhiteSpace(createCardId)))
@@ -1007,6 +1096,12 @@ public sealed class NativeBehaviorGraphAutoImporter
 
                 steps.Add(step);
                 result.RecognizedCalls.Add(callLabel);
+                continue;
+            }
+
+            if (TryInlineHelperMethod(model, method, calledMethod, triggerId, defaultTargetSelector, defaultSelfSelector, result, visitedMethods, out var helperSteps))
+            {
+                steps.AddRange(helperSteps);
                 continue;
             }
 
@@ -1224,6 +1319,7 @@ public sealed class NativeBehaviorGraphAutoImporter
         AbstractModel model,
         MethodBase method,
         int? int32ArgumentHint,
+        string? stringArgumentHint,
         string defaultTargetSelector,
         string defaultSelfSelector,
         string? pendingCreatedCardId,
@@ -1839,6 +1935,63 @@ public sealed class NativeBehaviorGraphAutoImporter
             return true;
         }
 
+        if (method.DeclaringType?.Name == "CreatureCmd" && string.Equals(method.Name, "TriggerAnim", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "monster.animate",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["animation_id"] = string.IsNullOrWhiteSpace(stringArgumentHint) ? "Attack" : stringArgumentHint,
+                    ["wait_duration"] = "0"
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "CreatureCmd" && string.Equals(method.Name, "Escape", StringComparison.Ordinal))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "monster.escape",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.Name == "SfxCmd" && string.Equals(method.Name, "Play", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(stringArgumentHint))
+        {
+            step = new NativeBehaviorStep
+            {
+                Kind = "monster.play_sfx",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["sfx_path"] = stringArgumentHint
+                }
+            };
+            return true;
+        }
+
+        if (method.DeclaringType?.IsSubclassOf(typeof(MonsterModel)) == true &&
+            method.Name.StartsWith("set_", StringComparison.Ordinal) &&
+            int32ArgumentHint.HasValue)
+        {
+            var parameterType = method.GetParameters().FirstOrDefault()?.ParameterType;
+            var valueText = parameterType == typeof(bool)
+                ? (int32ArgumentHint.Value != 0 ? bool.TrueString : bool.FalseString)
+                : int32ArgumentHint.Value.ToString(CultureInfo.InvariantCulture);
+            step = new NativeBehaviorStep
+            {
+                Kind = "monster.set_state",
+                Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["variable_name"] = method.Name["set_".Length..],
+                    ["value"] = valueText
+                }
+            };
+            return true;
+        }
+
         if (method.DeclaringType?.Name == "CreatureCmd" && string.Equals(method.Name, "GainMaxHp", StringComparison.Ordinal))
         {
             var parameters = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -2163,6 +2316,26 @@ public sealed class NativeBehaviorGraphAutoImporter
             return true;
         }
 
+        if (method.DeclaringType?.Name == "CreatureCmd" && string.Equals(method.Name, "Add", StringComparison.Ordinal))
+        {
+            if (method is MethodInfo addMethod && addMethod.IsGenericMethod)
+            {
+                var genericMonsterType = addMethod.GetGenericArguments().FirstOrDefault(type => type.IsSubclassOf(typeof(MonsterModel)));
+                if (genericMonsterType != null)
+                {
+                    step = new NativeBehaviorStep
+                    {
+                        Kind = "monster.summon",
+                        Parameters = new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["monster_id"] = ModelDb.GetId(genericMonsterType).Entry
+                        }
+                    };
+                    return true;
+                }
+            }
+        }
+
         if (method.DeclaringType?.Name == "OstyCmd" && string.Equals(method.Name, "Summon", StringComparison.Ordinal))
         {
             var parameters = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -2181,6 +2354,43 @@ public sealed class NativeBehaviorGraphAutoImporter
         }
 
         return false;
+    }
+
+    private bool TryInlineHelperMethod(
+        AbstractModel model,
+        MethodInfo ownerMethod,
+        MethodBase calledMethod,
+        string triggerId,
+        string defaultTargetSelector,
+        string defaultSelfSelector,
+        NativeBehaviorGraphAutoImportResult result,
+        ISet<MethodInfo> visitedMethods,
+        out IReadOnlyList<NativeBehaviorStep> helperSteps)
+    {
+        helperSteps = Array.Empty<NativeBehaviorStep>();
+        if (calledMethod is not MethodInfo helperMethod)
+        {
+            return false;
+        }
+
+        helperMethod = ResolveImplementationMethod(helperMethod);
+        if (helperMethod == ownerMethod ||
+            helperMethod.IsSpecialName ||
+            helperMethod.DeclaringType != ownerMethod.DeclaringType ||
+            helperMethod.ReturnType != typeof(Task))
+        {
+            return false;
+        }
+
+        var inlined = ExtractStepsFromMethod(model, helperMethod, triggerId, defaultTargetSelector, defaultSelfSelector, result, visitedMethods);
+        if (inlined.Count == 0)
+        {
+            return false;
+        }
+
+        helperSteps = inlined;
+        result.RecognizedCalls.Add($"inline:{helperMethod.DeclaringType?.Name}.{helperMethod.Name}");
+        return true;
     }
 
     private static bool ShouldIgnoreCall(MethodBase method)
@@ -5053,6 +5263,7 @@ public sealed class NativeBehaviorGraphAutoImporter
         var results = new List<NativeCallSite>();
         var index = 0;
         int? lastInt32Constant = null;
+        string? lastStringConstant = null;
         while (index < il.Length)
         {
             var code = il[index++];
@@ -5085,7 +5296,8 @@ public sealed class NativeBehaviorGraphAutoImporter
                         results.Add(new NativeCallSite
                         {
                             Method = resolved,
-                            Int32ArgumentHint = lastInt32Constant
+                            Int32ArgumentHint = lastInt32Constant,
+                            StringArgumentHint = lastStringConstant
                         });
                     }
                 }
@@ -5095,6 +5307,7 @@ public sealed class NativeBehaviorGraphAutoImporter
                 }
 
                 lastInt32Constant = null;
+                lastStringConstant = null;
                 continue;
             }
 
@@ -5102,9 +5315,22 @@ public sealed class NativeBehaviorGraphAutoImporter
             {
                 lastInt32Constant = int32Constant;
             }
+            else if (opcode == OpCodes.Ldstr)
+            {
+                try
+                {
+                    var token = BitConverter.ToInt32(il, index);
+                    lastStringConstant = implementationMethod.Module.ResolveString(token);
+                }
+                catch
+                {
+                    lastStringConstant = null;
+                }
+            }
             else if (opcode != OpCodes.Nop)
             {
                 lastInt32Constant = null;
+                lastStringConstant = null;
             }
 
             index += GetOperandSize(opcode, il, index);

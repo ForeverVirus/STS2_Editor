@@ -6,6 +6,7 @@ using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.MonsterMoves;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.ValueProps;
@@ -82,6 +83,24 @@ internal static class FieldChoiceProvider
                 .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
                 .ToList(),
             "layout_type" => Enum.GetNames<EventLayoutType>()
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
+                .ToList(),
+            "phase_kind" => Enum.GetNames<MonsterPhaseKind>()
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
+                .ToList(),
+            "repeat_type" => Enum.GetNames<MoveRepeatType>()
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
+                .ToList(),
+            "intent_type" => Enum.GetNames<MonsterIntentType>()
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
+                .ToList(),
+            "hook_type" => Enum.GetNames<MonsterLifecycleHookType>()
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
+                .ToList(),
+            "event_kind" => Enum.GetNames<MonsterEventTriggerKind>()
+                .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
+                .ToList(),
+            "state_variable_type" => Enum.GetNames<MonsterStateVariableType>()
                 .Select(value => (value, ModStudioFieldDisplayNames.FormatPropertyValue(key, value)))
                 .ToList(),
             "pool_id" => GetPoolChoices(kind),

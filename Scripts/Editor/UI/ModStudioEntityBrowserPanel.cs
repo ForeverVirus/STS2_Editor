@@ -50,6 +50,7 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
             pair.Value.ButtonPressed = pair.Key == kind;
         }
 
+        UpdateCreateEntryButtonState();
         if (kindChanged && CanRefreshForSelectedKind())
         {
             RefreshItemList();
@@ -88,6 +89,7 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
             pair.Value.Text = pair.Key switch
             {
                 ModStudioEntityKind.Character => Dual("角色", "Characters"),
+                ModStudioEntityKind.Monster => Dual("怪物", "Monsters"),
                 ModStudioEntityKind.Card => Dual("卡牌", "Cards"),
                 ModStudioEntityKind.Relic => Dual("遗物", "Relics"),
                 ModStudioEntityKind.Potion => Dual("药水", "Potions"),
@@ -109,6 +111,7 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
         if (_deleteEntryButton != null) _deleteEntryButton.Text = Dual("删除条目", "Delete Entry");
         if (_refreshButton != null) _refreshButton.Text = Dual("刷新", "Refresh");
 
+        UpdateCreateEntryButtonState();
         RefreshItemList();
     }
 
@@ -133,7 +136,7 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
         kindRow.AddThemeConstantOverride("separation", 4);
         root.AddChild(kindRow);
 
-        foreach (var kind in new[] { ModStudioEntityKind.Character, ModStudioEntityKind.Card, ModStudioEntityKind.Relic, ModStudioEntityKind.Potion, ModStudioEntityKind.Event, ModStudioEntityKind.Enchantment })
+        foreach (var kind in new[] { ModStudioEntityKind.Character, ModStudioEntityKind.Monster, ModStudioEntityKind.Card, ModStudioEntityKind.Relic, ModStudioEntityKind.Potion, ModStudioEntityKind.Event, ModStudioEntityKind.Enchantment })
         {
             var button = MakeButton(string.Empty, () => SelectKind(kind), toggle: true);
             button.CustomMinimumSize = new Vector2(0f, 34f);
@@ -199,6 +202,7 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
             pair.Value.ButtonPressed = pair.Key == kind;
         }
 
+        UpdateCreateEntryButtonState();
         KindChanged?.Invoke(kind);
         if (CanRefreshForSelectedKind())
         {
@@ -380,5 +384,15 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
                 ItemActivated?.Invoke(_item);
             }
         }
+    }
+
+    private void UpdateCreateEntryButtonState()
+    {
+        if (_newEntryButton == null)
+        {
+            return;
+        }
+
+        _newEntryButton.Disabled = _selectedKind is ModStudioEntityKind.Character or ModStudioEntityKind.Monster;
     }
 }

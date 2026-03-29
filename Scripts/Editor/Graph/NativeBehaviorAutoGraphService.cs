@@ -76,8 +76,14 @@ public sealed class NativeBehaviorAutoGraphService
 
     private readonly NativeBehaviorGraphTranslator _translator = new();
     private readonly NativeBehaviorGraphAutoImporter _importer = new();
+    private readonly NativeMonsterAiImporter _monsterAiImporter = new();
 
     public IReadOnlyList<NativeBehaviorTranslationCapability> SupportCatalog => NativeBehaviorGraphTranslator.GetSupportCatalog();
+
+    public bool TryCreateMonsterAi(string entityId, out NativeMonsterAiImportResult? result)
+    {
+        return _monsterAiImporter.TryImportMonster(entityId, out result);
+    }
 
     public bool TryCreateGraph(ModStudioEntityKind kind, string entityId, out NativeBehaviorAutoGraphResult? result)
     {

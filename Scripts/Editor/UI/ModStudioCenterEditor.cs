@@ -11,6 +11,7 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
     private ModStudioBasicEditor? _basicEditor;
     private ModStudioAssetEditor? _assetEditor;
     private ModStudioGraphEditor? _graphEditor;
+    private ModStudioMonsterAiEditor? _monsterAiEditor;
 
     public ModStudioBasicEditor BasicEditor
     {
@@ -36,6 +37,15 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
         {
             EnsureBuilt();
             return _graphEditor!;
+        }
+    }
+
+    public ModStudioMonsterAiEditor MonsterAiEditor
+    {
+        get
+        {
+            EnsureBuilt();
+            return _monsterAiEditor!;
         }
     }
 
@@ -72,6 +82,12 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
         _graphEditor?.EnsureBuilt();
     }
 
+    public void EnsureMonsterAiBuilt()
+    {
+        EnsureBuilt();
+        _monsterAiEditor?.EnsureBuilt();
+    }
+
     public void RefreshTexts()
     {
         if (_tabs != null)
@@ -79,11 +95,13 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
             _tabs.SetTabTitle(0, Dual("基础信息", "Basic"));
             _tabs.SetTabTitle(1, Dual("资源", "Assets"));
             _tabs.SetTabTitle(2, Dual("Graph", "Graph"));
+            _tabs.SetTabTitle(3, Dual("Monster AI", "Monster AI"));
         }
 
         _basicEditor?.RefreshTexts();
         _assetEditor?.RefreshTexts();
         _graphEditor?.RefreshTexts();
+        _monsterAiEditor?.RefreshTexts();
     }
 
     public void BindGraph(BehaviorGraphDefinition graph, BehaviorGraphRegistry registry, AbstractModel? sourceModel = null, DynamicPreviewContext? previewContext = null)
@@ -101,7 +119,7 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
         _graphEditor?.ClearGraph();
     }
 
-    public void SetFeatureAvailability(bool showAssets, bool showGraph)
+    public void SetFeatureAvailability(bool showAssets, bool showGraph, bool showMonsterAi = false)
     {
         EnsureBuilt();
         if (_tabs == null)
@@ -111,10 +129,11 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
 
         _tabs.SetTabHidden(1, !showAssets);
         _tabs.SetTabHidden(2, !showGraph);
+        _tabs.SetTabHidden(3, !showMonsterAi);
 
-        if ((_tabs.CurrentTab == 1 && !showAssets) || (_tabs.CurrentTab == 2 && !showGraph))
+        if ((_tabs.CurrentTab == 1 && !showAssets) || (_tabs.CurrentTab == 2 && !showGraph) || (_tabs.CurrentTab == 3 && !showMonsterAi))
         {
-            _tabs.CurrentTab = 0;
+            _tabs.CurrentTab = showMonsterAi ? 3 : 0;
         }
     }
 
@@ -140,9 +159,11 @@ internal sealed partial class ModStudioCenterEditor : PanelContainer
         _basicEditor = new ModStudioBasicEditor { Name = "BasicTab", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
         _assetEditor = new ModStudioAssetEditor { Name = "AssetsTab", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
         _graphEditor = new ModStudioGraphEditor { Name = "GraphTab", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
+        _monsterAiEditor = new ModStudioMonsterAiEditor { Name = "MonsterAiTab", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ExpandFill };
 
         _tabs.AddChild(_basicEditor);
         _tabs.AddChild(_assetEditor);
         _tabs.AddChild(_graphEditor);
+        _tabs.AddChild(_monsterAiEditor);
     }
 }

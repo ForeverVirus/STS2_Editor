@@ -1,5 +1,6 @@
 using System.Globalization;
 using MegaCrit.Sts2.Core.CardSelection;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -17,6 +18,9 @@ using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.ValueProps;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
+using MegaCrit.Sts2.Core.Nodes.Rooms;
+using MegaCrit.Sts2.Core.Nodes.Vfx;
+using STS2_Editor.Scripts.Editor.Runtime;
 
 namespace STS2_Editor.Scripts.Editor.Graph;
 
@@ -87,6 +91,23 @@ internal static class BuiltInBehaviorNodeExecutors
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("creature.set_current_hp", ExecuteSetCurrentHpAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("creature.kill", ExecuteCreatureKillAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("creature.stun", ExecuteCreatureStunAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.attack", ExecuteMonsterAttackAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.gain_block", ExecuteMonsterGainBlockAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.apply_power", ExecuteMonsterApplyPowerAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.heal", ExecuteMonsterHealAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.summon", ExecuteMonsterSummonAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.talk", ExecuteMonsterTalkAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.escape", ExecuteMonsterEscapeAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.inject_status_card", ExecuteMonsterInjectStatusCardAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.set_state", ExecuteMonsterSetStateAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.get_state", ExecuteMonsterGetStateAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.check_state", ExecuteMonsterCheckStateAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.animate", ExecuteMonsterAnimateAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.play_sfx", ExecuteMonsterPlaySfxAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.remove_player_card", ExecuteMonsterRemovePlayerCardAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.check_ally_alive", ExecuteMonsterCheckAllyAliveAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.count_allies", ExecuteMonsterCountAlliesAsync));
+        registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("monster.force_transition", ExecuteMonsterForceTransitionAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("power.remove", ExecuteRemovePowerAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("power.modify_amount", ExecuteModifyPowerAmountAsync));
         registry.RegisterExecutor(new DelegateBehaviorNodeExecutor("cardpile.shuffle", ExecuteShuffleCardPileAsync));
@@ -304,7 +325,7 @@ internal static class BuiltInBehaviorNodeExecutors
 
         var amount = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context);
         var props = ParseValueProps(GetProperty(node, "props"));
-        var results = (await CreatureCmd.Damage(context.ChoiceContext, targets, amount, props, context.Owner?.Creature, context.Card)).ToList();
+        var results = (await CreatureCmd.Damage(context.ChoiceContext, targets, amount, props, context.SourceCreature, context.Card)).ToList();
         if (results.Count == 0)
         {
             return;
@@ -384,7 +405,7 @@ internal static class BuiltInBehaviorNodeExecutors
         var amount = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 1m);
         foreach (var target in targets)
         {
-            await PowerCmd.Apply(canonicalPower.ToMutable(), target, amount, context.Owner?.Creature, context.Card);
+            await PowerCmd.Apply(canonicalPower.ToMutable(), target, amount, context.SourceCreature, context.Card);
         }
     }
 
@@ -1174,7 +1195,7 @@ internal static class BuiltInBehaviorNodeExecutors
         }
 
         var props = ParseValueProps(GetProperty(node, "props", "none")) | ValueProp.Unblockable | ValueProp.Unpowered;
-        await CreatureCmd.Damage(context.ChoiceContext, targets, amount, props, context.Owner.Creature);
+        await CreatureCmd.Damage(context.ChoiceContext, targets, amount, props, context.SourceCreature);
     }
 
     private static async Task ExecuteGainMaxHpAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
@@ -1273,6 +1294,338 @@ internal static class BuiltInBehaviorNodeExecutors
         }
     }
 
+    private static async Task ExecuteMonsterAttackAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.SourceCreature == null)
+        {
+            return;
+        }
+
+        var targets = context.ResolveTargets(GetProperty(node, "target", "current_target"));
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var amount = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        var hitCount = Math.Max(1, context.ResolveInt(GetProperty(node, "hit_count", "1"), 1));
+        var choiceContext = context.ChoiceContext ?? new BlockingPlayerChoiceContext();
+
+        if (context.Monster != null && targets.Count > 1)
+        {
+            await DamageCmd.Attack(amount).WithHitCount(hitCount).FromMonster(context.Monster).Execute(choiceContext);
+            return;
+        }
+
+        await CreatureCmd.TriggerAnim(context.SourceCreature, "Attack", 0f);
+        for (var index = 0; index < hitCount; index++)
+        {
+            await CreatureCmd.Damage(choiceContext, targets, amount, ParseValueProps(GetProperty(node, "props", "none")), context.SourceCreature);
+        }
+    }
+
+    private static async Task ExecuteMonsterGainBlockAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var targets = context.ResolveTargets(GetProperty(node, "target", "self"));
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var amount = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        foreach (var target in targets)
+        {
+            await CreatureCmd.GainBlock(target, amount, ValueProp.Move, null);
+        }
+    }
+
+    private static async Task ExecuteMonsterApplyPowerAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var powerId = GetProperty(node, "power_id");
+        if (string.IsNullOrWhiteSpace(powerId))
+        {
+            return;
+        }
+
+        var targets = context.ResolveTargets(GetProperty(node, "target", "current_target"));
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var canonicalPower = ResolvePowerTemplate(powerId);
+        if (canonicalPower == null)
+        {
+            return;
+        }
+
+        var amount = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 1m);
+        foreach (var target in targets)
+        {
+            await PowerCmd.Apply(canonicalPower.ToMutable(), target, amount, context.SourceCreature, context.Card);
+        }
+    }
+
+    private static async Task ExecuteMonsterHealAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var targets = context.ResolveTargets(GetProperty(node, "target", "self"));
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var amount = DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "amount", context, 0m);
+        foreach (var target in targets)
+        {
+            await CreatureCmd.Heal(target, amount);
+        }
+    }
+
+    private static async Task ExecuteMonsterSummonAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.CombatState == null)
+        {
+            return;
+        }
+
+        var monsterId = GetProperty(node, "monster_id");
+        var canonicalMonster = ResolveMonsterTemplate(monsterId);
+        if (canonicalMonster == null)
+        {
+            return;
+        }
+
+        var slotName = context.CombatState.Encounter?.GetNextSlot(context.CombatState);
+        var creature = await CreatureCmd.Add(canonicalMonster.ToMutable(), context.CombatState, context.SourceCreature?.Side ?? CombatSide.Enemy, string.IsNullOrWhiteSpace(slotName) ? null : slotName);
+        context["last_summoned_creature"] = creature;
+    }
+
+    private static Task ExecuteMonsterTalkAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.SourceCreature == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var text = GetProperty(node, "text");
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return Task.CompletedTask;
+        }
+
+        var duration = (double)context.ResolveDecimal(GetProperty(node, "duration", "1.5"), 1.5m);
+        var bubble = NSpeechBubbleVfx.Create(text, context.SourceCreature, duration, VfxColor.White);
+        if (bubble != null)
+        {
+            NCombatRoom.Instance?.CombatVfxContainer.AddChild(bubble);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static async Task ExecuteMonsterEscapeAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        _ = node;
+        if (context.SourceCreature == null)
+        {
+            return;
+        }
+
+        await CreatureCmd.Escape(context.SourceCreature);
+    }
+
+    private static async Task ExecuteMonsterInjectStatusCardAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.CombatState == null)
+        {
+            return;
+        }
+
+        var cardId = GetProperty(node, "card_id");
+        var canonicalCard = ModelDb.AllCards.FirstOrDefault(card => string.Equals(card.Id.Entry, cardId, StringComparison.OrdinalIgnoreCase));
+        if (canonicalCard == null)
+        {
+            return;
+        }
+
+        var count = Math.Max(1, (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "count", context, 1m));
+        var pile = ParsePileType(GetProperty(node, "target_pile", PileType.Discard.ToString()), PileType.Discard);
+        var targets = context.ResolveTargets(GetProperty(node, "target", "all_enemies"));
+        foreach (var target in targets)
+        {
+            var player = target.Player ?? target.PetOwner;
+            if (player == null)
+            {
+                continue;
+            }
+
+            for (var index = 0; index < count; index++)
+            {
+                var created = context.CombatState.CreateCard(canonicalCard, player);
+                await CardPileCmd.AddGeneratedCardToCombat(created, pile, addedByPlayer: false);
+            }
+        }
+    }
+
+    private static Task ExecuteMonsterSetStateAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var variableName = GetProperty(node, "variable_name");
+        if (context.MonsterState == null || string.IsNullOrWhiteSpace(variableName))
+        {
+            return Task.CompletedTask;
+        }
+
+        var resolved = context.ResolveObject(GetProperty(node, "value"));
+        context.MonsterState.Variables[variableName] = resolved;
+        context[variableName] = resolved;
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteMonsterGetStateAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var variableName = GetProperty(node, "variable_name");
+        var resultKey = GetProperty(node, "result_key", "monster_state_value");
+        if (context.MonsterState == null || string.IsNullOrWhiteSpace(variableName))
+        {
+            return Task.CompletedTask;
+        }
+
+        context.MonsterState.Variables.TryGetValue(variableName, out var rawValue);
+        context[resultKey] = rawValue;
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteMonsterCheckStateAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var variableName = GetProperty(node, "variable_name");
+        var resultKey = GetProperty(node, "result_key", "monster_state_check");
+        if (context.MonsterState == null || string.IsNullOrWhiteSpace(variableName))
+        {
+            return Task.CompletedTask;
+        }
+
+        context.MonsterState.Variables.TryGetValue(variableName, out var left);
+        var right = context.ResolveObject(GetProperty(node, "value"));
+        var comparisonOperator = GetProperty(node, "operator", "eq").Trim().ToLowerInvariant();
+        context[resultKey] = EvaluateComparison(left, right, comparisonOperator);
+        return Task.CompletedTask;
+    }
+
+    private static async Task ExecuteMonsterAnimateAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        if (context.SourceCreature == null)
+        {
+            return;
+        }
+
+        var animationId = GetProperty(node, "animation_id", "Attack");
+        var waitDuration = (float)context.ResolveDecimal(GetProperty(node, "wait_duration", "0"), 0m);
+        await CreatureCmd.TriggerAnim(context.SourceCreature, animationId, waitDuration);
+    }
+
+    private static Task ExecuteMonsterPlaySfxAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        _ = context;
+        var sfxPath = GetProperty(node, "sfx_path");
+        if (!string.IsNullOrWhiteSpace(sfxPath))
+        {
+            SfxCmd.Play(sfxPath);
+        }
+        return Task.CompletedTask;
+    }
+
+    private static async Task ExecuteMonsterRemovePlayerCardAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var cardId = GetProperty(node, "card_id");
+        if (string.IsNullOrWhiteSpace(cardId))
+        {
+            return;
+        }
+
+        var count = Math.Max(1, (int)DynamicValueEvaluator.EvaluateRuntimeDecimal(node, "count", context, 1m));
+        var targets = context.ResolveTargets(GetProperty(node, "target", "current_target"));
+        foreach (var target in targets)
+        {
+            var player = target.Player ?? target.PetOwner;
+            if (player == null)
+            {
+                continue;
+            }
+
+            var removed = 0;
+            var deckCards = PileType.Deck.GetPile(player).Cards
+                .Where(card => string.Equals(card.Id.Entry, cardId, StringComparison.OrdinalIgnoreCase))
+                .Take(count)
+                .ToList();
+            if (deckCards.Count > 0)
+            {
+                await CardPileCmd.RemoveFromDeck(deckCards, showPreview: false);
+                removed += deckCards.Count;
+            }
+
+            if (removed >= count)
+            {
+                continue;
+            }
+
+            var combatCards = EnumerateCards(player)
+                .Where(card => card.Pile != null && card.Pile.IsCombatPile && card.Pile.Type != PileType.Deck)
+                .Where(card => string.Equals(card.Id.Entry, cardId, StringComparison.OrdinalIgnoreCase))
+                .Take(count - removed)
+                .ToList();
+            if (combatCards.Count > 0)
+            {
+                await CardPileCmd.RemoveFromCombat(combatCards, skipVisuals: true);
+            }
+        }
+    }
+
+    private static Task ExecuteMonsterCheckAllyAliveAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var monsterId = GetProperty(node, "monster_id");
+        var resultKey = GetProperty(node, "result_key", "monster_ally_alive");
+        var creature = context.SourceCreature;
+        var combatState = context.CombatState;
+        if (creature == null || combatState == null || string.IsNullOrWhiteSpace(monsterId))
+        {
+            return Task.CompletedTask;
+        }
+
+        var isAlive = combatState.GetTeammatesOf(creature).Any(ally =>
+            ally.IsAlive &&
+            ally.Monster != null &&
+            (string.Equals(ally.Monster.Id.Entry, monsterId, StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(ally.Monster.GetType().Name, monsterId, StringComparison.OrdinalIgnoreCase)));
+        context[resultKey] = isAlive;
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteMonsterCountAlliesAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var resultKey = GetProperty(node, "result_key", "monster_ally_count");
+        var creature = context.SourceCreature;
+        var combatState = context.CombatState;
+        if (creature == null || combatState == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        context[resultKey] = combatState.GetTeammatesOf(creature).Count(ally => ally.IsAlive && ally != creature);
+        return Task.CompletedTask;
+    }
+
+    private static Task ExecuteMonsterForceTransitionAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
+    {
+        var targetTurnId = GetProperty(node, "target_turn_id");
+        if (context.Monster == null || context.MonsterState == null || string.IsNullOrWhiteSpace(targetTurnId))
+        {
+            return Task.CompletedTask;
+        }
+
+        RuntimeMonsterDispatcher.ForceTransition(context.Monster, context.MonsterState, targetTurnId);
+        return Task.CompletedTask;
+    }
+
     private static async Task ExecuteRemovePowerAsync(BehaviorGraphNodeDefinition node, BehaviorGraphExecutionContext context)
     {
         var powerId = GetProperty(node, "power_id");
@@ -1324,7 +1677,7 @@ internal static class BuiltInBehaviorNodeExecutors
                 continue;
             }
 
-            await PowerCmd.ModifyAmount(power, amount, context.Owner?.Creature, cardSource, silent);
+            await PowerCmd.ModifyAmount(power, amount, context.SourceCreature, cardSource, silent);
         }
     }
 
@@ -1848,6 +2201,31 @@ internal static class BuiltInBehaviorNodeExecutors
             string.Equals(NormalizeLookupKey(candidate.GetType().Name), normalized, StringComparison.OrdinalIgnoreCase));
     }
 
+    private static MonsterModel? ResolveMonsterTemplate(string monsterId)
+    {
+        if (string.IsNullOrWhiteSpace(monsterId))
+        {
+            return null;
+        }
+
+        var canonical = ModelDb.Monsters.FirstOrDefault(candidate => string.Equals(candidate.Id.Entry, monsterId, StringComparison.OrdinalIgnoreCase));
+        if (canonical != null)
+        {
+            return canonical;
+        }
+
+        canonical = ModelDb.Monsters.FirstOrDefault(candidate => string.Equals(candidate.GetType().Name, monsterId, StringComparison.OrdinalIgnoreCase));
+        if (canonical != null)
+        {
+            return canonical;
+        }
+
+        var normalized = NormalizeLookupKey(monsterId);
+        return ModelDb.Monsters.FirstOrDefault(candidate =>
+            string.Equals(NormalizeLookupKey(candidate.Id.Entry), normalized, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(NormalizeLookupKey(candidate.GetType().Name), normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static string NormalizeLookupKey(string rawValue)
     {
         return new string((rawValue ?? string.Empty).Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
@@ -1866,6 +2244,7 @@ internal static class BuiltInBehaviorNodeExecutors
         if (context.Relic != null) return context.Relic;
         if (context.Event != null) return context.Event;
         if (context.Enchantment != null) return context.Enchantment;
+        if (context.Monster != null) return context.Monster;
         return null;
     }
 

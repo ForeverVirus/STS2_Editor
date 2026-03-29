@@ -14,5 +14,7 @@ public sealed class EntityOverrideEnvelope
 
     public List<AssetRef> Assets { get; set; } = new();
 
+    public MonsterAiDefinition? MonsterAi { get; set; }
+
     public string? Notes { get; set; }
 }

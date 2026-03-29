@@ -2,9 +2,11 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Enchantments;
 using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.Entities.Relics;
+using MegaCrit.Sts2.Core.Audio;
 using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Rooms;
+using STS2_Editor.Scripts.Editor.Core.Models;
 using STS2_Editor.Scripts.Editor.Core.Utilities;
 
 namespace STS2_Editor.Scripts.Editor.UI;
@@ -53,12 +55,35 @@ internal static class ModStudioFieldDisplayNames
             "show_amount" => Dual("显示数值", "Show Amount"),
             "has_extra_card_text" => Dual("额外卡牌文本", "Has Extra Card Text"),
             "extra_card_text" => Dual("额外卡牌文本内容", "Extra Card Text"),
+            "min_initial_hp" => Dual("最小初始血量", "Min Initial HP"),
+            "max_initial_hp" => Dual("最大初始血量", "Max Initial HP"),
+            "is_health_bar_visible" => Dual("显示生命条", "Is Health Bar Visible"),
+            "hp_bar_size_reduction" => Dual("生命条缩减", "HP Bar Size Reduction"),
+            "bestiary_attack_anim_id" => Dual("图鉴攻击动画", "Bestiary Attack Anim Id"),
+            "take_damage_sfx_type" => Dual("受击音效类型", "Take Damage Sfx Type"),
+            "take_damage_sfx" => Dual("受击音效", "Take Damage Sfx"),
+            "death_sfx" => Dual("死亡音效", "Death Sfx"),
+            "has_death_sfx" => Dual("有死亡音效", "Has Death Sfx"),
+            "hurt_sfx" => Dual("受伤音效", "Hurt Sfx"),
+            "has_hurt_sfx" => Dual("有受伤音效", "Has Hurt Sfx"),
+            "should_fade_after_death" => Dual("死亡后淡出", "Should Fade After Death"),
+            "should_disappear_from_doom" => Dual("末日后消失", "Should Disappear From Doom"),
+            "death_anim_length_override" => Dual("死亡动画时长", "Death Anim Length Override"),
+            "can_change_scale" => Dual("可缩放", "Can Change Scale"),
+            "extra_death_vfx_padding_x" => Dual("额外死亡特效偏移 X", "Extra Death VFX Padding X"),
+            "extra_death_vfx_padding_y" => Dual("额外死亡特效偏移 Y", "Extra Death VFX Padding Y"),
             "portrait_path" => Dual("立绘路径", "Portrait Path"),
             "icon_path" => Dual("图标路径", "Icon Path"),
             "image_path" => Dual("图片路径", "Image Path"),
             "amount" => Dual("数值", "Amount"),
             "count" => Dual("数量上限", "Count Limit"),
+            "hit_count" => Dual("连击次数", "Hit Count"),
             "target" => Dual("目标", "Target"),
+            "variable_name" => Dual("变量名", "Variable Name"),
+            "animation_id" => Dual("动画 ID", "Animation Id"),
+            "wait_duration" => Dual("等待时长", "Wait Duration"),
+            "sfx_path" => Dual("音效路径", "Sfx Path"),
+            "duration" => Dual("持续时长", "Duration"),
             "source_pile" => Dual("来源牌堆", "Source Pile"),
             "target_pile" => Dual("目标牌堆", "Target Pile"),
             "exact_energy_cost" => Dual("精确费用", "Exact Cost"),
@@ -67,6 +92,7 @@ internal static class ModStudioFieldDisplayNames
             "position" => Dual("抽取位置", "Draw Position"),
             "card_id" => Dual("卡牌 ID", "Card Id"),
             "replacement_card_id" => Dual("替换卡牌 ID", "Replacement Card Id"),
+            "monster_id" => Dual("怪物 ID", "Monster Id"),
             "enchantment_id" => Dual("附魔 ID", "Enchantment Id"),
             "auto_play_type" => Dual("自动打出类型", "Auto Play Type"),
             "force_exhaust" => Dual("强制消耗", "Force Exhaust"),
@@ -91,6 +117,24 @@ internal static class ModStudioFieldDisplayNames
             "reward_kind" => Dual("奖励类型", "Reward Kind"),
             "reward_count" => Dual("奖励数量", "Reward Count"),
             "operator" => Dual("运算符", "Operator"),
+            "phase_kind" => Dual("阶段类型", "Phase Kind"),
+            "repeat_type" => Dual("重复规则", "Repeat Type"),
+            "intent_type" => Dual("意图类型", "Intent Type"),
+            "hook_type" => Dual("生命周期钩子", "Lifecycle Hook"),
+            "event_kind" => Dual("事件类型", "Event Kind"),
+            "state_variable_type" => Dual("状态变量类型", "State Variable Type"),
+            "turn_id" => Dual("回合 ID", "Turn Id"),
+            "move_id" => Dual("招式 ID", "Move Id"),
+            "phase_id" => Dual("阶段 ID", "Phase Id"),
+            "branch_id" => Dual("分支 ID", "Branch Id"),
+            "graph_id" => Dual("Graph ID", "Graph Id"),
+            "initial_value" => Dual("初始值", "Initial Value"),
+            "filter_monster_id" => Dual("过滤怪物 ID", "Filter Monster Id"),
+            "target_phase_id" => Dual("目标阶段 ID", "Target Phase Id"),
+            "target_turn_id" => Dual("目标回合 ID", "Target Turn Id"),
+            "max_repeats" => Dual("最大重复次数", "Max Repeats"),
+            "cooldown" => Dual("冷却回合", "Cooldown"),
+            "weight" => Dual("权重", "Weight"),
             "page_id" => Dual("页面 ID", "Page Id"),
             "option_id" => Dual("选项 ID", "Option Id"),
             "next_page_id" => Dual("下一页面 ID", "Next Page Id"),
@@ -177,6 +221,19 @@ internal static class ModStudioFieldDisplayNames
                 nameof(RelicRarity.Shop) => Dual("商店", "Shop"),
                 _ => value
             },
+            "take_damage_sfx_type" => value switch
+            {
+                nameof(DamageSfxType.None) => Dual("无", "None"),
+                nameof(DamageSfxType.Armor) => Dual("护甲", "Armor"),
+                nameof(DamageSfxType.ArmorBig) => Dual("厚重护甲", "Armor Big"),
+                nameof(DamageSfxType.Fur) => Dual("毛皮", "Fur"),
+                nameof(DamageSfxType.Insect) => Dual("昆虫", "Insect"),
+                nameof(DamageSfxType.Magic) => Dual("魔法", "Magic"),
+                nameof(DamageSfxType.Plant) => Dual("植物", "Plant"),
+                nameof(DamageSfxType.Slime) => Dual("史莱姆", "Slime"),
+                nameof(DamageSfxType.Stone) => Dual("石头", "Stone"),
+                _ => value
+            },
             "usage" => value switch
             {
                 nameof(PotionUsage.None) => Dual("无", "None"),
@@ -191,6 +248,58 @@ internal static class ModStudioFieldDisplayNames
                 nameof(EventLayoutType.Combat) => Dual("战斗", "Combat"),
                 nameof(EventLayoutType.Ancient) => Dual("远古", "Ancient"),
                 nameof(EventLayoutType.Custom) => Dual("自定义", "Custom"),
+                _ => value
+            },
+            "phase_kind" => value switch
+            {
+                nameof(MonsterPhaseKind.Sequential) => Dual("顺序", "Sequential"),
+                nameof(MonsterPhaseKind.RandomBranch) => Dual("随机分支", "Random Branch"),
+                nameof(MonsterPhaseKind.ConditionalBranch) => Dual("条件分支", "Conditional Branch"),
+                _ => value
+            },
+            "repeat_type" => value switch
+            {
+                "CanRepeatForever" => Dual("可无限重复", "Can Repeat Forever"),
+                "CanRepeatXTimes" => Dual("可重复固定次数", "Can Repeat X Times"),
+                "CannotRepeat" => Dual("不能连续重复", "Cannot Repeat"),
+                "UseOnlyOnce" => Dual("仅一次", "Use Only Once"),
+                _ => value
+            },
+            "intent_type" => value switch
+            {
+                nameof(MonsterIntentType.Unknown) => Dual("未知", "Unknown"),
+                nameof(MonsterIntentType.SingleAttack) => Dual("单段攻击", "Single Attack"),
+                nameof(MonsterIntentType.MultiAttack) => Dual("多段攻击", "Multi Attack"),
+                nameof(MonsterIntentType.Buff) => Dual("增益", "Buff"),
+                nameof(MonsterIntentType.Debuff) => Dual("减益", "Debuff"),
+                nameof(MonsterIntentType.Defend) => Dual("防御", "Defend"),
+                nameof(MonsterIntentType.Summon) => Dual("召唤", "Summon"),
+                nameof(MonsterIntentType.Status) => Dual("状态牌", "Status"),
+                nameof(MonsterIntentType.Heal) => Dual("治疗", "Heal"),
+                nameof(MonsterIntentType.CardDebuff) => Dual("卡牌减益", "Card Debuff"),
+                _ => value
+            },
+            "hook_type" => value switch
+            {
+                nameof(MonsterLifecycleHookType.AfterAddedToRoom) => Dual("进入房间后", "After Added To Room"),
+                nameof(MonsterLifecycleHookType.BeforeRemovedFromRoom) => Dual("离开房间前", "Before Removed From Room"),
+                nameof(MonsterLifecycleHookType.OnDieToDoom) => Dual("死于末日时", "On Die To Doom"),
+                nameof(MonsterLifecycleHookType.BeforeDeath) => Dual("死亡前", "Before Death"),
+                nameof(MonsterLifecycleHookType.AfterCurrentHpChanged) => Dual("生命变化后", "After Current HP Changed"),
+                _ => value
+            },
+            "event_kind" => value switch
+            {
+                nameof(MonsterEventTriggerKind.AllyDied) => Dual("友军死亡", "Ally Died"),
+                nameof(MonsterEventTriggerKind.HpChanged) => Dual("生命变化", "HP Changed"),
+                _ => value
+            },
+            "state_variable_type" => value switch
+            {
+                nameof(MonsterStateVariableType.Integer) => Dual("整数", "Integer"),
+                nameof(MonsterStateVariableType.Boolean) => Dual("布尔", "Boolean"),
+                nameof(MonsterStateVariableType.Float) => Dual("浮点", "Float"),
+                nameof(MonsterStateVariableType.String) => Dual("字符串", "String"),
                 _ => value
             },
             "pool_id" => FormatPoolValue(value),
@@ -348,7 +457,7 @@ internal static class ModStudioFieldDisplayNames
                 "missing_hp" => Dual("已损生命", "Missing HP"),
                 _ => value
             },
-            "target_type" or "type" or "rarity" or "usage" or "layout_type" or "pool_id" or "behavior_source" or "room_type" or "reward_room_type" or "map_kind" or "selection_mode" or "prompt_kind" => FormatPropertyValue(key, value),
+            "target_type" or "type" or "rarity" or "usage" or "layout_type" or "pool_id" or "behavior_source" or "room_type" or "reward_room_type" or "map_kind" or "selection_mode" or "prompt_kind" or "take_damage_sfx_type" => FormatPropertyValue(key, value),
             "card_type_scope" => value switch
             {
                 "any" => Dual("任意类型", "Any Type"),

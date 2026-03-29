@@ -1,0 +1,187 @@
+#nullable enable
+using System.Text.Json;
+using MegaCrit.Sts2.Core.Models;
+using STS2_Editor.Scripts.Editor.Core.Utilities;
+using STS2_Editor.Scripts.Editor.Graph;
+
+var root = args.Length > 0 && !string.IsNullOrWhiteSpace(args[0])
+    ? Path.GetFullPath(args[0])
+    : Directory.GetCurrentDirectory();
+
+InitializeModelDb();
+
+var reportLines = new List<string>();
+var failures = new List<string>();
+var partialDetails = new List<(string MonsterId, string Summary, IReadOnlyList<string> Notes)>();
+var unresolvedConditions = new List<string>();
+var service = new NativeBehaviorAutoGraphService();
+var monsters = ModelDb.Monsters.OrderBy(monster => monster.Id.Entry, StringComparer.OrdinalIgnoreCase).ToList();
+var imported = 0;
+var partial = 0;
+var roundtripped = 0;
+var conditionalPhaseCount = 0;
+var conditionalBranchCount = 0;
+var resolvedConditionCount = 0;
+
+foreach (var monster in monsters)
+{
+    if (!service.TryCreateMonsterAi(monster.Id.Entry, out var importResult) || importResult == null)
+    {
+        failures.Add($"Failed to import {monster.Id.Entry}");
+        continue;
+    }
+
+    imported++;
+    if (importResult.IsPartial)
+    {
+        partial++;
+        partialDetails.Add((monster.Id.Entry, importResult.Summary, importResult.Notes));
+    }
+
+    conditionalPhaseCount += importResult.Definition.LoopPhases.Count(phase =>
+        phase.PhaseKind == STS2_Editor.Scripts.Editor.Core.Models.MonsterPhaseKind.ConditionalBranch);
+
+    foreach (var (phase, branch) in EnumerateConditionalBranches(importResult.Definition))
+    {
+        conditionalBranchCount++;
+        if (IsResolvedCondition(branch.Condition))
+        {
+            resolvedConditionCount++;
+            continue;
+        }
+
+        unresolvedConditions.Add($"{monster.Id.Entry}:{phase.PhaseId}:{branch.BranchId} => {FormatCondition(branch.Condition)}");
+    }
+
+    var json = JsonSerializer.Serialize(importResult.Definition, ModStudioJson.Options);
+    var reloaded = JsonSerializer.Deserialize<STS2_Editor.Scripts.Editor.Core.Models.MonsterAiDefinition>(json, ModStudioJson.Options);
+    if (reloaded == null || !string.Equals(reloaded.MonsterId, importResult.Definition.MonsterId, StringComparison.Ordinal))
+    {
+        failures.Add($"Roundtrip failed for {monster.Id.Entry}");
+        continue;
+    }
+
+    roundtripped++;
+}
+
+if (unresolvedConditions.Count > 0)
+{
+    failures.Add($"Conditional import left {unresolvedConditions.Count} unresolved branch expressions.");
+}
+
+var coverageDir = Path.Combine(root, "coverage", "monster-proof");
+Directory.CreateDirectory(coverageDir);
+var reportPath = Path.Combine(coverageDir, "stage81-report.md");
+var partialDetailsPath = Path.Combine(coverageDir, "stage81-partial-details.md");
+reportLines.Add("# Stage 81 Monster Proof");
+reportLines.Add(string.Empty);
+reportLines.Add($"- Monster count: {monsters.Count}");
+reportLines.Add($"- Imported: {imported}");
+reportLines.Add($"- Partial: {partial}");
+reportLines.Add($"- Roundtripped: {roundtripped}");
+reportLines.Add($"- Conditional phases: {conditionalPhaseCount}");
+reportLines.Add($"- Conditional branches: {conditionalBranchCount}");
+reportLines.Add($"- Resolved conditional expressions: {resolvedConditionCount}");
+reportLines.Add($"- Placeholder / unresolved conditions: {unresolvedConditions.Count}");
+reportLines.Add($"- Failures: {failures.Count}");
+if (failures.Count > 0)
+{
+    reportLines.Add(string.Empty);
+    reportLines.Add("## Failures");
+    reportLines.AddRange(failures.Select(failure => $"- {failure}"));
+}
+File.WriteAllText(reportPath, string.Join(Environment.NewLine, reportLines));
+
+var partialLines = new List<string>
+{
+    "# Stage 81 Partial Import Details",
+    string.Empty,
+    $"Total partial imports: {partialDetails.Count}",
+    string.Empty
+};
+foreach (var detail in partialDetails.OrderBy(item => item.MonsterId, StringComparer.OrdinalIgnoreCase))
+{
+    partialLines.Add($"## {detail.MonsterId}");
+    partialLines.Add(string.Empty);
+    partialLines.Add($"- Summary: {detail.Summary.Replace(Environment.NewLine, " | ")}");
+    if (detail.Notes.Count > 0)
+    {
+        partialLines.Add($"- Notes: {string.Join(" | ", detail.Notes)}");
+    }
+    partialLines.Add(string.Empty);
+}
+if (unresolvedConditions.Count > 0)
+{
+    partialLines.Add("## Unresolved Conditional Expressions");
+    partialLines.Add(string.Empty);
+    partialLines.AddRange(unresolvedConditions.Select(condition => $"- {condition}"));
+    partialLines.Add(string.Empty);
+}
+File.WriteAllText(partialDetailsPath, string.Join(Environment.NewLine, partialLines));
+
+Console.WriteLine("Stage 81 monster proof summary");
+Console.WriteLine($"Root: {root}");
+Console.WriteLine($"Monsters: {monsters.Count}");
+Console.WriteLine($"Imported: {imported}");
+Console.WriteLine($"Partial: {partial}");
+Console.WriteLine($"Roundtripped: {roundtripped}");
+Console.WriteLine($"Conditional phases: {conditionalPhaseCount}");
+Console.WriteLine($"Conditional branches: {conditionalBranchCount}");
+Console.WriteLine($"Resolved conditions: {resolvedConditionCount}");
+Console.WriteLine($"Unresolved conditions: {unresolvedConditions.Count}");
+Console.WriteLine($"Report: {reportPath}");
+Console.WriteLine($"Partial details: {partialDetailsPath}");
+
+if (failures.Count > 0)
+{
+    foreach (var failure in failures)
+    {
+        Console.WriteLine($"FAIL: {failure}");
+    }
+
+    return 1;
+}
+
+Console.WriteLine("Result: PASS");
+return 0;
+
+static IEnumerable<(STS2_Editor.Scripts.Editor.Core.Models.MonsterPhaseDefinition Phase, STS2_Editor.Scripts.Editor.Core.Models.MonsterPhaseBranch Branch)> EnumerateConditionalBranches(STS2_Editor.Scripts.Editor.Core.Models.MonsterAiDefinition definition)
+{
+    foreach (var phase in definition.LoopPhases.Where(phase => phase.PhaseKind == STS2_Editor.Scripts.Editor.Core.Models.MonsterPhaseKind.ConditionalBranch))
+    {
+        foreach (var branch in phase.Branches)
+        {
+            yield return (phase, branch);
+        }
+    }
+}
+
+static bool IsResolvedCondition(string? condition)
+{
+    var trimmed = condition?.Trim();
+    if (string.IsNullOrWhiteSpace(trimmed))
+    {
+        return false;
+    }
+
+    const string Prefix = "native_condition_";
+    return !(trimmed.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) &&
+             int.TryParse(trimmed[Prefix.Length..], out _));
+}
+
+static string FormatCondition(string? condition)
+{
+    return string.IsNullOrWhiteSpace(condition) ? "<empty>" : condition.Trim();
+}
+
+static void InitializeModelDb()
+{
+    try
+    {
+        ModelDb.Init();
+        ModelDb.InitIds();
+    }
+    catch
+    {
+    }
+}

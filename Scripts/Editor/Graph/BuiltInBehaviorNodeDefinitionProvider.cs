@@ -98,6 +98,23 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
         yield return CardRewardOptionsEnchant();
         yield return ReplaceGeneratedMap();
         yield return RemoveUnknownRoomType();
+        yield return MonsterAttack();
+        yield return MonsterGainBlock();
+        yield return MonsterApplyPower();
+        yield return MonsterHeal();
+        yield return MonsterSummon();
+        yield return MonsterTalk();
+        yield return MonsterEscape();
+        yield return MonsterInjectStatusCard();
+        yield return MonsterSetState();
+        yield return MonsterGetState();
+        yield return MonsterCheckState();
+        yield return MonsterAnimate();
+        yield return MonsterPlaySfx();
+        yield return MonsterRemovePlayerCard();
+        yield return MonsterCheckAllyAlive();
+        yield return MonsterCountAllies();
+        yield return MonsterForceTransition();
     }
 
     private static BehaviorGraphNodeDefinitionDescriptor FlowEntry()
@@ -3145,6 +3162,210 @@ public sealed class BuiltInBehaviorNodeDefinitionProvider : IBehaviorNodeDefinit
                 ["amount"] = "1",
                 ["selection"] = "all"
             }
+        };
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterAttack()
+    {
+        return CreateMonsterNode("monster.attack", "Monster Attack", "Deals monster attack damage using the current monster as the attacker.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["target"] = "current_target",
+                ["hit_count"] = "1"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterGainBlock()
+    {
+        return CreateMonsterNode("monster.gain_block", "Monster Gain Block", "Grants block from a monster-authored move.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["target"] = "self"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterApplyPower()
+    {
+        return CreateMonsterNode("monster.apply_power", "Monster Apply Power", "Applies a power from a monster-authored move.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["power_id"] = string.Empty,
+                ["amount"] = "1",
+                ["target"] = "current_target"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterHeal()
+    {
+        return CreateMonsterNode("monster.heal", "Monster Heal", "Heals the selected target from a monster-authored move.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["amount"] = "0",
+                ["target"] = "self"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterSummon()
+    {
+        return CreateMonsterNode("monster.summon", "Monster Summon", "Summons another monster into the current combat.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["monster_id"] = string.Empty
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterTalk()
+    {
+        return CreateMonsterNode("monster.talk", "Monster Talk", "Displays a speech bubble for the current monster.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["text"] = string.Empty,
+                ["duration"] = "1.5"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterEscape()
+    {
+        return CreateMonsterNode("monster.escape", "Monster Escape", "Makes the current monster escape from combat.",
+            new Dictionary<string, string>(StringComparer.Ordinal));
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterInjectStatusCard()
+    {
+        return CreateMonsterNode("monster.inject_status_card", "Monster Inject Status Card", "Creates status cards for target players and places them into the selected pile.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_id"] = string.Empty,
+                ["count"] = "1",
+                ["target_pile"] = PileType.Discard.ToString(),
+                ["target"] = "all_enemies"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterSetState()
+    {
+        return CreateMonsterNode("monster.set_state", "Monster Set State", "Writes a value into monster runtime state.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["variable_name"] = string.Empty,
+                ["value"] = string.Empty
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterGetState()
+    {
+        return CreateMonsterNode("monster.get_state", "Monster Get State", "Reads a value from monster runtime state into graph state.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["variable_name"] = string.Empty,
+                ["result_key"] = "monster_state_value"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterCheckState()
+    {
+        return CreateMonsterNode("monster.check_state", "Monster Check State", "Compares a monster runtime state variable and stores the boolean result.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["variable_name"] = string.Empty,
+                ["operator"] = "eq",
+                ["value"] = string.Empty,
+                ["result_key"] = "monster_state_check"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterAnimate()
+    {
+        return CreateMonsterNode("monster.animate", "Monster Animate", "Triggers a monster animation.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["animation_id"] = "Attack",
+                ["wait_duration"] = "0"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterPlaySfx()
+    {
+        return CreateMonsterNode("monster.play_sfx", "Monster Play Sfx", "Plays a monster move sound effect.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["sfx_path"] = string.Empty
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterRemovePlayerCard()
+    {
+        return CreateMonsterNode("monster.remove_player_card", "Monster Remove Player Card", "Removes matching player cards from deck or combat piles.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["card_id"] = string.Empty,
+                ["count"] = "1",
+                ["target"] = "current_target"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterCheckAllyAlive()
+    {
+        return CreateMonsterNode("monster.check_ally_alive", "Monster Check Ally Alive", "Stores whether a matching ally monster is alive.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["monster_id"] = string.Empty,
+                ["result_key"] = "monster_ally_alive"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterCountAllies()
+    {
+        return CreateMonsterNode("monster.count_allies", "Monster Count Allies", "Stores the number of living allied creatures.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["result_key"] = "monster_ally_count"
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor MonsterForceTransition()
+    {
+        return CreateMonsterNode("monster.force_transition", "Monster Force Transition", "Forces the current monster runtime to transition to another authored turn.",
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["target_turn_id"] = string.Empty
+            });
+    }
+
+    private static BehaviorGraphNodeDefinitionDescriptor CreateMonsterNode(
+        string nodeType,
+        string displayName,
+        string description,
+        Dictionary<string, string> defaultProperties)
+    {
+        return new BehaviorGraphNodeDefinitionDescriptor
+        {
+            NodeType = nodeType,
+            DisplayName = displayName,
+            Description = description,
+            Inputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "in",
+                    DisplayName = "In",
+                    Direction = BehaviorGraphPortDirection.Input,
+                    ValueType = "flow"
+                }
+            },
+            Outputs = new[]
+            {
+                new BehaviorGraphPortDefinition
+                {
+                    PortId = "out",
+                    DisplayName = "Out",
+                    Direction = BehaviorGraphPortDirection.Output,
+                    ValueType = "flow"
+                }
+            },
+            DefaultProperties = defaultProperties
         };
     }
 

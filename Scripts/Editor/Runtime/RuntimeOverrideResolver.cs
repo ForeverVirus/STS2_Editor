@@ -100,6 +100,7 @@ public sealed class RuntimeOverrideResolver
             EntityId = source.EntityId,
             BehaviorSource = source.BehaviorSource,
             GraphId = source.GraphId,
+            MonsterAi = MonsterAiDefinitionCloner.Clone(source.MonsterAi),
             Notes = source.Notes,
             Metadata = new Dictionary<string, string>(source.Metadata, StringComparer.Ordinal),
             Assets = source.Assets.Select(CloneAsset).ToList()

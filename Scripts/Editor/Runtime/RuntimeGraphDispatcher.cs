@@ -1899,6 +1899,43 @@ internal static class RuntimeGraphDispatcher
         return model is RelicModel or EnchantmentModel;
     }
 
+    internal static bool TryGetMonsterOverride(
+        string monsterId,
+        out EntityOverrideEnvelope? envelope,
+        out MonsterAiDefinition? monsterAi)
+    {
+        envelope = null;
+        monsterAi = null;
+        if (!ModStudioBootstrap.RuntimeRegistry.TryGetOverride(ModStudioEntityKind.Monster, monsterId, out envelope) ||
+            envelope == null ||
+            envelope.MonsterAi == null)
+        {
+            return false;
+        }
+
+        monsterAi = envelope.MonsterAi;
+        return true;
+    }
+
+    internal static bool TryGetResolvedGraph(string graphId, out BehaviorGraphDefinition? graph)
+    {
+        graph = null;
+        return !string.IsNullOrWhiteSpace(graphId) && ModStudioBootstrap.RuntimeRegistry.TryGetGraph(graphId, out graph);
+    }
+
+    internal static string ResolveGraphEntryNode(BehaviorGraphDefinition graph, string triggerId, bool allowDefaultFallback = true)
+    {
+        return ResolveEntryNode(graph, triggerId, allowDefaultFallback);
+    }
+
+    internal static Task ExecuteResolvedGraphAsync(
+        BehaviorGraphDefinition graph,
+        BehaviorGraphExecutionContext context,
+        string entryNodeId)
+    {
+        return ExecuteGraphAndApplyStateAsync(graph, context, entryNodeId);
+    }
+
     private static bool TryGetGraphOverride(
         ModStudioEntityKind kind,
         string entityId,

@@ -1034,6 +1034,7 @@ public sealed class AiEditExecutor
             EntityId = envelope.EntityId,
             BehaviorSource = envelope.BehaviorSource,
             GraphId = envelope.GraphId,
+            MonsterAi = MonsterAiDefinitionCloner.Clone(envelope.MonsterAi),
             Notes = envelope.Notes,
             Metadata = new Dictionary<string, string>(envelope.Metadata, StringComparer.Ordinal),
             Assets = envelope.Assets.Select(CloneAsset).ToList()

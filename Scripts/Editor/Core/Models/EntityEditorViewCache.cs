@@ -10,6 +10,10 @@ public sealed class EntityEditorViewCache
 
     public BehaviorGraphDefinition? AutoGraph { get; set; }
 
+    public MonsterAiDefinition? AutoMonsterAi { get; set; }
+
+    public Dictionary<string, BehaviorGraphDefinition> AutoMonsterGraphs { get; set; } = new(StringComparer.Ordinal);
+
     public List<string> RuntimeAssetCandidates { get; set; } = new();
 
     public List<AssetRef> ImportedAssets { get; set; } = new();

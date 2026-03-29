@@ -36,6 +36,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
     private bool _dirty;
     private bool _suppressDirty;
     private bool _basicDraftDirty;
+    private bool _monsterAiDraftDirty;
     private bool _graphDraftDirty;
     private bool _assetTabLoadedForCurrentItem;
     private bool _graphTabLoadedForCurrentItem;
@@ -49,7 +50,9 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
     private EntityBrowserItem? _currentItem;
     private string _currentResolvedAssetPath = string.Empty;
     private string _selectedRuntimeAssetPath = string.Empty;
+    private string _boundMonsterAiEntityId = string.Empty;
     private AssetRef? _selectedImportedAsset;
+    private MonsterMoveDefinition? _selectedMonsterMoveForGraph;
     private EntityEditorViewCache? _currentViewCache;
     private Action? _pendingAfterSave;
     private Action? _pendingAfterDiscard;
@@ -221,6 +224,10 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _centerEditor.BasicEditor.SaveRequested += SaveBasic;
         _centerEditor.BasicEditor.RevertRequested += RevertBasic;
         _centerEditor.BasicEditor.FieldChanged += MarkBasicDirty;
+        _centerEditor.MonsterAiEditor.SaveRequested += SaveMonsterAi;
+        _centerEditor.MonsterAiEditor.RevertRequested += RevertMonsterAi;
+        _centerEditor.MonsterAiEditor.Changed += MarkMonsterAiDirty;
+        _centerEditor.MonsterAiEditor.MoveGraphEditRequested += OnMonsterMoveGraphEditRequested;
         _centerEditor.AssetEditor.SaveRequested += SaveAssetBinding;
         _centerEditor.AssetEditor.RevertRequested += RevertAssetBinding;
         _centerEditor.GraphEditor.ImportRequested += ImportGraphTemplate;
@@ -615,7 +622,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
 
     private void OnKindChanged(ModStudioEntityKind kind)
     {
-        if (_basicDraftDirty || _graphDraftDirty)
+        if (_basicDraftDirty || _monsterAiDraftDirty || _graphDraftDirty)
         {
             CommitPendingDrafts();
         }
@@ -624,6 +631,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _currentEntityId = null;
         _currentItem = null;
         _currentViewCache = null;
+        _boundMonsterAiEntityId = string.Empty;
         _assetTabLoadedForCurrentItem = false;
         _graphTabLoadedForCurrentItem = false;
         RefreshTabAvailability();
@@ -634,7 +642,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
     {
         if (_currentItem != null &&
             !string.Equals(_currentItem.EntityId, item.EntityId, StringComparison.Ordinal) &&
-            (_basicDraftDirty || _graphDraftDirty))
+            (_basicDraftDirty || _monsterAiDraftDirty || _graphDraftDirty))
         {
             CommitPendingDrafts();
         }
@@ -717,12 +725,19 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         try
         {
             _basicDraftDirty = false;
+            _monsterAiDraftDirty = false;
             _graphDraftDirty = false;
             _assetTabLoadedForCurrentItem = false;
             _graphTabLoadedForCurrentItem = false;
+            _selectedMonsterMoveForGraph = null;
+            _boundMonsterAiEntityId = string.Empty;
             _currentViewCache = GetOrCreateEntityCache(item);
             _graphPreviewContext = BuildPreviewContext(item, _currentViewCache.MergedMetadata);
             RefreshBasicView(item, _currentViewCache);
+            if (_currentKind == ModStudioEntityKind.Monster && _centerEditor != null)
+            {
+                _centerEditor.Tabs.CurrentTab = 3;
+            }
             RefreshCurrentTabView(forceLoad: true);
             return;
         }
@@ -915,6 +930,39 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _detailPanel.SetBasicText(BuildBasicDetailsText(item, BuildBasicEditorMetadata(item.Kind, cache.OriginalMetadata)));
     }
 
+    private void RefreshMonsterAiView(EntityBrowserItem item, EntityEditorViewCache cache)
+    {
+        if (_centerEditor == null || _currentKind != ModStudioEntityKind.Monster)
+        {
+            return;
+        }
+
+        if (_monsterAiDraftDirty && string.Equals(_boundMonsterAiEntityId, item.EntityId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _centerEditor.EnsureMonsterAiBuilt();
+        var envelope = GetEnvelope(item.Kind, item.EntityId);
+        if (envelope?.MonsterAi == null &&
+            cache.AutoMonsterAi == null &&
+            _nativeAutoGraphService.TryCreateMonsterAi(item.EntityId, out var importResult) &&
+            importResult != null)
+        {
+            cache.AutoMonsterAi = importResult.Definition.Clone();
+            cache.AutoMonsterGraphs = importResult.MoveGraphs.ToDictionary(graph => graph.GraphId, CloneGraph, StringComparer.Ordinal);
+        }
+
+        var definition = envelope?.MonsterAi?.Clone() ??
+                         cache.AutoMonsterAi?.Clone() ??
+                         new MonsterAiDefinition
+        {
+            MonsterId = item.EntityId
+        };
+        _centerEditor.MonsterAiEditor.BindMonsterAi(definition);
+        _boundMonsterAiEntityId = item.EntityId;
+    }
+
     private void RefreshCurrentTabView(bool forceLoad)
     {
         if (_currentItem == null || _centerEditor == null)
@@ -948,6 +996,15 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
             if (forceLoad || !_graphTabLoadedForCurrentItem)
             {
                 RefreshGraphView(_currentItem, cache);
+            }
+            return;
+        }
+
+        if (tabIndex == 3)
+        {
+            if (forceLoad)
+            {
+                RefreshMonsterAiView(_currentItem, cache);
             }
         }
     }
@@ -1033,11 +1090,18 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
             return;
         }
 
+        if (item.Kind == ModStudioEntityKind.Monster)
+        {
+            RefreshMonsterMoveGraphView(item);
+            return;
+        }
+
         if (!SupportsGraph(item.Kind))
         {
             _centerEditor.ClearGraph();
             _detailPanel.SetGraphDetails(string.Empty, ResolveEntityDisplayTitle(item, cache.MergedMetadata), string.Empty, false);
             RefreshGraphTriggerEditor(null, item.Kind);
+            _detailPanel.GraphEnabledCheck.Disabled = false;
             _detailPanel.SetGraphInfo(Dual("当前分类不支持 Graph 编辑。", "Graph editing is not supported for the current category."));
             _detailPanel.SetPreviewContext(_graphPreviewContext);
             _detailPanel.SetSelectedNode(null);
@@ -1076,6 +1140,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
 
         RefreshDerivedGraphText(graphToBind, updateBasicPreview: false);
         _centerEditor.BindGraph(graphToBind, _graphRegistry, sourceModel, _graphPreviewContext);
+        _detailPanel.GraphEnabledCheck.Disabled = false;
         _detailPanel.SetGraphDetails(graphToBind.GraphId, graphToBind.Name, graphToBind.Description, envelope?.BehaviorSource == BehaviorSource.Graph);
         RefreshGraphTriggerEditor(graphToBind, item.Kind);
         _detailPanel.SetGraphInfo(BuildGraphOverviewText(graphToBind, envelope));
@@ -1151,9 +1216,52 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         };
     }
 
+    private void RefreshMonsterMoveGraphView(EntityBrowserItem item)
+    {
+        if (_detailPanel == null || _centerEditor == null)
+        {
+            return;
+        }
+
+        _centerEditor.EnsureGraphBuilt();
+        EnsureGraphCanvasSignalsWired();
+        var sourceModel = ResolveSourceModel(item.Kind, item.EntityId);
+        if (_selectedMonsterMoveForGraph == null)
+        {
+            _centerEditor.ClearGraph();
+            _detailPanel.SetGraphDetails(string.Empty, item.Title, string.Empty, true);
+            _detailPanel.GraphEnabledCheck.ButtonPressed = true;
+            _detailPanel.GraphEnabledCheck.Disabled = true;
+            _detailPanel.SetGraphInfo(Dual("请先在 Monster AI 页签选择一个 Move 并点击“编辑 Graph”。", "Select a move in the Monster AI tab and click Edit Graph first."));
+            _detailPanel.SetSelectedNode(null);
+            _detailPanel.SetSelectedNodeProperties(new Dictionary<string, string>());
+            _graphTabLoadedForCurrentItem = true;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_selectedMonsterMoveForGraph.GraphId) || !_project!.Graphs.TryGetValue(_selectedMonsterMoveForGraph.GraphId, out var graph))
+        {
+            EnsureMonsterMoveGraphExists(item, _selectedMonsterMoveForGraph);
+            graph = _project.Graphs[_selectedMonsterMoveForGraph.GraphId];
+        }
+
+        var graphToBind = CloneGraph(graph);
+        RefreshDerivedGraphText(graphToBind, updateBasicPreview: false);
+        _centerEditor.BindGraph(graphToBind, _graphRegistry, sourceModel, _graphPreviewContext);
+        _detailPanel.SetGraphDetails(graphToBind.GraphId, graphToBind.Name, graphToBind.Description, true);
+        _detailPanel.GraphEnabledCheck.ButtonPressed = true;
+        _detailPanel.GraphEnabledCheck.Disabled = true;
+        _detailPanel.SetGraphInfo(Dual(
+            $"正在编辑 Monster Move Graph：{_selectedMonsterMoveForGraph.DisplayName}",
+            $"Editing Monster Move Graph: {_selectedMonsterMoveForGraph.DisplayName}"));
+        _detailPanel.SetPreviewContext(_graphPreviewContext);
+        UpdateSelectedNodeDetails(graphToBind, graphToBind.EntryNodeId);
+        _graphTabLoadedForCurrentItem = true;
+    }
+
     private void OnCenterTabChanged(long index)
     {
-        _detailPanel?.SetTab((int)index);
+        _detailPanel?.SetTab(index == 3 ? 0 : (int)index);
         RefreshCurrentTabView(forceLoad: true);
     }
 
@@ -1198,6 +1306,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         var summary = item.Kind switch
         {
             ModStudioEntityKind.Character => $"HP {MetadataOrFallback(metadata, "starting_hp", "0")} | {Dual("金币", "Gold")} {MetadataOrFallback(metadata, "starting_gold", "0")} | {Dual("能量", "Energy")} {MetadataOrFallback(metadata, "max_energy", "0")}",
+            ModStudioEntityKind.Monster => $"HP {BuildMonsterHpSummary(metadata)}",
             ModStudioEntityKind.Card => $"{ModStudioFieldDisplayNames.FormatPropertyValue("type", MetadataOrFallback(metadata, "type", "Attack"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))}",
             ModStudioEntityKind.Relic => $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))}",
             ModStudioEntityKind.Potion => $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("usage", MetadataOrFallback(metadata, "usage", "CombatOnly"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("target_type", MetadataOrFallback(metadata, "target_type", "Self"))}",
@@ -1215,6 +1324,13 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
             Summary = summary,
             DetailText = fallback.DetailText
         };
+    }
+
+    private static string BuildMonsterHpSummary(IReadOnlyDictionary<string, string> metadata)
+    {
+        var minHp = MetadataOrFallback(metadata, "min_initial_hp", "0");
+        var maxHp = MetadataOrFallback(metadata, "max_initial_hp", minHp);
+        return string.Equals(minHp, maxHp, StringComparison.Ordinal) ? minHp : $"{minHp}-{maxHp}";
     }
 
     private BehaviorGraphDefinition? GetGraph(EntityBrowserItem item, EntityOverrideEnvelope? envelope)
@@ -1403,10 +1519,14 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
             SaveGraph();
         }
 
+        if (_monsterAiDraftDirty)
+        {
+            SaveMonsterAi();
+        }
+
         if (_basicDraftDirty)
         {
             SaveBasic();
         }
     }
 }
-

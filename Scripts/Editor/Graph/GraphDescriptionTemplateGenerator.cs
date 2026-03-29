@@ -81,6 +81,23 @@ public sealed class GraphDescriptionTemplateGenerator
             "creature.set_current_hp" => BuildSimpleTemplate(node, "amount", "将当前生命设为", string.Empty, "Set current HP to", string.Empty),
             "creature.kill" => GraphDescriptionSupport.Dual("击杀目标。", "Kill the target."),
             "creature.stun" => GraphDescriptionSupport.Dual("击晕目标。", "Stun the target."),
+            "monster.attack" => BuildMonsterAttackTemplate(node),
+            "monster.gain_block" => BuildAmountTemplate(node, "amount", "怪物获得", "点格挡", "Monster gains", "block"),
+            "monster.apply_power" => BuildApplyPowerTemplate(node),
+            "monster.heal" => BuildAmountTemplate(node, "amount", "怪物恢复", "点生命", "Monster heals", "HP"),
+            "monster.summon" => GraphDescriptionSupport.Dual("召唤怪物。", "Summon a monster."),
+            "monster.talk" => GraphDescriptionSupport.Dual("怪物说话。", "Monster speaks."),
+            "monster.escape" => GraphDescriptionSupport.Dual("怪物逃跑。", "Monster escapes."),
+            "monster.inject_status_card" => GraphDescriptionSupport.Dual("向玩家注入状态牌。", "Inject status cards into players."),
+            "monster.set_state" => GraphDescriptionSupport.Dual("设置怪物状态。", "Set monster state."),
+            "monster.get_state" => GraphDescriptionSupport.Dual("读取怪物状态。", "Read monster state."),
+            "monster.check_state" => GraphDescriptionSupport.Dual("检查怪物状态。", "Check monster state."),
+            "monster.animate" => GraphDescriptionSupport.Dual("播放怪物动画。", "Play monster animation."),
+            "monster.play_sfx" => GraphDescriptionSupport.Dual("播放怪物音效。", "Play monster SFX."),
+            "monster.remove_player_card" => GraphDescriptionSupport.Dual("移除玩家卡牌。", "Remove player cards."),
+            "monster.check_ally_alive" => GraphDescriptionSupport.Dual("检查友军是否存活。", "Check whether an ally is alive."),
+            "monster.count_allies" => GraphDescriptionSupport.Dual("统计友军数量。", "Count allies."),
+            "monster.force_transition" => GraphDescriptionSupport.Dual("强制切换怪物回合。", "Force a monster turn transition."),
             "orb.channel" => BuildChannelOrbTemplate(node),
             "orb.passive" => GraphDescriptionSupport.Dual("触发充能球被动。", "Trigger an orb passive."),
             "orb.add_slots" => BuildSimpleTemplate(node, "amount", "获得", "个充能球槽位", "Gain", "orb slots"),
@@ -221,6 +238,17 @@ public sealed class GraphDescriptionTemplateGenerator
     {
         return GraphDescriptionSupport.BuildChannelOrbDescription(
             GraphDescriptionSupport.GetProperty(node, "orb_id", string.Empty));
+    }
+
+    private string BuildMonsterAttackTemplate(BehaviorGraphNodeDefinition node)
+    {
+        var amountText = GraphDescriptionSupport.GetCountTemplate(node, "amount", "0");
+        var hitCount = GraphDescriptionSupport.GetProperty(node, "hit_count", "1");
+        return hitCount == "1"
+            ? BuildAmountTemplate(node, "amount", "造成", "点伤害", "Deal", "damage")
+            : GraphDescriptionSupport.Dual(
+                $"造成{amountText}点伤害，重复{hitCount}次。",
+                $"Deal {amountText} damage for {hitCount} hits.");
     }
 
     private string BuildMoveCardsTemplate(BehaviorGraphNodeDefinition node)

@@ -70,6 +70,23 @@ public sealed class GraphDescriptionGenerator
         "creature.set_current_hp",
         "creature.kill",
         "creature.stun",
+        "monster.attack",
+        "monster.gain_block",
+        "monster.apply_power",
+        "monster.heal",
+        "monster.summon",
+        "monster.talk",
+        "monster.escape",
+        "monster.inject_status_card",
+        "monster.set_state",
+        "monster.get_state",
+        "monster.check_state",
+        "monster.animate",
+        "monster.play_sfx",
+        "monster.remove_player_card",
+        "monster.check_ally_alive",
+        "monster.count_allies",
+        "monster.force_transition",
         "orb.channel",
         "orb.passive",
         "orb.add_slots",
@@ -244,6 +261,23 @@ public sealed class GraphDescriptionGenerator
             "creature.set_current_hp" => DescribeSimpleAmount(node, "amount", "将当前生命设为", string.Empty, "Set current HP to", string.Empty, sourceModel, previewContext),
             "creature.kill" => Dual("击杀目标。", "Kill the target."),
             "creature.stun" => Dual("击晕目标。", "Stun the target."),
+            "monster.attack" => DescribeMonsterAttack(node, sourceModel, previewContext),
+            "monster.gain_block" => DescribeAmountNode(node, "amount", "怪物获得", "点格挡", "Monster gains", "block", sourceModel, previewContext),
+            "monster.apply_power" => DescribeApplyPower(node, sourceModel, previewContext),
+            "monster.heal" => DescribeAmountNode(node, "amount", "怪物恢复", "点生命", "Monster heals", "HP", sourceModel, previewContext),
+            "monster.summon" => Dual($"召唤 {GraphDescriptionSupport.GetProperty(node, "monster_id", "monster")}。", $"Summon {GraphDescriptionSupport.GetProperty(node, "monster_id", "monster")}."),
+            "monster.talk" => Dual($"怪物说出“{GraphDescriptionSupport.GetProperty(node, "text", string.Empty)}”。", $"Monster says \"{GraphDescriptionSupport.GetProperty(node, "text", string.Empty)}\"."),
+            "monster.escape" => Dual("怪物逃离战斗。", "Monster escapes from combat."),
+            "monster.inject_status_card" => DescribeMonsterInjectStatusCard(node, sourceModel, previewContext),
+            "monster.set_state" => Dual($"设置怪物状态 {GraphDescriptionSupport.GetProperty(node, "variable_name", "state")}。", $"Set monster state {GraphDescriptionSupport.GetProperty(node, "variable_name", "state")}."),
+            "monster.get_state" => Dual($"读取怪物状态 {GraphDescriptionSupport.GetProperty(node, "variable_name", "state")}。", $"Read monster state {GraphDescriptionSupport.GetProperty(node, "variable_name", "state")}."),
+            "monster.check_state" => Dual($"检查怪物状态 {GraphDescriptionSupport.GetProperty(node, "variable_name", "state")}。", $"Check monster state {GraphDescriptionSupport.GetProperty(node, "variable_name", "state")}."),
+            "monster.animate" => Dual($"播放怪物动画 {GraphDescriptionSupport.GetProperty(node, "animation_id", "Attack")}。", $"Play monster animation {GraphDescriptionSupport.GetProperty(node, "animation_id", "Attack")}."),
+            "monster.play_sfx" => Dual($"播放音效 {GraphDescriptionSupport.GetProperty(node, "sfx_path", string.Empty)}。", $"Play SFX {GraphDescriptionSupport.GetProperty(node, "sfx_path", string.Empty)}."),
+            "monster.remove_player_card" => Dual($"移除玩家卡牌 {GraphDescriptionSupport.GetProperty(node, "card_id", "card")}。", $"Remove player card {GraphDescriptionSupport.GetProperty(node, "card_id", "card")}."),
+            "monster.check_ally_alive" => Dual($"检查友军 {GraphDescriptionSupport.GetProperty(node, "monster_id", "monster")} 是否存活。", $"Check whether ally {GraphDescriptionSupport.GetProperty(node, "monster_id", "monster")} is alive."),
+            "monster.count_allies" => Dual("统计存活友军数量。", "Count living allies."),
+            "monster.force_transition" => Dual($"强制切换到回合 {GraphDescriptionSupport.GetProperty(node, "target_turn_id", string.Empty)}。", $"Force transition to turn {GraphDescriptionSupport.GetProperty(node, "target_turn_id", string.Empty)}."),
             "orb.passive" => Dual("触发一个充能球的被动效果。", "Trigger an orb passive."),
             "orb.channel" => DescribeChannelOrb(node),
             "orb.add_slots" => DescribeSimpleAmount(node, "amount", "获得", "个充能球槽位", "Gain", "orb slots", sourceModel, previewContext),
@@ -313,6 +347,28 @@ public sealed class GraphDescriptionGenerator
     {
         return GraphDescriptionSupport.BuildChannelOrbDescription(
             GraphDescriptionSupport.GetProperty(node, "orb_id", string.Empty));
+    }
+
+    private string DescribeMonsterAttack(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        var amountPreview = _previewService.Evaluate(node, "amount", sourceModel, previewContext, 0m).PreviewText;
+        var hitCount = GraphDescriptionSupport.GetProperty(node, "hit_count", "1");
+        var target = GraphDescriptionSupport.GetProperty(node, "target", "current_target");
+        return hitCount == "1"
+            ? DescribeDamage(node, sourceModel, previewContext)
+            : target switch
+            {
+                "all_enemies" => Dual($"对所有敌人造成{amountPreview}点伤害，共{hitCount}次。", $"Deal {amountPreview} damage to all enemies for {hitCount} hits."),
+                _ => Dual($"造成{amountPreview}点伤害，共{hitCount}次。", $"Deal {amountPreview} damage for {hitCount} hits.")
+            };
+    }
+
+    private string DescribeMonsterInjectStatusCard(BehaviorGraphNodeDefinition node, AbstractModel? sourceModel, DynamicPreviewContext? previewContext)
+    {
+        var countPreview = _previewService.Evaluate(node, "count", sourceModel, previewContext, 1m).PreviewText;
+        var cardId = GraphDescriptionSupport.GetProperty(node, "card_id", "card");
+        var pile = GraphDescriptionSupport.GetProperty(node, "target_pile", "Discard");
+        return Dual($"向玩家注入{countPreview}张{cardId}，放入{pile}。", $"Inject {countPreview} {cardId} card(s) into {pile}.");
     }
 
     private string DescribeAmountNode(

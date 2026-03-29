@@ -42,6 +42,7 @@ public sealed partial class NModStudioProjectWindow
             ModStudioEntityKind.Event => ModelDb.AllEvents.FirstOrDefault(item => string.Equals(item.Id.Entry, entityId, StringComparison.Ordinal)),
             ModStudioEntityKind.Enchantment => ModelDb.DebugEnchantments.FirstOrDefault(item => string.Equals(item.Id.Entry, entityId, StringComparison.Ordinal)),
             ModStudioEntityKind.Character => ModelDb.AllCharacters.FirstOrDefault(item => string.Equals(item.Id.Entry, entityId, StringComparison.Ordinal)),
+            ModStudioEntityKind.Monster => ModelDb.Monsters.FirstOrDefault(item => string.Equals(item.Id.Entry, entityId, StringComparison.Ordinal)),
             _ => null
         };
     }

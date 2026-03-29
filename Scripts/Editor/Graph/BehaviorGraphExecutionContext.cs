@@ -6,6 +6,7 @@ using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Runs;
+using STS2_Editor.Scripts.Editor.Runtime;
 
 namespace STS2_Editor.Scripts.Editor.Graph;
 
@@ -35,9 +36,15 @@ public sealed class BehaviorGraphExecutionContext
 
     public EnchantmentModel? Enchantment { get; init; }
 
+    public MonsterModel? Monster { get; init; }
+
+    public Creature? MonsterCreature { get; init; }
+
+    public MonsterRuntimeState? MonsterState { get; init; }
+
     public Player? Owner { get; init; }
 
-    public Creature? SourceCreature => Owner?.Creature;
+    public Creature? SourceCreature => MonsterCreature ?? Owner?.Creature;
 
     public CombatState? CombatState { get; init; }
 
@@ -101,8 +108,11 @@ public sealed class BehaviorGraphExecutionContext
             "relic" => Relic,
             "event" => Event,
             "enchantment" => Enchantment,
+            "monster" => Monster,
+            "monster_creature" => MonsterCreature,
+            "monster_state" => MonsterState,
             "owner" or "owner_player" => Owner,
-            "owner_creature" or "source_creature" or "self" => Owner?.Creature,
+            "owner_creature" or "source_creature" or "self" => SourceCreature,
             "target" or "current_target" => Target,
             "combat_state" => CombatState,
             "run_state" => RunState,
@@ -168,9 +178,19 @@ public sealed class BehaviorGraphExecutionContext
     public IReadOnlyList<Creature> ResolveTargets(string? selector)
     {
         selector = string.IsNullOrWhiteSpace(selector) ? "current_target" : selector.Trim().ToLowerInvariant();
-        var combatState = CombatState ?? Owner?.Creature?.CombatState;
-        var ownerCreature = Owner?.Creature;
+        var combatState = CombatState ?? SourceCreature?.CombatState ?? Owner?.Creature?.CombatState;
+        var ownerCreature = SourceCreature;
         var ownerSide = ownerCreature?.Side ?? Target?.Side ?? CombatSide.Player;
+        var opposingSide = ownerSide == CombatSide.Player ? CombatSide.Enemy : CombatSide.Player;
+
+        if ((selector == "target" || selector == "current_target") && Target == null && combatState != null)
+        {
+            var fallbackTarget = combatState.GetCreaturesOnSide(opposingSide).FirstOrDefault(creature => creature.IsAlive);
+            if (fallbackTarget != null)
+            {
+                return new[] { fallbackTarget };
+            }
+        }
 
         return selector switch
         {
@@ -185,12 +205,15 @@ public sealed class BehaviorGraphExecutionContext
             "other_enemies" or "other_opponents" => combatState == null
                 ? Array.Empty<Creature>()
                 : combatState
-                    .GetCreaturesOnSide(ownerSide == CombatSide.Player ? CombatSide.Enemy : CombatSide.Player)
+                    .GetCreaturesOnSide(opposingSide)
                     .Where(x => x.IsAlive && x != Target)
                     .ToList(),
             "all_enemies" or "all_opponents" or "enemies" or "opponents" => combatState == null
                 ? Array.Empty<Creature>()
-                : combatState.GetCreaturesOnSide(ownerSide == CombatSide.Player ? CombatSide.Enemy : CombatSide.Player).Where(x => x.IsAlive).ToList(),
+                : combatState.GetCreaturesOnSide(opposingSide).Where(x => x.IsAlive).ToList(),
+            "all_targets" => combatState == null
+                ? Array.Empty<Creature>()
+                : combatState.Creatures.Where(x => x.IsAlive).ToList(),
             _ => Array.Empty<Creature>()
         };
     }

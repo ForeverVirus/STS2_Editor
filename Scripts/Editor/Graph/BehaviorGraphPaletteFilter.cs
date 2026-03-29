@@ -28,6 +28,14 @@ public static class BehaviorGraphPaletteFilter
         "reward."
     ];
 
+    private static readonly string[] MonsterPrefixes =
+    [
+        "combat.",
+        "creature.",
+        "power.",
+        "monster."
+    ];
+
     public static IEnumerable<BehaviorGraphNodeDefinitionDescriptor> FilterForEntityKind(
         IEnumerable<BehaviorGraphNodeDefinitionDescriptor> definitions,
         ModStudioEntityKind kind)
@@ -55,6 +63,7 @@ public static class BehaviorGraphPaletteFilter
             ModStudioEntityKind.Potion => HasAnyPrefix(nodeType, GameplayPrefixes),
             ModStudioEntityKind.Enchantment => HasAnyPrefix(nodeType, GameplayPrefixes),
             ModStudioEntityKind.Event => HasAnyPrefix(nodeType, EventPrefixes),
+            ModStudioEntityKind.Monster => HasAnyPrefix(nodeType, MonsterPrefixes),
             _ => false
         };
     }

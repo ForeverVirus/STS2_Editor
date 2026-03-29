@@ -13,6 +13,8 @@ public sealed class EntityDraft
     public AssetDraft Assets { get; set; } = new();
 
     public GraphDraft Graph { get; set; } = new();
+
+    public MonsterAiDraft? MonsterAi { get; set; }
 }
 
 public sealed class BasicDraft
@@ -50,4 +52,11 @@ public sealed class GraphDraft
     public BehaviorGraphDefinition? WorkingGraph { get; set; }
 
     public BehaviorGraphDefinition? OriginalGraph { get; set; }
+}
+
+public sealed class MonsterAiDraft
+{
+    public MonsterAiDefinition? WorkingMonsterAi { get; set; }
+
+    public MonsterAiDefinition? OriginalMonsterAi { get; set; }
 }

@@ -397,6 +397,18 @@ public sealed class NativeBehaviorGraphTranslator
             "Summons or adds a pet for the owner player.",
             new[] { "monster_id" }),
         new NativeBehaviorTranslationCapability(
+            "monster.summon",
+            "Monster Summon",
+            NativeBehaviorTranslationStatus.Supported,
+            "Summons another monster into the current combat.",
+            new[] { "monster_id" }),
+        new NativeBehaviorTranslationCapability(
+            "monster.escape",
+            "Monster Escape",
+            NativeBehaviorTranslationStatus.Supported,
+            "Makes the current monster escape from combat.",
+            Array.Empty<string>()),
+        new NativeBehaviorTranslationCapability(
             "player.forge",
             "Forge",
             NativeBehaviorTranslationStatus.Partial,
@@ -958,6 +970,11 @@ public sealed class NativeBehaviorGraphTranslator
             {
                 ["monster_id"] = GetParameter(step, "monster_id", string.Empty)
             }),
+            "monster.summon" => BuildNode(nodeId, "monster.summon", "Monster Summon", step, new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["monster_id"] = GetParameter(step, "monster_id", string.Empty)
+            }),
+            "monster.escape" => BuildNode(nodeId, "monster.escape", "Monster Escape", step, new Dictionary<string, string>(StringComparer.Ordinal)),
             "player.forge" => BuildNode(nodeId, "player.forge", "Forge", step, new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["amount"] = GetParameter(step, "amount", "1")
