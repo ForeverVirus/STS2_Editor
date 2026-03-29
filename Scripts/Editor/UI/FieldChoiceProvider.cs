@@ -227,7 +227,11 @@ internal static class FieldChoiceProvider
     private static IReadOnlyList<(string Value, string Display)> GetRelicChoices()
     {
         var items = ModelDb.AllRelics
-            .Select(relic => (relic.Id.Entry, $"{SafeLocText(relic.Title)} [{relic.Id.Entry}]"))
+            .Select(relic =>
+            {
+                var title = ResolveEntityTitle(ModStudioEntityKind.Relic, relic.Id.Entry, SafeLocText(relic.Title));
+                return (relic.Id.Entry, $"{title} [{relic.Id.Entry}]");
+            })
             .ToList();
 
         AppendProjectEntities(items, ModStudioEntityKind.Relic);
@@ -238,7 +242,11 @@ internal static class FieldChoiceProvider
     private static IReadOnlyList<(string Value, string Display)> GetPotionChoices()
     {
         var items = ModelDb.AllPotions
-            .Select(potion => (potion.Id.Entry, $"{SafeLocText(potion.Title)} [{potion.Id.Entry}]"))
+            .Select(potion =>
+            {
+                var title = ResolveEntityTitle(ModStudioEntityKind.Potion, potion.Id.Entry, SafeLocText(potion.Title));
+                return (potion.Id.Entry, $"{title} [{potion.Id.Entry}]");
+            })
             .ToList();
 
         AppendProjectEntities(items, ModStudioEntityKind.Potion);
@@ -265,7 +273,11 @@ internal static class FieldChoiceProvider
     private static IReadOnlyList<(string Value, string Display)> GetCardChoices()
     {
         var items = ModelDb.AllCards
-            .Select(card => (card.Id.Entry, $"{SafeLocText(card.TitleLocString)} [{card.Id.Entry}]"))
+            .Select(card =>
+            {
+                var title = ResolveEntityTitle(ModStudioEntityKind.Card, card.Id.Entry, SafeLocText(card.TitleLocString));
+                return (card.Id.Entry, $"{title} [{card.Id.Entry}]");
+            })
             .ToList();
 
         AppendProjectEntities(items, ModStudioEntityKind.Card);
@@ -276,7 +288,11 @@ internal static class FieldChoiceProvider
     private static IReadOnlyList<(string Value, string Display)> GetEnchantmentChoices()
     {
         var items = ModelDb.DebugEnchantments
-            .Select(enchantment => (enchantment.Id.Entry, $"{SafeLocText(enchantment.Title)} [{enchantment.Id.Entry}]"))
+            .Select(enchantment =>
+            {
+                var title = ResolveEntityTitle(ModStudioEntityKind.Enchantment, enchantment.Id.Entry, SafeLocText(enchantment.Title));
+                return (enchantment.Id.Entry, $"{title} [{enchantment.Id.Entry}]");
+            })
             .ToList();
 
         AppendProjectEntities(items, ModStudioEntityKind.Enchantment);
@@ -592,9 +608,29 @@ internal static class FieldChoiceProvider
                 continue;
             }
 
-            var title = envelope.Metadata.TryGetValue("title", out var t) ? t : envelope.EntityId;
+            var title = ResolveEntityTitle(kind, envelope.EntityId, envelope.EntityId);
             items.Add((envelope.EntityId, $"{title} [{envelope.EntityId}]"));
         }
+    }
+
+    internal static string ResolveEntityTitle(ModStudioEntityKind kind, string entityId, string fallbackTitle)
+    {
+        if (_currentProject == null)
+        {
+            return string.IsNullOrWhiteSpace(fallbackTitle) ? entityId : fallbackTitle;
+        }
+
+        var envelope = _currentProject.Overrides.FirstOrDefault(candidate =>
+            candidate.EntityKind == kind &&
+            string.Equals(candidate.EntityId, entityId, StringComparison.Ordinal));
+        if (envelope?.Metadata != null &&
+            envelope.Metadata.TryGetValue("title", out var overriddenTitle) &&
+            !string.IsNullOrWhiteSpace(overriddenTitle))
+        {
+            return overriddenTitle;
+        }
+
+        return string.IsNullOrWhiteSpace(fallbackTitle) ? entityId : fallbackTitle;
     }
 
     private static void EnsureCacheLanguage()

@@ -307,6 +307,7 @@ public sealed partial class NModStudioProjectWindow
             }
         }
 
+        FieldChoiceProvider.InvalidateProjectChoices();
         _basicDraftDirty = false;
         MarkDirty();
         RefreshCurrentEntityCache();
@@ -353,6 +354,7 @@ public sealed partial class NModStudioProjectWindow
             TryRemoveEmptyEnvelope(_currentItem, envelope);
         }
 
+        FieldChoiceProvider.InvalidateProjectChoices();
         _basicDraftDirty = false;
         MarkDirty();
         RefreshCurrentEntityCache();

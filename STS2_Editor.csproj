@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <Compile Remove="sts2\**\*.cs" />
+    <Compile Remove="sts2_beta\**\*.cs" />
     <Compile Remove="sts2_guides\**\*.cs" />
     <Compile Remove="STS2_Proj\**\*.cs" />
     <Compile Remove=".godot\**\*.cs" />

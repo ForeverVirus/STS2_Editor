@@ -319,7 +319,11 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             case "starting_deck_ids":
             {
                 var cardOptions = ModelDb.AllCards
-                    .Select(card => new FieldOption(card.Id.Entry, BuildOptionDisplay(card.Title, card.Id.Entry)))
+                    .Select(card =>
+                    {
+                        var title = FieldChoiceProvider.ResolveEntityTitle(ModStudioEntityKind.Card, card.Id.Entry, card.Title);
+                        return new FieldOption(card.Id.Entry, BuildOptionDisplay(title, card.Id.Entry));
+                    })
                     .ToList();
                 AppendProjectFieldOptions(cardOptions, ModStudioEntityKind.Card);
                 options = cardOptions.OrderBy(o => o.DisplayText, StringComparer.OrdinalIgnoreCase).ThenBy(o => o.Id, StringComparer.OrdinalIgnoreCase).ToList();
@@ -328,7 +332,11 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             case "starting_relic_ids":
             {
                 var relicOptions = ModelDb.AllRelics
-                    .Select(relic => new FieldOption(relic.Id.Entry, BuildOptionDisplay(SafeLocText(relic.Title), relic.Id.Entry)))
+                    .Select(relic =>
+                    {
+                        var title = FieldChoiceProvider.ResolveEntityTitle(ModStudioEntityKind.Relic, relic.Id.Entry, SafeLocText(relic.Title));
+                        return new FieldOption(relic.Id.Entry, BuildOptionDisplay(title, relic.Id.Entry));
+                    })
                     .ToList();
                 AppendProjectFieldOptions(relicOptions, ModStudioEntityKind.Relic);
                 options = relicOptions.OrderBy(o => o.DisplayText, StringComparer.OrdinalIgnoreCase).ThenBy(o => o.Id, StringComparer.OrdinalIgnoreCase).ToList();
@@ -337,7 +345,11 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             case "starting_potion_ids":
             {
                 var potionOptions = ModelDb.AllPotions
-                    .Select(potion => new FieldOption(potion.Id.Entry, BuildOptionDisplay(SafeLocText(potion.Title), potion.Id.Entry)))
+                    .Select(potion =>
+                    {
+                        var title = FieldChoiceProvider.ResolveEntityTitle(ModStudioEntityKind.Potion, potion.Id.Entry, SafeLocText(potion.Title));
+                        return new FieldOption(potion.Id.Entry, BuildOptionDisplay(title, potion.Id.Entry));
+                    })
                     .ToList();
                 AppendProjectFieldOptions(potionOptions, ModStudioEntityKind.Potion);
                 options = potionOptions.OrderBy(o => o.DisplayText, StringComparer.OrdinalIgnoreCase).ThenBy(o => o.Id, StringComparer.OrdinalIgnoreCase).ToList();
@@ -711,7 +723,7 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
                 continue;
             }
 
-            var title = envelope.Metadata.TryGetValue("title", out var t) ? t : envelope.EntityId;
+            var title = FieldChoiceProvider.ResolveEntityTitle(kind, envelope.EntityId, envelope.EntityId);
             items.Add(new FieldOption(envelope.EntityId, BuildOptionDisplay(title, envelope.EntityId)));
         }
     }
