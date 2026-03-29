@@ -242,6 +242,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _detailPanel.GraphIdEdit.TextChanged += _ => MarkGraphDirty();
         _detailPanel.GraphNameEdit.TextChanged += _ => MarkGraphDirty();
         _detailPanel.GraphDescriptionEdit.TextChanged += () => MarkGraphDirty();
+        _detailPanel.GraphTriggerChanged += _ => MarkGraphDirty();
         _detailPanel.PreviewContextChanged += OnPreviewContextChanged;
         _detailPanel.NodePropertyChanged += OnSelectedNodePropertyChanged;
         _detailPanel.SelectedNodeDisplayNameChanged += OnSelectedNodeDisplayNameChanged;
@@ -818,6 +819,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
             RefreshDerivedGraphText(graph, updateBasicPreview: false);
             _centerEditor.BindGraph(graph, _graphRegistry, sourceModel, _graphPreviewContext);
             _detailPanel.SetGraphDetails(graph.GraphId, graph.Name, graph.Description, envelope?.BehaviorSource == BehaviorSource.Graph);
+            RefreshGraphTriggerEditor(graph, item.Kind);
             _detailPanel.SetGraphInfo(BuildGraphOverviewText(graph, envelope));
             UpdateSelectedNodeDetails(graph, null);
             return;
@@ -830,6 +832,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
             RefreshDerivedGraphText(autoGraphResult.Graph, updateBasicPreview: false);
             _centerEditor.BindGraph(autoGraphResult.Graph, _graphRegistry, sourceModel, _graphPreviewContext);
             _detailPanel.SetGraphDetails(autoGraphResult.Graph.GraphId, autoGraphResult.Graph.Name, autoGraphResult.Graph.Description, false);
+            RefreshGraphTriggerEditor(autoGraphResult.Graph, item.Kind);
             _detailPanel.SetGraphInfo(BuildGraphOverviewText(autoGraphResult.Graph, null));
             UpdateSelectedNodeDetails(autoGraphResult.Graph, autoGraphResult.Graph.EntryNodeId);
             return;
@@ -837,6 +840,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
 
         _centerEditor.ClearGraph();
         _detailPanel.SetGraphDetails(string.Empty, item.Title, string.Empty, false);
+        RefreshGraphTriggerEditor(null, item.Kind);
             _detailPanel.SetGraphInfo(Dual("当前条目尚未创建 graph。", "No graph has been created for the current entry."));
         _detailPanel.SetSelectedNode(null);
         _detailPanel.SetSelectedNodeProperties(new Dictionary<string, string>());
@@ -1033,6 +1037,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         {
             _centerEditor.ClearGraph();
             _detailPanel.SetGraphDetails(string.Empty, ResolveEntityDisplayTitle(item, cache.MergedMetadata), string.Empty, false);
+            RefreshGraphTriggerEditor(null, item.Kind);
             _detailPanel.SetGraphInfo(Dual("当前分类不支持 Graph 编辑。", "Graph editing is not supported for the current category."));
             _detailPanel.SetPreviewContext(_graphPreviewContext);
             _detailPanel.SetSelectedNode(null);
@@ -1057,6 +1062,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
             RefreshDerivedGraphText(scaffold, updateBasicPreview: false);
             _centerEditor.BindGraph(scaffold, _graphRegistry, sourceModel, _graphPreviewContext);
             _detailPanel.SetGraphDetails(scaffold.GraphId, scaffold.Name, scaffold.Description, false);
+            RefreshGraphTriggerEditor(scaffold, item.Kind);
             _detailPanel.SetGraphInfo(Dual(
                 "当前条目的原版效果暂未自动转成 graph，已为你创建可手工编辑的空白 scaffold。",
                 "Native behavior could not be converted automatically. A blank scaffold graph has been created for manual editing."));
@@ -1071,10 +1077,78 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         RefreshDerivedGraphText(graphToBind, updateBasicPreview: false);
         _centerEditor.BindGraph(graphToBind, _graphRegistry, sourceModel, _graphPreviewContext);
         _detailPanel.SetGraphDetails(graphToBind.GraphId, graphToBind.Name, graphToBind.Description, envelope?.BehaviorSource == BehaviorSource.Graph);
+        RefreshGraphTriggerEditor(graphToBind, item.Kind);
         _detailPanel.SetGraphInfo(BuildGraphOverviewText(graphToBind, envelope));
         _detailPanel.SetPreviewContext(_graphPreviewContext);
         UpdateSelectedNodeDetails(graphToBind, graphToBind.EntryNodeId);
         _graphTabLoadedForCurrentItem = true;
+    }
+
+    private void RefreshGraphTriggerEditor(BehaviorGraphDefinition? graph, ModStudioEntityKind kind)
+    {
+        if (_detailPanel == null)
+        {
+            return;
+        }
+
+        var options = FieldChoiceProvider.GetGraphTriggerChoices(kind);
+        if (graph == null || options.Count == 0)
+        {
+            _detailPanel.SetGraphTriggerOptions(Array.Empty<(string Value, string Display)>(), string.Empty, visible: false);
+            return;
+        }
+
+        _detailPanel.SetGraphTriggerOptions(options, ResolveGraphTrigger(kind, graph, options), visible: true);
+    }
+
+    private static string ResolveGraphTrigger(ModStudioEntityKind kind, BehaviorGraphDefinition graph, IReadOnlyList<(string Value, string Display)> options)
+    {
+        var knownTriggers = new HashSet<string>(options.Select(option => option.Value), StringComparer.Ordinal);
+        if (graph.Metadata.TryGetValue("trigger.default", out var defaultEntryNodeId) &&
+            !string.IsNullOrWhiteSpace(defaultEntryNodeId))
+        {
+            foreach (var pair in graph.Metadata)
+            {
+                if (!pair.Key.StartsWith("trigger.", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(pair.Key, "trigger.default", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var triggerId = pair.Key["trigger.".Length..];
+                if (knownTriggers.Contains(triggerId) &&
+                    string.Equals(pair.Value, defaultEntryNodeId, StringComparison.Ordinal))
+                {
+                    return triggerId;
+                }
+            }
+        }
+
+        foreach (var pair in graph.Metadata)
+        {
+            if (pair.Key.StartsWith("trigger.", StringComparison.OrdinalIgnoreCase))
+            {
+                var triggerId = pair.Key["trigger.".Length..];
+                if (knownTriggers.Contains(triggerId))
+                {
+                    return triggerId;
+                }
+            }
+
+            if (knownTriggers.Contains(pair.Key))
+            {
+                return pair.Key;
+            }
+        }
+
+        return options.FirstOrDefault().Value ?? kind switch
+        {
+            ModStudioEntityKind.Card => "card.on_play",
+            ModStudioEntityKind.Potion => "potion.on_use",
+            ModStudioEntityKind.Relic => "relic.after_card_played",
+            ModStudioEntityKind.Enchantment => "enchantment.on_play",
+            _ => string.Empty
+        };
     }
 
     private void OnCenterTabChanged(long index)
@@ -1335,5 +1409,4 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         }
     }
 }
-
 

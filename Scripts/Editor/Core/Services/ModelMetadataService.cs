@@ -29,11 +29,18 @@ public sealed partial class ModelMetadataService
     public IReadOnlyList<EntityBrowserItem> GetItems(ModStudioEntityKind kind, EditorProject? project = null)
     {
         var items = GetRuntimeItems(kind).ToDictionary(item => item.EntityId, StringComparer.Ordinal);
-        if (project != null && SupportsProjectOnlyEntries(kind))
+        if (project != null)
         {
             foreach (var envelope in project.Overrides.Where(overrideEnvelope => overrideEnvelope.EntityKind == kind))
             {
-                if (!items.ContainsKey(envelope.EntityId))
+                if (items.TryGetValue(envelope.EntityId, out var existing))
+                {
+                    var mergedMetadata = MergeMetadata(GetEditableMetadata(kind, envelope.EntityId), envelope);
+                    items[envelope.EntityId] = BuildMergedRuntimeItem(existing, mergedMetadata);
+                    continue;
+                }
+
+                if (SupportsProjectOnlyEntries(kind))
                 {
                     items[envelope.EntityId] = BuildProjectOnlyItem(project, envelope);
                 }
@@ -469,6 +476,47 @@ public sealed partial class ModelMetadataService
             },
             _ => new EntityBrowserItem { Kind = envelope.EntityKind, EntityId = envelope.EntityId, IsProjectOnly = true, Title = envelope.EntityId, Summary = ModStudioLocalization.T("placeholder.project_only_entry"), DetailText = ProjectOnlySource(project.Manifest.Name) }
         };
+    }
+
+    private static EntityBrowserItem BuildMergedRuntimeItem(EntityBrowserItem existing, IReadOnlyDictionary<string, string> metadata)
+    {
+        var title = MetadataOrFallback(metadata, "title", existing.Title);
+        var summary = existing.Kind switch
+        {
+            ModStudioEntityKind.Character => $"HP {MetadataOrFallback(metadata, "starting_hp", "0")} | Gold {MetadataOrFallback(metadata, "starting_gold", "0")} | Energy {MetadataOrFallback(metadata, "max_energy", "0")}",
+            ModStudioEntityKind.Card => $"{ModStudioFieldDisplayNames.FormatPropertyValue("type", MetadataOrFallback(metadata, "type", "Attack"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))}",
+            ModStudioEntityKind.Relic => $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {Dual("卡池", "Pool")} {ModStudioFieldDisplayNames.FormatPropertyValue("pool_id", MetadataOrFallback(metadata, "pool_id", "-"))}",
+            ModStudioEntityKind.Potion => $"{ModStudioFieldDisplayNames.FormatPropertyValue("rarity", MetadataOrFallback(metadata, "rarity", "Common"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("usage", MetadataOrFallback(metadata, "usage", "CombatOnly"))} | {ModStudioFieldDisplayNames.FormatPropertyValue("target_type", MetadataOrFallback(metadata, "target_type", "Self"))}",
+            ModStudioEntityKind.Event => $"{ModStudioFieldDisplayNames.FormatPropertyValue("layout_type", MetadataOrFallback(metadata, "layout_type", "Default"))} | {Dual("共享", "Shared")} {ModStudioFieldDisplayNames.FormatPropertyValue("is_shared", MetadataOrFallback(metadata, "is_shared", "True"))}",
+            ModStudioEntityKind.Enchantment => $"{Dual("显示数值", "Show Amount")} {ModStudioFieldDisplayNames.FormatPropertyValue("show_amount", MetadataOrFallback(metadata, "show_amount", "False"))} | {Dual("图标", "Icon")} {MetadataOrFallback(metadata, "icon_path", "-")}",
+            _ => existing.Summary
+        };
+
+        return new EntityBrowserItem
+        {
+            Kind = existing.Kind,
+            EntityId = existing.EntityId,
+            IsProjectOnly = existing.IsProjectOnly,
+            Title = title,
+            Summary = summary,
+            DetailText = existing.DetailText
+        };
+    }
+
+    private static Dictionary<string, string> MergeMetadata(IReadOnlyDictionary<string, string> originalMetadata, EntityOverrideEnvelope? envelope)
+    {
+        var merged = new Dictionary<string, string>(originalMetadata, StringComparer.OrdinalIgnoreCase);
+        if (envelope == null)
+        {
+            return merged;
+        }
+
+        foreach (var pair in envelope.Metadata)
+        {
+            merged[pair.Key] = pair.Value;
+        }
+
+        return merged;
     }
 
     private IReadOnlyDictionary<string, string> CreateDefaultEventMetadata(string entityId)

@@ -441,6 +441,7 @@ public sealed partial class NModStudioProjectWindow
         if (_detailPanel != null)
         {
             _detailPanel.SetGraphDetails(graph.GraphId, graph.Name, graph.Description, enableGraphBehavior);
+            RefreshGraphTriggerEditor(graph, _currentKind);
             _detailPanel.SetGraphInfo(BuildGraphOverviewText(graph, GetEnvelope(_currentKind, _currentEntityId)));
             _detailPanel.SetPreviewContext(_graphPreviewContext);
         }
@@ -500,6 +501,7 @@ public sealed partial class NModStudioProjectWindow
         graph.Name = detailPanel.GraphNameEdit.Text ?? graph.Name;
         graph.GraphId = detailPanel.GraphIdEdit.Text ?? graph.GraphId;
         graph.EntityKind = _currentKind;
+        ApplyGraphTriggerSelection(graph, _currentKind, detailPanel.GraphTriggerValue);
         if (!detailPanel.GraphEnabledCheck.ButtonPressed)
         {
             detailPanel.GraphEnabledCheck.ButtonPressed = true;
@@ -523,6 +525,43 @@ public sealed partial class NModStudioProjectWindow
         {
             UpdateCachedBrowserItem(_currentItem, _currentViewCache.MergedMetadata);
         }
+    }
+
+    private static void ApplyGraphTriggerSelection(BehaviorGraphDefinition graph, ModStudioEntityKind kind, string selectedTrigger)
+    {
+        var availableTriggers = FieldChoiceProvider.GetGraphTriggerChoices(kind);
+        if (availableTriggers.Count == 0)
+        {
+            return;
+        }
+
+        var normalizedTrigger = string.IsNullOrWhiteSpace(selectedTrigger)
+            ? availableTriggers[0].Value
+            : selectedTrigger;
+        if (string.IsNullOrWhiteSpace(normalizedTrigger))
+        {
+            return;
+        }
+
+        var entryNodeId = string.IsNullOrWhiteSpace(graph.EntryNodeId)
+            ? graph.Nodes.FirstOrDefault(node => string.Equals(node.NodeType, "flow.entry", StringComparison.OrdinalIgnoreCase))?.NodeId ?? string.Empty
+            : graph.EntryNodeId;
+        if (string.IsNullOrWhiteSpace(entryNodeId))
+        {
+            return;
+        }
+
+        var knownTriggers = new HashSet<string>(availableTriggers.Select(trigger => trigger.Value), StringComparer.Ordinal);
+        foreach (var key in graph.Metadata.Keys.Where(key =>
+                     string.Equals(key, "trigger.default", StringComparison.OrdinalIgnoreCase) ||
+                     (key.StartsWith("trigger.", StringComparison.OrdinalIgnoreCase) && knownTriggers.Contains(key["trigger.".Length..])) ||
+                     knownTriggers.Contains(key)).ToList())
+        {
+            graph.Metadata.Remove(key);
+        }
+
+        graph.Metadata[$"trigger.{normalizedTrigger}"] = entryNodeId;
+        graph.Metadata["trigger.default"] = entryNodeId;
     }
 
     private void ValidateGraph()

@@ -43,6 +43,9 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
     private LineEdit? _graphNameEdit;
     private Label? _graphDescriptionLabel;
     private TextEdit? _graphDescriptionEdit;
+    private Label? _graphTriggerLabel;
+    private SearchableOptionPicker? _graphTriggerPicker;
+    private IReadOnlyList<(string Value, string Display)> _graphTriggerOptions = Array.Empty<(string, string)>();
     private VBoxContainer? _previewContextRoot;
     private Label? _previewContextLabel;
     private CheckBox? _previewUpgradedCheck;
@@ -147,6 +150,15 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         }
     }
 
+    public string GraphTriggerValue
+    {
+        get
+        {
+            EnsureBuilt();
+            return _graphTriggerPicker?.GetValue() ?? string.Empty;
+        }
+    }
+
     public Label SelectedNodeTypeLabel
     {
         get
@@ -186,6 +198,7 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
     public event Action<string, string>? NodePropertyChanged;
     public event Action<string>? SelectedNodeDisplayNameChanged;
     public event Action<string>? SelectedNodeDescriptionChanged;
+    public event Action<string>? GraphTriggerChanged;
     public event Action<DynamicPreviewContext>? PreviewContextChanged;
     public event Action<string>? EventOptionAddRequested;
 
@@ -260,6 +273,24 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         if (_graphNameEdit != null) _graphNameEdit.Text = graphName ?? string.Empty;
         if (_graphDescriptionEdit != null) _graphDescriptionEdit.Text = graphDescription ?? string.Empty;
         if (_graphEnabledCheck != null) _graphEnabledCheck.ButtonPressed = useGraphBehavior;
+    }
+
+    public void SetGraphTriggerOptions(IReadOnlyList<(string Value, string Display)> options, string selectedValue, bool visible)
+    {
+        EnsureBuilt();
+        _graphTriggerOptions = options;
+
+        if (_graphTriggerLabel != null)
+        {
+            _graphTriggerLabel.Visible = visible;
+        }
+
+        if (_graphTriggerPicker != null)
+        {
+            _graphTriggerPicker.Visible = visible;
+            _graphTriggerPicker.SetChoices(options);
+            _graphTriggerPicker.SetValue(selectedValue ?? string.Empty);
+        }
     }
 
     public void SetPreviewContext(DynamicPreviewContext? context)
@@ -548,6 +579,11 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             _graphDescriptionLabel.Text = Dual("Graph 描述", "Graph Description");
         }
 
+        if (_graphTriggerLabel != null)
+        {
+            _graphTriggerLabel.Text = Dual("触发时机", "Trigger");
+        }
+
         if (_graphIdEdit != null)
         {
             _graphIdEdit.PlaceholderText = Dual("输入 Graph ID", "Enter graph id");
@@ -557,6 +593,9 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         {
             _graphNameEdit.PlaceholderText = Dual("输入 Graph 名称", "Enter graph name");
         }
+
+        _graphTriggerPicker?.SetChoices(_graphTriggerOptions);
+        _graphTriggerPicker?.RefreshTexts();
 
         if (_previewContextLabel != null)
         {
@@ -752,6 +791,14 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         };
         page.AddChild(_graphDescriptionLabel);
         page.AddChild(_graphDescriptionEdit);
+
+        _graphTriggerLabel = MakeLabel(string.Empty, true);
+        _graphTriggerPicker = new SearchableOptionPicker(Array.Empty<(string Value, string Display)>(), allowEmptySelection: false);
+        _graphTriggerPicker.ValueChanged += value => GraphTriggerChanged?.Invoke(value);
+        _graphTriggerLabel.Visible = false;
+        _graphTriggerPicker.Visible = false;
+        page.AddChild(_graphTriggerLabel);
+        page.AddChild(_graphTriggerPicker);
 
         var previewContextPanel = new PanelContainer
         {

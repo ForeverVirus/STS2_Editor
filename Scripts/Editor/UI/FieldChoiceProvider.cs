@@ -19,6 +19,7 @@ internal static class FieldChoiceProvider
 {
     private static readonly Dictionary<string, IReadOnlyList<(string Value, string Display)>> BasicChoiceCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, IReadOnlyList<(string Value, string Display)>> GraphChoiceCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<ModStudioEntityKind, IReadOnlyList<(string Value, string Display)>> GraphTriggerChoiceCache = new();
     private static bool? _cachedLanguageIsChinese;
     private static EditorProject? _currentProject;
 
@@ -165,6 +166,109 @@ internal static class FieldChoiceProvider
         };
 
         GraphChoiceCache[key] = result;
+        return result;
+    }
+
+    public static IReadOnlyList<(string Value, string Display)> GetGraphTriggerChoices(ModStudioEntityKind kind)
+    {
+        EnsureCacheLanguage();
+        if (GraphTriggerChoiceCache.TryGetValue(kind, out var cached))
+        {
+            return cached;
+        }
+
+        var result = kind switch
+        {
+            ModStudioEntityKind.Card => BuildTriggerChoices(
+            [
+                ("card.on_play", Dual("打出卡牌时", "On Play"))
+            ]),
+            ModStudioEntityKind.Potion => BuildTriggerChoices(
+            [
+                ("potion.on_use", Dual("使用药水时", "On Use"))
+            ]),
+            ModStudioEntityKind.Relic => BuildTriggerChoices(
+            [
+                ("relic.after_obtained", Dual("获得遗物后", "After Obtained")),
+                ("relic.after_room_entered", Dual("进入房间后", "After Room Entered")),
+                ("relic.before_combat_start", Dual("战斗开始前", "Before Combat Start")),
+                ("relic.before_combat_start_late", Dual("战斗开始前 Late", "Before Combat Start Late")),
+                ("relic.after_player_turn_start_early", Dual("玩家回合开始后 Early", "After Player Turn Start Early")),
+                ("relic.after_player_turn_start", Dual("玩家回合开始后", "After Player Turn Start")),
+                ("relic.after_player_turn_start_late", Dual("玩家回合开始后 Late", "After Player Turn Start Late")),
+                ("relic.before_turn_end_very_early", Dual("回合结束前 Very Early", "Before Turn End Very Early")),
+                ("relic.before_turn_end_early", Dual("回合结束前 Early", "Before Turn End Early")),
+                ("relic.before_turn_end", Dual("回合结束前", "Before Turn End")),
+                ("relic.after_turn_end", Dual("回合结束后", "After Turn End")),
+                ("relic.after_turn_end_late", Dual("回合结束后 Late", "After Turn End Late")),
+                ("relic.before_card_played", Dual("打牌前", "Before Card Played")),
+                ("relic.after_card_played", Dual("打牌后", "After Card Played")),
+                ("relic.after_card_played_late", Dual("打牌后 Late", "After Card Played Late")),
+                ("relic.after_card_drawn", Dual("抽到卡牌后", "After Card Drawn")),
+                ("relic.after_card_discarded", Dual("弃牌后", "After Card Discarded")),
+                ("relic.after_card_exhausted", Dual("卡牌消耗后", "After Card Exhausted")),
+                ("relic.after_card_changed_piles", Dual("卡牌换牌堆后", "After Card Changed Piles")),
+                ("relic.after_card_changed_piles_late", Dual("卡牌换牌堆后 Late", "After Card Changed Piles Late")),
+                ("relic.before_hand_draw", Dual("手牌抽取前", "Before Hand Draw")),
+                ("relic.before_hand_draw_late", Dual("手牌抽取前 Late", "Before Hand Draw Late")),
+                ("relic.modify_hand_draw", Dual("修改抽牌数量", "Modify Hand Draw")),
+                ("relic.modify_hand_draw_late", Dual("修改抽牌数量 Late", "Modify Hand Draw Late")),
+                ("relic.modify_max_energy", Dual("修改最大能量", "Modify Max Energy")),
+                ("relic.after_energy_reset", Dual("能量重置后", "After Energy Reset")),
+                ("relic.after_energy_reset_late", Dual("能量重置后 Late", "After Energy Reset Late")),
+                ("relic.should_player_reset_energy", Dual("是否重置玩家能量", "Should Player Reset Energy")),
+                ("relic.before_attack", Dual("攻击前", "Before Attack")),
+                ("relic.after_attack", Dual("攻击后", "After Attack")),
+                ("relic.before_potion_used", Dual("使用药水前", "Before Potion Used")),
+                ("relic.after_potion_used", Dual("使用药水后", "After Potion Used")),
+                ("relic.after_shuffle", Dual("洗牌后", "After Shuffle")),
+                ("relic.after_hand_emptied", Dual("手牌打空后", "After Hand Emptied")),
+                ("relic.after_stars_spent", Dual("消耗星数后", "After Stars Spent")),
+                ("relic.after_combat_end", Dual("战斗结束后", "After Combat End")),
+                ("relic.after_combat_victory_early", Dual("战斗胜利后 Early", "After Combat Victory Early")),
+                ("relic.after_combat_victory", Dual("战斗胜利后", "After Combat Victory")),
+                ("relic.modify_rewards", Dual("修改奖励", "Modify Rewards")),
+                ("relic.modify_rewards_late", Dual("修改奖励 Late", "Modify Rewards Late")),
+                ("relic.modify_card_reward_options", Dual("修改卡牌奖励选项", "Modify Card Reward Options")),
+                ("relic.modify_card_reward_options_late", Dual("修改卡牌奖励选项 Late", "Modify Card Reward Options Late")),
+                ("relic.modify_rest_site_heal_rewards", Dual("修改休息点治疗奖励", "Modify Rest Site Heal Rewards")),
+                ("relic.should_disable_remaining_rest_site_options", Dual("是否禁用剩余休息点选项", "Should Disable Remaining Rest Site Options")),
+                ("relic.should_flush", Dual("是否清空手牌", "Should Flush")),
+                ("relic.should_force_potion_reward", Dual("是否强制药水奖励", "Should Force Potion Reward")),
+                ("relic.should_gain_gold", Dual("是否获得金币", "Should Gain Gold")),
+                ("relic.should_procure_potion", Dual("是否获得药水", "Should Procure Potion")),
+                ("relic.should_refill_merchant_entry", Dual("是否补货商店物品", "Should Refill Merchant Entry")),
+                ("relic.modify_generated_map", Dual("修改地图生成", "Modify Generated Map")),
+                ("relic.modify_generated_map_late", Dual("修改地图生成 Late", "Modify Generated Map Late")),
+                ("relic.modify_unknown_map_point_room_types", Dual("修改未知地图点房间类型", "Modify Unknown Map Point Room Types")),
+                ("relic.modify_x_value", Dual("修改 X 值", "Modify X Value")),
+                ("relic.modify_damage_additive", Dual("修改伤害加算", "Modify Damage Additive")),
+                ("relic.modify_damage_multiplicative", Dual("修改伤害乘算", "Modify Damage Multiplicative")),
+                ("relic.modify_block_multiplicative", Dual("修改格挡乘算", "Modify Block Multiplicative")),
+                ("relic.modify_hp_lost_before_osty", Dual("修改失去生命前置", "Modify HP Lost Before Osty")),
+                ("relic.modify_hp_lost_after_osty", Dual("修改失去生命后置", "Modify HP Lost After Osty")),
+                ("relic.before_play_phase_start", Dual("出牌阶段开始前", "Before Play Phase Start")),
+                ("relic.before_side_turn_start", Dual("阵营回合开始前", "Before Side Turn Start")),
+                ("relic.after_side_turn_start", Dual("阵营回合开始后", "After Side Turn Start"))
+            ]),
+            ModStudioEntityKind.Enchantment => BuildTriggerChoices(
+            [
+                ("enchantment.on_enchant", Dual("附魔生效时", "On Enchant")),
+                ("enchantment.on_play", Dual("附魔卡牌打出时", "On Play")),
+                ("enchantment.after_card_played", Dual("打牌后", "After Card Played")),
+                ("enchantment.after_card_drawn", Dual("抽到卡牌后", "After Card Drawn")),
+                ("enchantment.after_player_turn_start", Dual("玩家回合开始后", "After Player Turn Start")),
+                ("enchantment.before_flush", Dual("洗切前", "Before Flush")),
+                ("enchantment.modify_damage_additive", Dual("修改伤害加算", "Modify Damage Additive")),
+                ("enchantment.modify_damage_multiplicative", Dual("修改伤害乘算", "Modify Damage Multiplicative")),
+                ("enchantment.modify_block_additive", Dual("修改格挡加算", "Modify Block Additive")),
+                ("enchantment.modify_block_multiplicative", Dual("修改格挡乘算", "Modify Block Multiplicative")),
+                ("enchantment.modify_play_count", Dual("修改打出次数", "Modify Play Count"))
+            ]),
+            _ => Array.Empty<(string, string)>()
+        };
+
+        GraphTriggerChoiceCache[kind] = result;
         return result;
     }
 
@@ -592,6 +696,11 @@ internal static class FieldChoiceProvider
         return ModStudioLocalization.IsChinese ? zh : en;
     }
 
+    private static IReadOnlyList<(string Value, string Display)> BuildTriggerChoices((string Value, string Display)[] choices)
+    {
+        return choices.ToList();
+    }
+
     private static void AppendProjectEntities(List<(string Value, string Display)> items, ModStudioEntityKind kind)
     {
         if (_currentProject == null)
@@ -643,5 +752,6 @@ internal static class FieldChoiceProvider
         _cachedLanguageIsChinese = ModStudioLocalization.IsChinese;
         BasicChoiceCache.Clear();
         GraphChoiceCache.Clear();
+        GraphTriggerChoiceCache.Clear();
     }
 }
