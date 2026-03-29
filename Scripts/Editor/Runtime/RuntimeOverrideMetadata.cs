@@ -57,7 +57,6 @@ internal static class RuntimeOverrideMetadata
         return raw
             .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.Ordinal)
             .ToList();
     }
 

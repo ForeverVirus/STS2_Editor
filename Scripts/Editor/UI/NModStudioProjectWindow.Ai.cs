@@ -367,6 +367,7 @@ public sealed partial class NModStudioProjectWindow
         }
 
         _project = appliedPreview.ProjectSnapshot;
+        FieldChoiceProvider.SetCurrentProject(_project);
         _pendingAiPreview = null;
         _aiSession?.AddAppliedSummaries(appliedPreview.SummaryLines);
         ApplyAiResultFocus(appliedPreview);

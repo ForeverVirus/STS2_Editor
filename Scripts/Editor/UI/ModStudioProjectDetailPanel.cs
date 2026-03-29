@@ -423,6 +423,9 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
                 case SpinBox spinBox when double.TryParse(pair.Value, out var numericValue):
                     spinBox.Value = numericValue;
                     break;
+                case SearchableOptionPicker searchableOptionPicker:
+                    searchableOptionPicker.SetValue(pair.Value ?? string.Empty);
+                    break;
                 case OptionButton optionButton:
                     ApplyOptionValue(optionButton, pair.Key, pair.Value ?? string.Empty);
                     break;
@@ -1192,56 +1195,26 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
             return false;
         }
 
-        var optionButton = new OptionButton
-        {
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
-        };
-
-        var selectedIndex = -1;
-        var index = 0;
-        foreach (var choice in choices)
-        {
-            optionButton.AddItem(choice.DisplayText);
-            optionButton.SetItemMetadata(index, choice.Value);
-            if (string.Equals(choice.Value, propertyValue, StringComparison.Ordinal))
-            {
-                selectedIndex = index;
-            }
-            index++;
-        }
-
-        if (selectedIndex < 0 && !string.IsNullOrWhiteSpace(propertyValue))
-        {
-            optionButton.AddItem($"{ModStudioFieldDisplayNames.FormatGraphPropertyValue(propertyKey, propertyValue)} [{propertyValue}]");
-            optionButton.SetItemMetadata(optionButton.ItemCount - 1, propertyValue);
-            selectedIndex = optionButton.ItemCount - 1;
-        }
+        var picker = new SearchableOptionPicker(
+            choices.Select(choice => (choice.Value, choice.DisplayText)).ToList(),
+            propertyValue,
+            fallbackDisplayFactory: unknown => $"{ModStudioFieldDisplayNames.FormatGraphPropertyValue(propertyKey, unknown)} [{unknown}]");
 
         string? autoSelectedValue = null;
-        _choiceIndexCache[propertyKey] = BuildChoiceIndexMap(optionButton);
 
-        if (selectedIndex >= 0)
+        if (string.IsNullOrWhiteSpace(propertyValue))
         {
-            optionButton.Select(selectedIndex);
-        }
-        else if (optionButton.ItemCount > 0)
-        {
-            optionButton.Select(0);
-            autoSelectedValue = optionButton.GetItemMetadata(0).AsString();
+            autoSelectedValue = picker.GetValue();
         }
 
-        optionButton.ItemSelected += itemIndex =>
-        {
-            var selectedValue = optionButton.GetItemMetadata((int)itemIndex).AsString();
-            NodePropertyChanged?.Invoke(propertyKey, selectedValue);
-        };
+        picker.ValueChanged += selectedValue => NodePropertyChanged?.Invoke(propertyKey, selectedValue);
 
-        if (selectedIndex < 0 && string.IsNullOrWhiteSpace(propertyValue) && !string.IsNullOrWhiteSpace(autoSelectedValue))
+        if (string.IsNullOrWhiteSpace(propertyValue) && !string.IsNullOrWhiteSpace(autoSelectedValue))
         {
             CallDeferred(nameof(EmitDeferredNodePropertyChanged), propertyKey, autoSelectedValue);
         }
 
-        editor = optionButton;
+        editor = picker;
         return true;
     }
 
@@ -1350,7 +1323,6 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
         return rawValue
             .Split([',', ';', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.Ordinal)
             .ToList();
     }
 
@@ -1575,5 +1547,3 @@ internal sealed partial class ModStudioProjectDetailPanel : PanelContainer
 
     private sealed record PropertyChoice(string Value, string DisplayText);
 }
-
-

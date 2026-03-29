@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Helpers;
@@ -22,6 +23,16 @@ internal static class RuntimeDynamicContentPatches
     }
 
     [HarmonyPostfix]
+    [HarmonyPatch(typeof(CardPoolModel), "get_AllCardIds")]
+    private static void CardPoolModel_get_AllCardIds_Postfix(CardPoolModel __instance, ref IEnumerable<ModelId> __result)
+    {
+        var customIds = ModStudioBootstrap.RuntimeDynamicContentRegistry
+            .GetActiveCardsForPool(__instance.Id.Entry)
+            .Select(card => card.Id);
+        __result = __result.Concat(customIds).Distinct();
+    }
+
+    [HarmonyPostfix]
     [HarmonyPatch(typeof(RelicPoolModel), "get_AllRelics")]
     private static void RelicPoolModel_get_AllRelics_Postfix(RelicPoolModel __instance, ref IEnumerable<RelicModel> __result)
     {
@@ -30,11 +41,36 @@ internal static class RuntimeDynamicContentPatches
     }
 
     [HarmonyPostfix]
+    [HarmonyPatch(typeof(RelicPoolModel), "get_AllRelicIds")]
+    private static void RelicPoolModel_get_AllRelicIds_Postfix(RelicPoolModel __instance, ref HashSet<ModelId> __result)
+    {
+        var updatedIds = new HashSet<ModelId>(__result);
+        foreach (var relicId in ModStudioBootstrap.RuntimeDynamicContentRegistry
+                     .GetActiveRelicsForPool(__instance.Id.Entry)
+                     .Select(relic => relic.Id))
+        {
+            updatedIds.Add(relicId);
+        }
+
+        __result = updatedIds;
+    }
+
+    [HarmonyPostfix]
     [HarmonyPatch(typeof(PotionPoolModel), "get_AllPotions")]
     private static void PotionPoolModel_get_AllPotions_Postfix(PotionPoolModel __instance, ref IEnumerable<PotionModel> __result)
     {
         var customPotions = ModStudioBootstrap.RuntimeDynamicContentRegistry.GetActivePotionsForPool(__instance.Id.Entry);
         __result = __result.Concat(customPotions).DistinctBy(potion => potion.Id);
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(PotionPoolModel), "get_AllPotionIds")]
+    private static void PotionPoolModel_get_AllPotionIds_Postfix(PotionPoolModel __instance, ref IEnumerable<ModelId> __result)
+    {
+        var customIds = ModStudioBootstrap.RuntimeDynamicContentRegistry
+            .GetActivePotionsForPool(__instance.Id.Entry)
+            .Select(potion => potion.Id);
+        __result = __result.Concat(customIds).Distinct();
     }
 
     [HarmonyPostfix]

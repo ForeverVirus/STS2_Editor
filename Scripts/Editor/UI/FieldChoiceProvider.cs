@@ -20,6 +20,44 @@ internal static class FieldChoiceProvider
     private static readonly Dictionary<string, IReadOnlyList<(string Value, string Display)>> BasicChoiceCache = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Dictionary<string, IReadOnlyList<(string Value, string Display)>> GraphChoiceCache = new(StringComparer.OrdinalIgnoreCase);
     private static bool? _cachedLanguageIsChinese;
+    private static EditorProject? _currentProject;
+
+    public static EditorProject? CurrentProject => _currentProject;
+
+    public static void SetCurrentProject(EditorProject? project)
+    {
+        if (ReferenceEquals(_currentProject, project))
+        {
+            return;
+        }
+
+        _currentProject = project;
+        InvalidateProjectChoices();
+    }
+
+    public static void InvalidateProjectChoices()
+    {
+        // Clear cached entries that include project entities
+        foreach (var key in BasicChoiceCache.Keys.Where(k =>
+            k.EndsWith(":card_id", StringComparison.OrdinalIgnoreCase) ||
+            k.EndsWith(":replacement_card_id", StringComparison.OrdinalIgnoreCase) ||
+            k.EndsWith(":relic_id", StringComparison.OrdinalIgnoreCase) ||
+            k.EndsWith(":replacement_relic_id", StringComparison.OrdinalIgnoreCase) ||
+            k.EndsWith(":potion_id", StringComparison.OrdinalIgnoreCase) ||
+            k.EndsWith(":enchantment_id", StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            BasicChoiceCache.Remove(key);
+        }
+
+        GraphChoiceCache.Remove("card_id");
+        GraphChoiceCache.Remove("replacement_card_id");
+        GraphChoiceCache.Remove("relic_id");
+        GraphChoiceCache.Remove("replacement_relic_id");
+        GraphChoiceCache.Remove("potion_id");
+        GraphChoiceCache.Remove("enchantment_id");
+
+        ModStudioBasicEditor.InvalidateListOptionCache();
+    }
 
     public static IReadOnlyList<(string Value, string Display)> GetBasicChoices(ModStudioEntityKind kind, string key)
     {
@@ -188,18 +226,24 @@ internal static class FieldChoiceProvider
 
     private static IReadOnlyList<(string Value, string Display)> GetRelicChoices()
     {
-        return ModelDb.AllRelics
+        var items = ModelDb.AllRelics
             .Select(relic => (relic.Id.Entry, $"{SafeLocText(relic.Title)} [{relic.Id.Entry}]"))
-            .OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        AppendProjectEntities(items, ModStudioEntityKind.Relic);
+
+        return items.OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static IReadOnlyList<(string Value, string Display)> GetPotionChoices()
     {
-        return ModelDb.AllPotions
+        var items = ModelDb.AllPotions
             .Select(potion => (potion.Id.Entry, $"{SafeLocText(potion.Title)} [{potion.Id.Entry}]"))
-            .OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        AppendProjectEntities(items, ModStudioEntityKind.Potion);
+
+        return items.OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static IReadOnlyList<(string Value, string Display)> GetMonsterChoices()
@@ -220,18 +264,24 @@ internal static class FieldChoiceProvider
 
     private static IReadOnlyList<(string Value, string Display)> GetCardChoices()
     {
-        return ModelDb.AllCards
+        var items = ModelDb.AllCards
             .Select(card => (card.Id.Entry, $"{SafeLocText(card.TitleLocString)} [{card.Id.Entry}]"))
-            .OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        AppendProjectEntities(items, ModStudioEntityKind.Card);
+
+        return items.OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static IReadOnlyList<(string Value, string Display)> GetEnchantmentChoices()
     {
-        return ModelDb.DebugEnchantments
+        var items = ModelDb.DebugEnchantments
             .Select(enchantment => (enchantment.Id.Entry, $"{SafeLocText(enchantment.Title)} [{enchantment.Id.Entry}]"))
-            .OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        AppendProjectEntities(items, ModStudioEntityKind.Enchantment);
+
+        return items.OrderBy(pair => pair.Item2, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private static IReadOnlyList<(string Value, string Display)> GetRarityChoices(ModStudioEntityKind kind)
@@ -524,6 +574,27 @@ internal static class FieldChoiceProvider
     private static string Dual(string zh, string en)
     {
         return ModStudioLocalization.IsChinese ? zh : en;
+    }
+
+    private static void AppendProjectEntities(List<(string Value, string Display)> items, ModStudioEntityKind kind)
+    {
+        if (_currentProject == null)
+        {
+            return;
+        }
+
+        var existingIds = new HashSet<string>(items.Select(i => i.Value), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var envelope in _currentProject.Overrides)
+        {
+            if (envelope.EntityKind != kind || existingIds.Contains(envelope.EntityId))
+            {
+                continue;
+            }
+
+            var title = envelope.Metadata.TryGetValue("title", out var t) ? t : envelope.EntityId;
+            items.Add((envelope.EntityId, $"{title} [{envelope.EntityId}]"));
+        }
     }
 
     private static void EnsureCacheLanguage()

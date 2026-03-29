@@ -20,6 +20,7 @@ namespace STS2_Editor.Scripts.Editor.Runtime;
 internal static class RuntimeOverridePatches
 {
     private static readonly HashSet<string> LoggedTextureOverrideApplications = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> LoggedPoolFallbackApplications = new(StringComparer.OrdinalIgnoreCase);
 
 [HarmonyPrefix]
     [HarmonyPatch(typeof(LocString), nameof(LocString.GetRawText))]
@@ -159,14 +160,23 @@ internal static class RuntimeOverridePatches
         }
     }
 
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [HarmonyPatch(typeof(CardModel), "get_Pool")]
-    private static void CardModel_get_Pool_Postfix(CardModel __instance, ref CardPoolModel __result)
+    private static bool CardModel_get_Pool_Prefix(CardModel __instance, ref CardPoolModel __result)
     {
         if (TryResolveCardPool(ModStudioEntityKind.Card, __instance.Id.Entry, "pool_id", out var pool))
         {
             __result = pool;
+            return false;
         }
+
+        if (TryResolveFallbackCardPool(__instance.Id.Entry, out pool))
+        {
+            __result = pool;
+            return false;
+        }
+
+        return true;
     }
 
     [HarmonyPostfix]
@@ -277,14 +287,23 @@ internal static class RuntimeOverridePatches
         }
     }
 
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [HarmonyPatch(typeof(RelicModel), "get_Pool")]
-    private static void RelicModel_get_Pool_Postfix(RelicModel __instance, ref RelicPoolModel __result)
+    private static bool RelicModel_get_Pool_Prefix(RelicModel __instance, ref RelicPoolModel __result)
     {
         if (TryResolveRelicPool(ModStudioEntityKind.Relic, __instance.Id.Entry, "pool_id", out var pool))
         {
             __result = pool;
+            return false;
         }
+
+        if (TryResolveFallbackRelicPool(__instance.Id.Entry, out pool))
+        {
+            __result = pool;
+            return false;
+        }
+
+        return true;
     }
 
     [HarmonyPostfix]
@@ -321,14 +340,23 @@ internal static class RuntimeOverridePatches
         }
     }
 
-    [HarmonyPostfix]
+    [HarmonyPrefix]
     [HarmonyPatch(typeof(PotionModel), "get_Pool")]
-    private static void PotionModel_get_Pool_Postfix(PotionModel __instance, ref PotionPoolModel __result)
+    private static bool PotionModel_get_Pool_Prefix(PotionModel __instance, ref PotionPoolModel __result)
     {
         if (TryResolvePotionPool(ModStudioEntityKind.Potion, __instance.Id.Entry, "pool_id", out var pool))
         {
             __result = pool;
+            return false;
         }
+
+        if (TryResolveFallbackPotionPool(__instance.Id.Entry, out pool))
+        {
+            __result = pool;
+            return false;
+        }
+
+        return true;
     }
 
     [HarmonyPostfix]
@@ -713,6 +741,74 @@ internal static class RuntimeOverridePatches
 
         encounter = resolved;
         return true;
+    }
+
+    private static bool TryResolveFallbackCardPool(string entityId, out CardPoolModel pool)
+    {
+        pool = null!;
+        if (!ModStudioBootstrap.RuntimeDynamicContentRegistry.IsCustomActive(ModStudioEntityKind.Card, entityId))
+        {
+            return false;
+        }
+
+        var resolved = ModelDb.AllCharacterCardPools.FirstOrDefault() ?? ModelDb.AllCardPools.FirstOrDefault();
+        if (resolved == null)
+        {
+            return false;
+        }
+
+        LogPoolFallback(ModStudioEntityKind.Card, entityId, resolved.Id.Entry);
+        pool = resolved;
+        return true;
+    }
+
+    private static bool TryResolveFallbackRelicPool(string entityId, out RelicPoolModel pool)
+    {
+        pool = null!;
+        if (!ModStudioBootstrap.RuntimeDynamicContentRegistry.IsCustomActive(ModStudioEntityKind.Relic, entityId))
+        {
+            return false;
+        }
+
+        var resolved = ModelDb.AllRelicPools.FirstOrDefault();
+        if (resolved == null)
+        {
+            return false;
+        }
+
+        LogPoolFallback(ModStudioEntityKind.Relic, entityId, resolved.Id.Entry);
+        pool = resolved;
+        return true;
+    }
+
+    private static bool TryResolveFallbackPotionPool(string entityId, out PotionPoolModel pool)
+    {
+        pool = null!;
+        if (!ModStudioBootstrap.RuntimeDynamicContentRegistry.IsCustomActive(ModStudioEntityKind.Potion, entityId))
+        {
+            return false;
+        }
+
+        var resolved = ModelDb.AllPotionPools.FirstOrDefault();
+        if (resolved == null)
+        {
+            return false;
+        }
+
+        LogPoolFallback(ModStudioEntityKind.Potion, entityId, resolved.Id.Entry);
+        pool = resolved;
+        return true;
+    }
+
+    private static void LogPoolFallback(ModStudioEntityKind kind, string entityId, string poolId)
+    {
+        var key = $"{kind}:{entityId}:{poolId}";
+        if (!LoggedPoolFallbackApplications.Add(key))
+        {
+            return;
+        }
+
+        Log.Warn($"Mod Studio fell back to pool '{poolId}' for dynamic {kind} '{entityId}' because no explicit pool metadata could be resolved.");
     }
 
     private static CardModel? ResolveCardModel(string entityId)

@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using STS2_Editor.Scripts.Editor.Core.Models;
 using static STS2_Editor.Scripts.Editor.UI.ModStudioUiFactory;
@@ -8,23 +11,28 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
 {
     private readonly Dictionary<ModStudioEntityKind, Button> _kindButtons = new();
     private readonly List<EntityBrowserItem> _allItems = new();
+    private readonly List<EntityBrowserItem> _sortedItems = new();
+    private readonly List<BrowserItemButton> _itemButtons = new();
     private VBoxContainer? _itemsHost;
     private LineEdit? _searchEdit;
     private Button? _allScopeButton;
     private Button? _modifiedScopeButton;
     private Button? _newScopeButton;
     private Button? _newEntryButton;
+    private Button? _deleteEntryButton;
     private Button? _refreshButton;
     private ModStudioEntityKind _selectedKind = ModStudioEntityKind.Character;
     private string _scope = "all";
     private string _searchText = string.Empty;
     private string? _selectedEntityId;
+    private ModStudioEntityKind? _boundKind;
 
     public event Action<ModStudioEntityKind>? KindChanged;
     public event Action<string>? SearchChanged;
     public event Action<string>? ScopeChanged;
     public event Action<EntityBrowserItem>? ItemSelected;
     public event Action? CreateEntryRequested;
+    public event Action? DeleteEntryRequested;
 
     public override void _Ready()
     {
@@ -34,6 +42,7 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
 
     public void SetSelection(ModStudioEntityKind kind, string? entityId = null)
     {
+        var kindChanged = _selectedKind != kind;
         _selectedKind = kind;
         _selectedEntityId = entityId;
         foreach (var pair in _kindButtons)
@@ -41,13 +50,24 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
             pair.Value.ButtonPressed = pair.Key == kind;
         }
 
-        RefreshItemList();
+        if (kindChanged && CanRefreshForSelectedKind())
+        {
+            RefreshItemList();
+            return;
+        }
+
+        RefreshSelectionState();
     }
 
     public void BindItems(IEnumerable<EntityBrowserItem> items)
     {
         _allItems.Clear();
         _allItems.AddRange(items);
+        _sortedItems.Clear();
+        _sortedItems.AddRange(_allItems
+            .OrderBy(item => item.Title, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.EntityId, StringComparer.OrdinalIgnoreCase));
+        _boundKind = ResolveBoundKind(_allItems);
         RefreshItemList();
     }
 
@@ -86,6 +106,7 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
         if (_modifiedScopeButton != null) _modifiedScopeButton.Text = Dual("已修改", "Modified");
         if (_newScopeButton != null) _newScopeButton.Text = Dual("项目新建", "Project New");
         if (_newEntryButton != null) _newEntryButton.Text = Dual("新建条目", "New Entry");
+        if (_deleteEntryButton != null) _deleteEntryButton.Text = Dual("删除条目", "Delete Entry");
         if (_refreshButton != null) _refreshButton.Text = Dual("刷新", "Refresh");
 
         RefreshItemList();
@@ -140,8 +161,10 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
         actionRow.AddThemeConstantOverride("separation", 4);
         root.AddChild(actionRow);
         _newEntryButton = MakeButton(string.Empty, () => CreateEntryRequested?.Invoke());
+        _deleteEntryButton = MakeButton(string.Empty, () => DeleteEntryRequested?.Invoke());
         _refreshButton = MakeButton(string.Empty, RefreshItemList);
         actionRow.AddChild(_newEntryButton);
+        actionRow.AddChild(_deleteEntryButton);
         actionRow.AddChild(_refreshButton);
 
         var scroll = new ScrollContainer
@@ -177,7 +200,13 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
         }
 
         KindChanged?.Invoke(kind);
-        RefreshItemList();
+        if (CanRefreshForSelectedKind())
+        {
+            RefreshItemList();
+            return;
+        }
+
+        HideUnusedButtons(0);
     }
 
     private void SetScope(string scope)
@@ -204,12 +233,7 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
             return;
         }
 
-        foreach (var child in _itemsHost.GetChildren())
-        {
-            child.QueueFree();
-        }
-
-        var filtered = _allItems.Where(item => item.Kind == _selectedKind);
+        var filtered = _sortedItems.Where(item => item.Kind == _selectedKind);
         if (!string.IsNullOrWhiteSpace(_searchText))
         {
             filtered = filtered.Where(item =>
@@ -226,15 +250,71 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
             _ => filtered
         };
 
-        foreach (var item in filtered.OrderBy(item => item.Title, StringComparer.OrdinalIgnoreCase))
+        var visibleItems = filtered.ToList();
+        EnsureButtonPool(visibleItems.Count);
+
+        for (var index = 0; index < visibleItems.Count; index++)
         {
-            var button = MakeButton($"{item.Title}\n{item.Summary}", () => ItemSelected?.Invoke(item), toggle: true);
-            button.ButtonPressed = string.Equals(item.EntityId, _selectedEntityId, StringComparison.OrdinalIgnoreCase);
-            button.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-            button.CustomMinimumSize = new Vector2(0f, 52f);
+            var item = visibleItems[index];
+            _itemButtons[index].Bind(item, string.Equals(item.EntityId, _selectedEntityId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        HideUnusedButtons(visibleItems.Count);
+    }
+
+    private bool CanRefreshForSelectedKind()
+    {
+        return _boundKind == null || _boundKind == _selectedKind || _allItems.Count == 0;
+    }
+
+    private void EnsureButtonPool(int count)
+    {
+        if (_itemsHost == null)
+        {
+            return;
+        }
+
+        while (_itemButtons.Count < count)
+        {
+            var button = new BrowserItemButton();
+            button.ItemActivated += OnBrowserItemActivated;
+            _itemButtons.Add(button);
             _itemsHost.AddChild(button);
         }
+    }
+
+    private void HideUnusedButtons(int startIndex)
+    {
+        for (var index = startIndex; index < _itemButtons.Count; index++)
+        {
+            _itemButtons[index].Reset();
+        }
+    }
+
+    private void RefreshSelectionState()
+    {
+        foreach (var button in _itemButtons)
+        {
+            button.SetSelected(string.Equals(button.EntityId, _selectedEntityId, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    private void OnBrowserItemActivated(EntityBrowserItem item)
+    {
+        _selectedEntityId = item.EntityId;
+        RefreshSelectionState();
+        ItemSelected?.Invoke(item);
+    }
+
+    private static ModStudioEntityKind? ResolveBoundKind(IReadOnlyList<EntityBrowserItem> items)
+    {
+        if (items.Count == 0)
+        {
+            return null;
+        }
+
+        var kind = items[0].Kind;
+        return items.All(item => item.Kind == kind) ? kind : null;
     }
 
     private static bool Contains(string? source, string? value)
@@ -245,5 +325,60 @@ internal sealed partial class ModStudioEntityBrowserPanel : PanelContainer
         }
 
         return source.Contains(value, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed partial class BrowserItemButton : Button
+    {
+        private EntityBrowserItem? _item;
+
+        public BrowserItemButton()
+        {
+            ToggleMode = true;
+            AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            CustomMinimumSize = new Vector2(0f, 52f);
+            Visible = false;
+            Pressed += HandlePressed;
+        }
+
+        public event Action<EntityBrowserItem>? ItemActivated;
+
+        public string EntityId => _item?.EntityId ?? string.Empty;
+
+        public void Bind(EntityBrowserItem item, bool selected)
+        {
+            _item = item;
+            Text = $"{item.Title}\n{item.Summary}";
+            TooltipText = item.DetailText;
+            ButtonPressed = selected;
+            Visible = true;
+        }
+
+        public void SetSelected(bool selected)
+        {
+            if (_item == null || !Visible)
+            {
+                return;
+            }
+
+            ButtonPressed = selected;
+        }
+
+        public void Reset()
+        {
+            _item = null;
+            Text = string.Empty;
+            TooltipText = string.Empty;
+            ButtonPressed = false;
+            Visible = false;
+        }
+
+        private void HandlePressed()
+        {
+            if (_item != null)
+            {
+                ItemActivated?.Invoke(_item);
+            }
+        }
     }
 }

@@ -1376,6 +1376,7 @@ public sealed partial class NModStudioProjectWindow
         }
 
         _project = _projectStore.CreateProject(normalized, Path.GetFileName(normalized), overwriteExistingProject: true);
+        FieldChoiceProvider.SetCurrentProject(_project);
         _currentProjectPath = normalized;
         _currentKind = ModStudioEntityKind.Card;
         _currentEntityId = null;
@@ -1454,6 +1455,7 @@ public sealed partial class NModStudioProjectWindow
         if (_projectStore.TryLoad(path, out var project) && project != null)
         {
             _project = project;
+            FieldChoiceProvider.SetCurrentProject(_project);
             _currentProjectPath = _projectStore.GetProjectDirectory(path);
             _currentEntityId = null;
             _currentItem = null;
@@ -1765,7 +1767,6 @@ public sealed partial class NModStudioProjectWindow
             .Split(new[] { ',', ';', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(entry => entry.Trim())
             .Where(entry => !string.IsNullOrWhiteSpace(entry))
-            .Distinct(StringComparer.Ordinal)
             .ToList();
     }
 
@@ -1891,6 +1892,7 @@ public sealed partial class NModStudioProjectWindow
         if (_projectStore.TryLoad(settings.LastProjectPath, out var restoredProject) && restoredProject != null)
         {
             _project = restoredProject;
+            FieldChoiceProvider.SetCurrentProject(_project);
             _currentProjectPath = _projectStore.GetProjectDirectory(settings.LastProjectPath);
         }
     }

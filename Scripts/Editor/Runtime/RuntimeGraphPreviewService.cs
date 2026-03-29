@@ -28,33 +28,52 @@ internal static class RuntimeGraphPreviewService
 
     public static DynamicPreviewContext BuildCardPreviewContext(CardModel card, Creature? target, bool upgradedPreview)
     {
-        var combat = card.Owner?.PlayerCombatState;
+        PlayerCombatState? combat = null;
+        int block = 0;
+        int maxHp = 0;
+        int currentHp = 0;
+
+        try
+        {
+            var owner = card.Owner;
+            combat = owner?.PlayerCombatState;
+            block = owner?.Creature?.Block ?? 0;
+            maxHp = owner?.Creature?.MaxHp ?? 0;
+            currentHp = owner?.Creature?.CurrentHp ?? 0;
+        }
+        catch (MegaCrit.Sts2.Core.Models.Exceptions.CanonicalModelException)
+        {
+            // Canonical models (e.g. card library entries) are immutable — Owner access throws.
+            // Fall back to zero defaults.
+        }
+
         var handCount = ResolveHandCount(card, combat);
+        var missingHp = Math.Max(maxHp - currentHp, 0);
         return new DynamicPreviewContext
         {
             EntityKind = ModStudioEntityKind.Card,
             EntityId = card.Id.Entry,
             Upgraded = upgradedPreview || card.IsUpgraded,
             TargetSelector = target == null ? "current_target" : "current_target",
-            CurrentBlock = card.Owner?.Creature?.Block ?? 0,
+            CurrentBlock = block,
             CurrentStars = combat?.Stars ?? 0,
             CurrentEnergy = combat?.Energy ?? card.EnergyCost.GetWithModifiers(CostModifiers.All),
             HandCount = handCount,
             DrawPileCount = combat?.DrawPile?.Cards.Count ?? 0,
             DiscardPileCount = combat?.DiscardPile?.Cards.Count ?? 0,
             ExhaustPileCount = combat?.ExhaustPile?.Cards.Count ?? 0,
-            MissingHp = Math.Max((card.Owner?.Creature?.MaxHp ?? 0) - (card.Owner?.Creature?.CurrentHp ?? 0), 0),
+            MissingHp = missingHp,
             FormulaMultipliers = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
             {
                 ["hand_count"] = handCount,
                 ["cards"] = handCount,
                 ["stars"] = combat?.Stars ?? 0,
                 ["energy"] = combat?.Energy ?? 0,
-                ["current_block"] = card.Owner?.Creature?.Block ?? 0,
+                ["current_block"] = block,
                 ["draw_pile"] = combat?.DrawPile?.Cards.Count ?? 0,
                 ["discard_pile"] = combat?.DiscardPile?.Cards.Count ?? 0,
                 ["exhaust_pile"] = combat?.ExhaustPile?.Cards.Count ?? 0,
-                ["missing_hp"] = Math.Max((card.Owner?.Creature?.MaxHp ?? 0) - (card.Owner?.Creature?.CurrentHp ?? 0), 0)
+                ["missing_hp"] = missingHp
             }
         };
     }

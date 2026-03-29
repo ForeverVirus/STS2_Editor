@@ -317,26 +317,32 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         switch (key)
         {
             case "starting_deck_ids":
-                options = ModelDb.AllCards
-                    .OrderBy(card => card.Title, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(card => card.Id.Entry, StringComparer.OrdinalIgnoreCase)
+            {
+                var cardOptions = ModelDb.AllCards
                     .Select(card => new FieldOption(card.Id.Entry, BuildOptionDisplay(card.Title, card.Id.Entry)))
                     .ToList();
+                AppendProjectFieldOptions(cardOptions, ModStudioEntityKind.Card);
+                options = cardOptions.OrderBy(o => o.DisplayText, StringComparer.OrdinalIgnoreCase).ThenBy(o => o.Id, StringComparer.OrdinalIgnoreCase).ToList();
                 break;
+            }
             case "starting_relic_ids":
-                options = ModelDb.AllRelics
-                    .OrderBy(relic => SafeLocText(relic.Title), StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(relic => relic.Id.Entry, StringComparer.OrdinalIgnoreCase)
+            {
+                var relicOptions = ModelDb.AllRelics
                     .Select(relic => new FieldOption(relic.Id.Entry, BuildOptionDisplay(SafeLocText(relic.Title), relic.Id.Entry)))
                     .ToList();
+                AppendProjectFieldOptions(relicOptions, ModStudioEntityKind.Relic);
+                options = relicOptions.OrderBy(o => o.DisplayText, StringComparer.OrdinalIgnoreCase).ThenBy(o => o.Id, StringComparer.OrdinalIgnoreCase).ToList();
                 break;
+            }
             case "starting_potion_ids":
-                options = ModelDb.AllPotions
-                    .OrderBy(potion => SafeLocText(potion.Title), StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(potion => potion.Id.Entry, StringComparer.OrdinalIgnoreCase)
+            {
+                var potionOptions = ModelDb.AllPotions
                     .Select(potion => new FieldOption(potion.Id.Entry, BuildOptionDisplay(SafeLocText(potion.Title), potion.Id.Entry)))
                     .ToList();
+                AppendProjectFieldOptions(potionOptions, ModStudioEntityKind.Potion);
+                options = potionOptions.OrderBy(o => o.DisplayText, StringComparer.OrdinalIgnoreCase).ThenBy(o => o.Id, StringComparer.OrdinalIgnoreCase).ToList();
                 break;
+            }
             default:
                 return false;
         }
@@ -453,6 +459,11 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
         {
             _suppressFieldChanged = previous;
         }
+    }
+
+    public static void InvalidateListOptionCache()
+    {
+        ListOptionCache.Clear();
     }
 
     private static void EnsureListOptionCacheLanguage()
@@ -577,7 +588,7 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
     {
         private readonly ModStudioEntityKind _kind;
         private readonly string _key;
-        private readonly OptionButton _picker;
+        private readonly SearchableOptionPicker _picker;
         private string _currentValue;
 
         public ChoiceFieldEditor(ModStudioEntityKind kind, string key, IReadOnlyList<(string Value, string Display)> options, string value)
@@ -587,89 +598,39 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             _currentValue = value ?? string.Empty;
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 
-            _picker = new OptionButton
-            {
-                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
-            };
-            _picker.ItemSelected += OnItemSelected;
+            _picker = new SearchableOptionPicker(
+                options,
+                value,
+                fallbackDisplayFactory: unknown => BuildDisplayText(unknown, unknown));
+            _picker.ValueChanged += OnValueChanged;
             AddChild(_picker);
 
-            RefreshTexts(options);
-            SetValue(_currentValue);
+            RefreshTexts();
         }
 
         public event Action? ValueChanged;
 
         public string GetSerializedValue()
         {
-            if (_picker.Selected < 0 || _picker.Selected >= _picker.ItemCount)
-            {
-                return _currentValue;
-            }
-
-            return _picker.GetItemMetadata(_picker.Selected).AsString();
+            return _picker.GetValue();
         }
 
         public void SetValue(string value)
         {
             _currentValue = value ?? string.Empty;
-            for (var index = 0; index < _picker.ItemCount; index++)
-            {
-                if (string.Equals(_picker.GetItemMetadata(index).AsString(), _currentValue, StringComparison.Ordinal))
-                {
-                    _picker.Select(index);
-                    return;
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(_currentValue))
-            {
-                _picker.AddItem(BuildDisplayText(_currentValue, _currentValue));
-                _picker.SetItemMetadata(_picker.ItemCount - 1, _currentValue);
-                _picker.Select(_picker.ItemCount - 1);
-            }
-            else if (_picker.ItemCount > 0)
-            {
-                _picker.Select(0);
-            }
+            _picker.SetValue(_currentValue);
         }
 
         public void RefreshTexts()
         {
-            RefreshTexts(FieldChoiceProvider.GetBasicChoices(_kind, _key));
+            var options = FieldChoiceProvider.GetBasicChoices(_kind, _key);
+            _picker.SetChoices(options);
+            _picker.RefreshTexts();
         }
 
-        private void RefreshTexts(IReadOnlyList<(string Value, string Display)> options)
+        private void OnValueChanged(string value)
         {
-            var selected = GetSerializedValue();
-            _picker.Clear();
-
-            foreach (var option in options)
-            {
-                _picker.AddItem(option.Display);
-                _picker.SetItemMetadata(_picker.ItemCount - 1, option.Value);
-            }
-
-            if (!string.IsNullOrWhiteSpace(selected))
-            {
-                SetValue(selected);
-                return;
-            }
-
-            if (_picker.ItemCount > 0)
-            {
-                _picker.Select(0);
-            }
-        }
-
-        private void OnItemSelected(long index)
-        {
-            if (index < 0 || index >= _picker.ItemCount)
-            {
-                return;
-            }
-
-            _currentValue = _picker.GetItemMetadata((int)index).AsString();
+            _currentValue = value;
             ValueChanged?.Invoke();
         }
 
@@ -687,7 +648,7 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
 
     private sealed partial class ListRow : HBoxContainer
     {
-        private readonly OptionButton _picker;
+        private readonly SearchableOptionPicker _picker;
         private readonly Button _removeButton;
 
         public ListRow(IReadOnlyList<FieldOption> options, string? selectedId)
@@ -695,46 +656,12 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             AddThemeConstantOverride("separation", 6);
 
-            _picker = new OptionButton
-            {
-                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
-            };
-
-            _picker.AddItem(Dual("未选择", "Unselected"));
-            _picker.SetItemMetadata(0, string.Empty);
-
-            foreach (var option in options)
-            {
-                _picker.AddItem(option.DisplayText);
-                _picker.SetItemMetadata(_picker.ItemCount - 1, option.Id);
-            }
-
-            if (!string.IsNullOrWhiteSpace(selectedId))
-            {
-                var found = false;
-                for (var index = 0; index < _picker.ItemCount; index++)
-                {
-                    if (string.Equals(_picker.GetItemMetadata(index).AsString(), selectedId, StringComparison.Ordinal))
-                    {
-                        _picker.Select(index);
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found)
-                {
-                    _picker.AddItem(selectedId);
-                    _picker.SetItemMetadata(_picker.ItemCount - 1, selectedId);
-                    _picker.Select(_picker.ItemCount - 1);
-                }
-            }
-            else
-            {
-                _picker.Select(0);
-            }
-
-            _picker.ItemSelected += _ => SelectionChanged?.Invoke();
+            _picker = new SearchableOptionPicker(
+                options.Select(option => (option.Id, option.DisplayText)).ToList(),
+                selectedId,
+                allowEmptySelection: true,
+                fallbackDisplayFactory: unknown => unknown);
+            _picker.ValueChanged += _ => SelectionChanged?.Invoke();
             AddChild(_picker);
 
             _removeButton = MakeButton(string.Empty, () => RemoveRequested?.Invoke());
@@ -747,46 +674,45 @@ internal sealed partial class ModStudioBasicEditor : MarginContainer
 
         public string GetSelectedId()
         {
-            if (_picker.Selected < 0 || _picker.Selected >= _picker.ItemCount)
-            {
-                return string.Empty;
-            }
-
-            return _picker.GetItemMetadata(_picker.Selected).AsString();
+            return _picker.GetValue();
         }
 
         public void ClearSelection()
         {
-            _picker.Select(0);
+            _picker.SetValue(string.Empty);
         }
 
         public void SetSelectedId(string? selectedId)
         {
-            var normalized = selectedId ?? string.Empty;
-            for (var index = 0; index < _picker.ItemCount; index++)
-            {
-                if (string.Equals(_picker.GetItemMetadata(index).AsString(), normalized, StringComparison.Ordinal))
-                {
-                    _picker.Select(index);
-                    return;
-                }
-            }
-
-            if (!string.IsNullOrWhiteSpace(normalized))
-            {
-                _picker.AddItem(normalized);
-                _picker.SetItemMetadata(_picker.ItemCount - 1, normalized);
-                _picker.Select(_picker.ItemCount - 1);
-                return;
-            }
-
-            _picker.Select(0);
+            _picker.SetValue(selectedId ?? string.Empty);
         }
 
         public void RefreshTexts()
         {
-            _picker.SetItemText(0, Dual("未选择", "Unselected"));
+            _picker.RefreshTexts();
             _removeButton.Text = Dual("删除", "Remove");
+        }
+    }
+
+    private static void AppendProjectFieldOptions(List<FieldOption> items, ModStudioEntityKind kind)
+    {
+        var project = FieldChoiceProvider.CurrentProject;
+        if (project == null)
+        {
+            return;
+        }
+
+        var existingIds = new HashSet<string>(items.Select(i => i.Id), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var envelope in project.Overrides)
+        {
+            if (envelope.EntityKind != kind || existingIds.Contains(envelope.EntityId))
+            {
+                continue;
+            }
+
+            var title = envelope.Metadata.TryGetValue("title", out var t) ? t : envelope.EntityId;
+            items.Add(new FieldOption(envelope.EntityId, BuildOptionDisplay(title, envelope.EntityId)));
         }
     }
 

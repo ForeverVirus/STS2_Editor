@@ -208,6 +208,7 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _browserPanel.KindChanged += OnKindChanged;
         _browserPanel.ItemSelected += OnItemSelected;
         _browserPanel.CreateEntryRequested += CreateEntryRequested;
+        _browserPanel.DeleteEntryRequested += DeleteEntryRequested;
         body.AddChild(_browserPanel);
 
         _centerEditor = new ModStudioCenterEditor
@@ -672,8 +673,41 @@ public sealed partial class NModStudioProjectWindow : NSubmenu
         _project.Overrides.Add(envelope);
         MarkDirty();
         _browserItemsCache.Remove(_currentKind);
+        FieldChoiceProvider.InvalidateProjectChoices();
         RefreshBrowserItems(selectFirstIfPossible: false);
         SelectEntity(entityId);
+    }
+
+    private void DeleteEntryRequested()
+    {
+        if (_project == null || _currentItem == null || !_currentItem.IsProjectOnly)
+        {
+            return;
+        }
+
+        var entityId = _currentItem.EntityId;
+        var envelope = _project.Overrides.FirstOrDefault(
+            e => e.EntityKind == _currentKind &&
+                 string.Equals(e.EntityId, entityId, StringComparison.Ordinal));
+        if (envelope == null)
+        {
+            return;
+        }
+
+        // Remove associated graph if present
+        if (!string.IsNullOrWhiteSpace(envelope.GraphId) && _project.Graphs.ContainsKey(envelope.GraphId))
+        {
+            _project.Graphs.Remove(envelope.GraphId);
+        }
+
+        _project.Overrides.Remove(envelope);
+        _entityViewCache.Remove(entityId);
+        _currentItem = null;
+        _currentEntityId = null;
+        MarkDirty();
+        _browserItemsCache.Remove(_currentKind);
+        FieldChoiceProvider.InvalidateProjectChoices();
+        RefreshBrowserItems(selectFirstIfPossible: true);
     }
 
     private void LoadEntity(EntityBrowserItem item)
